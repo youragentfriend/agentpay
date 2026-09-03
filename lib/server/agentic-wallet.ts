@@ -64,6 +64,16 @@ async function runBaw<T>(args: readonly string[], timeout = READ_TIMEOUT_MS): Pr
     if (error instanceof SyntaxError) {
       throw new AgenticWalletError("Agentic Wallet returned invalid JSON.", "INVALID_WALLET_RESPONSE");
     }
+    const commandError = error as { stdout?: string | Buffer; stderr?: string | Buffer };
+    for (const output of [commandError.stdout, commandError.stderr]) {
+      const value = typeof output === "string" ? output : output?.toString("utf8");
+      if (!value?.trim().startsWith("{")) continue;
+      try {
+        return parseCliEnvelope<T>(value);
+      } catch (parsedError) {
+        if (parsedError instanceof AgenticWalletError) throw parsedError;
+      }
+    }
     throw new AgenticWalletError("Agentic Wallet command failed.", "WALLET_COMMAND_FAILED");
   }
 }

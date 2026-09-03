@@ -19,6 +19,10 @@ test("parseCliEnvelope preserves a documented CLI error", () => {
   );
 });
 
+test("parseCliEnvelope rejects non-JSON command output", () => {
+  assert.throws(() => parseCliEnvelope("internal command failure"), SyntaxError);
+});
+
 test("QR code IDs must be UUIDs", () => {
   assert.equal(isValidQrCodeId("a191884d-0e05-435b-a887-336bc242fafc"), true);
   assert.equal(isValidQrCodeId("../../shell-command"), false);
