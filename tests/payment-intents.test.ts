@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import type { WalletOverview } from "../lib/wallet-types";
 import {
-  approveTransfer,
   compareDecimalStrings,
   parseTransferInstruction,
   PaymentIntentError,
   prepareTransfer,
 } from "../lib/server/payment-intents";
+import { approvePaymentIntent, createPaymentIntent } from "../lib/server/payment-store";
+
+process.env.AGENTPAY_DB_PATH = path.join(mkdtempSync(path.join(tmpdir(), "agentpay-test-")), "test.sqlite");
 
 const recipient = "0x1111111111111111111111111111111111111111";
 const tokenAddress = "0x55d398326f99059fF775485246999027B3197955";
@@ -32,10 +37,10 @@ test("compares decimal strings without floating-point arithmetic", () => {
 });
 
 test("prepares and explicitly approves an exact transfer intent", () => {
-  const prepared = prepareTransfer({ amount: "5", recipient, tokenAddress, binanceChainId: "56", gasLevel: "MEDIUM" }, wallet);
+  const prepared = createPaymentIntent(prepareTransfer({ amount: "5", recipient, tokenAddress, binanceChainId: "56", gasLevel: "MEDIUM" }, wallet));
   assert.equal(prepared.status, "awaiting-approval");
   assert.equal(prepared.asset, "USDT");
-  assert.equal(approveTransfer(prepared.id).status, "approved");
+  assert.equal(approvePaymentIntent(prepared.id).status, "approved");
 });
 
 test("rejects an amount above the live wallet balance", () => {

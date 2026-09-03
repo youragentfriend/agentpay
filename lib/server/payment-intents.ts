@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { PrepareTransferRequest, PreparedTransfer } from "@/lib/payment-workflow";
 import type { WalletOverview } from "@/lib/wallet-types";
 
@@ -6,8 +5,6 @@ const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const DECIMAL_AMOUNT = /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/;
 const GAS_LEVELS = new Set(["LOW", "MEDIUM", "HIGH"]);
-const globalDrafts = globalThis as typeof globalThis & { agentPayDrafts?: Map<string, PreparedTransfer> };
-const drafts = globalDrafts.agentPayDrafts ??= new Map<string, PreparedTransfer>();
 
 export class PaymentIntentError extends Error {
   constructor(message: string, public readonly code: string) {
@@ -55,7 +52,7 @@ function validAddress(value: string, chainId: string): boolean {
   return chainId === "CT_501" ? SOLANA_ADDRESS.test(value) : EVM_ADDRESS.test(value);
 }
 
-export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletOverview): PreparedTransfer {
+export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletOverview): Omit<PreparedTransfer, "id"> {
   if (wallet.status !== "CONNECTED") {
     throw new PaymentIntentError("Connect Agentic Wallet before preparing a transfer.", "WALLET_NOT_CONNECTED");
   }
@@ -103,29 +100,15 @@ export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletO
   if (compareDecimalStrings(amount, balance.balance) > 0) throw new PaymentIntentError(`Amount exceeds the available ${balance.symbol} balance.`, "INSUFFICIENT_BALANCE");
 
   const now = new Date();
-  const prepared: PreparedTransfer = {
-    id: randomUUID(), status: "awaiting-approval", instruction: request.instruction?.trim(),
+  return {
+    status: "awaiting-approval", instruction: request.instruction?.trim(),
     amount, asset: balance.symbol, availableBalance: balance.balance, recipient,
     tokenAddress: balance.address, binanceChainId: chainId, chainName: chain.name,
     gasLevel: request.gasLevel ?? "HIGH", createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
     warnings: [
       "The recipient must already exist in your Binance Wallet address book.",
-      "Approval prepares this intent only; no transaction will be broadcast in this phase.",
+      "Approval alone does not broadcast funds; execution is a separate server-guarded action.",
     ],
   };
-  drafts.set(prepared.id, prepared);
-  return prepared;
-}
-
-export function approveTransfer(id: string): PreparedTransfer {
-  const draft = drafts.get(id);
-  if (!draft) throw new PaymentIntentError("Payment intent was not found or the server restarted.", "PAYMENT_INTENT_NOT_FOUND");
-  if (Date.parse(draft.expiresAt) <= Date.now()) {
-    drafts.delete(id);
-    throw new PaymentIntentError("Payment intent expired. Prepare it again with current wallet data.", "PAYMENT_INTENT_EXPIRED");
-  }
-  const approved = { ...draft, status: "approved" as const };
-  drafts.set(id, approved);
-  return approved;
 }

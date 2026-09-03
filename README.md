@@ -20,7 +20,7 @@ Phase 3A adds a non-executing payment safety workflow:
 - exact payment review;
 - explicit approval with a ten-minute expiry.
 
-No transfer, signing, swap, or payment execution endpoint is enabled yet. Approved intents remain in the current server process until the durable receipt store is added.
+Phase 3B adds SQLite persistence, guarded Agentic Wallet execution, transaction-status refresh, and Activity records. Real sends remain disabled by default; set `AGENTPAY_ENABLE_WALLET_SEND=true` only for a controlled test after reviewing the exact intent. A returned transaction hash is recorded as submitted, not confirmed.
 
 ## Local development
 

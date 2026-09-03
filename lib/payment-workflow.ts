@@ -11,7 +11,7 @@ export interface PrepareTransferRequest {
 
 export interface PreparedTransfer {
   id: string;
-  status: "awaiting-approval" | "approved";
+  status: "awaiting-approval" | "approved" | "submitting" | "submitted" | "confirmed" | "failed";
   instruction?: string;
   amount: string;
   asset: string;
@@ -23,6 +23,12 @@ export interface PreparedTransfer {
   gasLevel: GasLevel;
   createdAt: string;
   expiresAt: string;
+  approvedAt?: string;
+  submittedAt?: string;
+  confirmedAt?: string;
+  txHash?: string;
+  errorCode?: string;
+  errorMessage?: string;
   warnings: string[];
 }
 

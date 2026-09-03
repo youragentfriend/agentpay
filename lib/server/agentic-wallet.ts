@@ -10,6 +10,7 @@ import type {
   WalletSignIn,
   WalletTransaction,
 } from "@/lib/wallet-types";
+import type { PreparedTransfer } from "@/lib/payment-workflow";
 
 const execFileAsync = promisify(execFile);
 const BAW_BIN = path.join(process.cwd(), "node_modules", ".bin", "baw");
@@ -145,4 +146,27 @@ export async function verifyWalletSignIn(qrCodeId: string): Promise<void> {
   if (data.status !== "SUCCESS") {
     throw new AgenticWalletError("Agentic Wallet sign-in was not completed.", "WALLET_SIGN_IN_INCOMPLETE");
   }
+}
+
+export async function getWalletLockStatus(binanceChainId: string): Promise<"LOCKED" | "UNLOCKED"> {
+  const data = await runBaw<{ status?: unknown }>(["wallet", "tx-lock", "--binanceChainId", binanceChainId]);
+  if (data.status === "LOCKED" || data.status === "UNLOCKED") return data.status;
+  throw new AgenticWalletError("Agentic Wallet returned an unknown transaction lock status.", "UNKNOWN_TX_LOCK_STATUS");
+}
+
+export async function sendWalletTransfer(intent: PreparedTransfer): Promise<string> {
+  const data = await runBaw<{ txHash?: unknown }>([
+    "wallet", "send", "--amount", intent.amount, "--recipient", intent.recipient,
+    "--binanceChainId", intent.binanceChainId, "--tokenAddress", intent.tokenAddress,
+    "--gasLevel", intent.gasLevel,
+  ], 120_000);
+  const txHash = text(data.txHash);
+  if (!txHash) throw new AgenticWalletError("Agentic Wallet did not return a transaction hash.", "MISSING_TX_HASH");
+  return txHash;
+}
+
+export async function getWalletTransactionStatus(txHash: string): Promise<string | undefined> {
+  const data = await runBaw<{ transactions?: unknown }>(["wallet", "tx-history", "--tx", txHash]);
+  const first = record(list(data.transactions)[0]);
+  return text(first.status) || undefined;
 }

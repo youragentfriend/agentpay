@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PaymentRail } from "@/lib/domain";
 import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
 import { PaymentWorkflow } from "@/app/components/payment-workflow";
+import { ActivityWorkflow } from "@/app/components/activity-workflow";
 
 type View = "chat" | "wallet" | "pay" | "activity" | "rules" | "settings";
 
@@ -232,7 +233,7 @@ function PayOption({ icon, title, text }: { icon: string; title: string; text: s
 }
 
 function ActivityView() {
-  return <PageFrame eyebrow="Activity" title="Payment history" description="Every attempt, approval, and receipt will be recorded here."><div className="empty-state"><div className="empty-icon">◷</div><h2>No payment activity</h2><p>Completed and pending payment workflows will appear here. This view will use real provider status, not simulated transactions.</p></div></PageFrame>;
+  return <PageFrame eyebrow="Activity" title="Payment history" description="Prepared intents, approvals, broadcasts, confirmations, and failures are persisted here."><ActivityWorkflow /></PageFrame>;
 }
 
 function RulesView() {
