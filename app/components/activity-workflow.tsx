@@ -20,6 +20,18 @@ export function ActivityWorkflow() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const pending = intents.filter((intent) => intent.status === "submitted" || intent.status === "submitting");
+    if (!pending.length) return;
+    const timer = window.setInterval(() => {
+      void Promise.all(pending.map((intent) => fetch("/api/payments/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: intent.id }),
+      }))).then(() => load());
+    }, 8_000);
+    return () => window.clearInterval(timer);
+  }, [intents, load]);
 
   async function refresh(intent: PreparedTransfer) {
     setError("");
@@ -33,5 +45,5 @@ export function ActivityWorkflow() {
 
   if (loading) return <div className="workflow-message">Loading payment activity…</div>;
   if (!intents.length) return <div className="empty-state"><div className="empty-icon">◷</div><h2>No payment activity</h2><p>Prepared, approved, submitted, and confirmed workflows will appear here.</p></div>;
-  return <div className="activity-list">{error && <div className="workflow-error">{error}</div>}{intents.map((intent) => <article className="activity-card" key={intent.id}><div><span className={`review-status ${intent.status}`}>{intent.status.replace("-", " ")}</span><h2>{intent.amount} {intent.asset}</h2><p>{intent.chainName} · <span className="mono-value">{intent.recipient}</span></p>{intent.txHash && <p className="mono-value">{intent.txHash}</p>}{intent.errorMessage && <p className="activity-error">{intent.errorMessage}</p>}</div><div className="activity-side"><small>{new Date(intent.createdAt).toLocaleString()}</small>{intent.txHash && intent.status !== "confirmed" && <button className="secondary-button" onClick={() => void refresh(intent)}>Refresh status</button>}</div></article>)}</div>;
+  return <div className="activity-list">{error && <div className="workflow-error">{error}</div>}{intents.map((intent) => <article className="activity-card" key={intent.id}><div><span className={`review-status ${intent.status}`}>{intent.status.replace("-", " ")}</span><h2>{intent.amount} {intent.asset}</h2><p>{intent.chainName} · <span className="activity-address" title={intent.recipient}>{intent.recipient}</span></p>{intent.txHash && <p className="activity-hash" title={intent.txHash}>{intent.txHash}</p>}{intent.errorMessage && <p className="activity-error">{intent.errorMessage}</p>}</div><div className="activity-side"><small>{new Date(intent.createdAt).toLocaleString()}</small>{intent.txHash && (intent.status === "submitted" || intent.status === "submitting") && <button className="secondary-button" onClick={() => void refresh(intent)}>Refresh status</button>}</div></article>)}</div>;
 }
