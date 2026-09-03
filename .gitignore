@@ -6,7 +6,6 @@ out/
 *.log
 *.tsbuildinfo
 data/*.sqlite*
-.venv/
 vendor/binance/payment/config.json
 vendor/binance/payment/.payment_state.json
 vendor/binance/payment/.api_lock_time

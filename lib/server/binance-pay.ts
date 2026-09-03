@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { access, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { BinancePayCapability, BinancePayOrder } from "@/lib/binance-pay-types";
@@ -7,7 +8,9 @@ import type { BinancePayCapability, BinancePayOrder } from "@/lib/binance-pay-ty
 const execFileAsync = promisify(execFile);
 const SKILL_DIR = path.join(process.cwd(), "vendor", "binance", "payment");
 const SCRIPT = path.join(SKILL_DIR, "payment_skill.py");
-const VENV_PYTHON = path.join(process.cwd(), ".venv", "bin", "python");
+const CONFIG = path.join(SKILL_DIR, "config.json");
+const VENV_PYTHON = process.env.AGENTPAY_PAYMENT_PYTHON
+  || path.join(os.homedir(), ".local", "share", "agentpay", "payment-venv", "bin", "python");
 const MAX_OUTPUT = 2 * 1024 * 1024;
 let queue = Promise.resolve();
 
@@ -83,13 +86,25 @@ export function validateBinancePayInput(rawQr: string): string {
 
 export async function getBinancePayCapability(): Promise<BinancePayCapability> {
   const missing: string[] = [];
-  if (!process.env.PAYMENT_API_KEY) missing.push("PAYMENT_API_KEY");
-  if (!process.env.PAYMENT_API_SECRET) missing.push("PAYMENT_API_SECRET");
+  let fileKey = false;
+  let fileSecret = false;
+  try {
+    const config = JSON.parse(await readFile(CONFIG, "utf8")) as Record<string, unknown>;
+    fileKey = config.configured === true && typeof config.api_key === "string" && config.api_key.length > 0;
+    fileSecret = config.configured === true && typeof config.api_secret === "string" && config.api_secret.length > 0;
+  } catch { /* configuration has not been completed */ }
+  if (!process.env.PAYMENT_API_KEY && !fileKey) missing.push("PAYMENT_API_KEY");
+  if (!process.env.PAYMENT_API_SECRET && !fileSecret) missing.push("PAYMENT_API_SECRET");
   let imageDecodeReady = false;
   try {
-    await execFileAsync(await pythonBinary(), ["-c", "import cv2; from PIL import Image"], { timeout: 10_000 });
+    await execFileAsync(await pythonBinary(), ["-c", "from PIL import Image; from pyzbar.pyzbar import decode"], { timeout: 10_000 });
     imageDecodeReady = true;
-  } catch { imageDecodeReady = false; }
+  } catch {
+    try {
+      await execFileAsync(await pythonBinary(), ["-c", "import cv2"], { timeout: 10_000 });
+      imageDecodeReady = true;
+    } catch { imageDecodeReady = false; }
+  }
   return { configured: missing.length === 0, executionEnabled: process.env.AGENTPAY_ENABLE_BINANCE_PAY === "true", imageDecodeReady, missing };
 }
 
