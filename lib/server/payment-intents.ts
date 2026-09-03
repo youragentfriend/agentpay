@@ -5,6 +5,7 @@ const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const DECIMAL_AMOUNT = /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/;
 const GAS_LEVELS = new Set(["LOW", "MEDIUM", "HIGH"]);
+const EVM_NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
 export class PaymentIntentError extends Error {
   constructor(message: string, public readonly code: string) {
@@ -97,6 +98,10 @@ export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletO
 
   const balance = wallet.balances.find((item) => item.binanceChainId === chainId && item.address.toLowerCase() === tokenAddress.toLowerCase());
   if (!balance) throw new PaymentIntentError("That token is not available in the connected wallet.", "ASSET_NOT_AVAILABLE");
+  if (chainId === "56" && tokenAddress.toLowerCase() !== EVM_NATIVE_TOKEN) {
+    const bnbBalance = wallet.balances.find((item) => item.binanceChainId === "56" && item.symbol.toUpperCase() === "BNB");
+    if (!bnbBalance) throw new PaymentIntentError("BNB is required to pay network gas for this BSC token transfer.", "NATIVE_GAS_REQUIRED");
+  }
   if (compareDecimalStrings(amount, balance.balance) > 0) throw new PaymentIntentError(`Amount exceeds the available ${balance.symbol} balance.`, "INSUFFICIENT_BALANCE");
 
   const now = new Date();

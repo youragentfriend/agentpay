@@ -20,7 +20,10 @@ const wallet: WalletOverview = {
   status: "CONNECTED",
   addresses: [],
   chains: [{ binanceChainId: "56", name: "BNB Smart Chain", simpleName: "BSC" }],
-  balances: [{ symbol: "USDT", address: tokenAddress, binanceChainId: "56", balance: "12.50", price: "1", value: "12.50" }],
+  balances: [
+    { symbol: "USDT", address: tokenAddress, binanceChainId: "56", balance: "12.50", price: "1", value: "12.50" },
+    { symbol: "BNB", address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE", binanceChainId: "56", balance: "0.01", price: "500", value: "5" },
+  ],
   transactions: [],
 };
 
@@ -61,5 +64,12 @@ test("rejects an unknown gas priority from an API caller", () => {
   assert.throws(
     () => prepareTransfer({ amount: "1", recipient, tokenAddress, binanceChainId: "56", gasLevel: "FAST" as never }, wallet),
     (error) => error instanceof PaymentIntentError && error.code === "INVALID_GAS_LEVEL",
+  );
+});
+
+test("requires a visible native BNB balance for BSC token gas", () => {
+  assert.throws(
+    () => prepareTransfer({ amount: "1", recipient, tokenAddress, binanceChainId: "56" }, { ...wallet, balances: wallet.balances.filter((item) => item.symbol !== "BNB") }),
+    (error) => error instanceof PaymentIntentError && error.code === "NATIVE_GAS_REQUIRED",
   );
 });
