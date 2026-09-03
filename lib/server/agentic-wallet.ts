@@ -176,7 +176,23 @@ export async function sendWalletTransfer(intent: PreparedTransfer): Promise<stri
 }
 
 export async function getWalletTransactionStatus(txHash: string): Promise<string | undefined> {
-  const data = await runBaw<{ transactions?: unknown }>(["wallet", "tx-history", "--tx", txHash]);
-  const first = record(list(data.transactions)[0]);
-  return text(first.status) || undefined;
+  const data = await runBaw<Record<string, unknown>>(["wallet", "tx-history", "--tx", txHash]);
+  const transaction = Array.isArray(data.transactions) ? record(data.transactions[0]) : data;
+  return normalizeWalletTransactionStatus(text(transaction.status));
+}
+
+export function normalizeWalletTransactionStatus(status: string): "pending" | "confirmed" | "failed" | undefined {
+  switch (status.toUpperCase()) {
+    case "PENDING":
+    case "WORKING":
+      return "pending";
+    case "SUCCESS":
+    case "CONFIRMED":
+      return "confirmed";
+    case "FAILED":
+    case "REJECTED":
+      return "failed";
+    default:
+      return undefined;
+  }
 }

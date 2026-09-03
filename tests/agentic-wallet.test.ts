@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   AgenticWalletError,
   isValidQrCodeId,
+  normalizeWalletTransactionStatus,
   parseCliEnvelope,
 } from "../lib/server/agentic-wallet";
 
@@ -27,4 +28,12 @@ test("QR code IDs must be UUIDs", () => {
   assert.equal(isValidQrCodeId("a191884d-0e05-435b-a887-336bc242fafc"), true);
   assert.equal(isValidQrCodeId("../../shell-command"), false);
   assert.equal(isValidQrCodeId(""), false);
+});
+
+test("normalizes Binance transaction statuses", () => {
+  assert.equal(normalizeWalletTransactionStatus("SUCCESS"), "confirmed");
+  assert.equal(normalizeWalletTransactionStatus("confirmed"), "confirmed");
+  assert.equal(normalizeWalletTransactionStatus("PENDING"), "pending");
+  assert.equal(normalizeWalletTransactionStatus("FAILED"), "failed");
+  assert.equal(normalizeWalletTransactionStatus("UNKNOWN"), undefined);
 });
