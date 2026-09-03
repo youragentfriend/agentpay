@@ -12,7 +12,15 @@ Phase 2 provides a real, read-only Binance Agentic Wallet integration:
 - live balances;
 - recent transaction history.
 
-No transfer, signing, swap, or payment execution endpoint is enabled yet.
+Phase 3A adds a non-executing payment safety workflow:
+
+- natural-language transfer intent parsing;
+- structured transfer form;
+- live chain, token, and balance validation;
+- exact payment review;
+- explicit approval with a ten-minute expiry.
+
+No transfer, signing, swap, or payment execution endpoint is enabled yet. Approved intents remain in the current server process until the durable receipt store is added.
 
 ## Local development
 

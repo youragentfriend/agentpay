@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PaymentRail } from "@/lib/domain";
 import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
+import { PaymentWorkflow } from "@/app/components/payment-workflow";
 
 type View = "chat" | "wallet" | "pay" | "activity" | "rules" | "settings";
 
@@ -25,6 +26,7 @@ const railLabels: Record<PaymentRail, string> = {
 export default function Home() {
   const [view, setView] = useState<View>("chat");
   const [walletStatus, setWalletStatus] = useState<WalletConnectionStatus>("UNCONNECTED");
+  const [paymentInstruction, setPaymentInstruction] = useState("");
 
   return (
     <main className="app-shell">
@@ -81,9 +83,9 @@ export default function Home() {
         </header>
 
         <div className="page-content">
-          {view === "chat" && <ChatView onNavigate={setView} />}
+          {view === "chat" && <ChatView onNavigate={setView} onPaymentInstruction={setPaymentInstruction} />}
           {view === "wallet" && <WalletView onStatusChange={setWalletStatus} />}
-          {view === "pay" && <PayView />}
+          {view === "pay" && <PayView initialInstruction={paymentInstruction} />}
           {view === "activity" && <ActivityView />}
           {view === "rules" && <RulesView />}
           {view === "settings" && <SettingsView />}
@@ -93,7 +95,15 @@ export default function Home() {
   );
 }
 
-function ChatView({ onNavigate }: { onNavigate: (view: View) => void }) {
+function ChatView({ onNavigate, onPaymentInstruction }: { onNavigate: (view: View) => void; onPaymentInstruction: (instruction: string) => void }) {
+  const [message, setMessage] = useState("");
+
+  function submitPaymentInstruction() {
+    if (!message.trim()) return;
+    onPaymentInstruction(message.trim());
+    onNavigate("pay");
+  }
+
   return (
     <div className="chat-page">
       <div className="eyebrow"><span className="spark">✦</span> AgentPay assistant</div>
@@ -108,8 +118,8 @@ function ChatView({ onNavigate }: { onNavigate: (view: View) => void }) {
           <button onClick={() => onNavigate("rules")}>Set a payment rule <span>⌘</span></button>
         </div>
         <div className="composer">
-          <span className="composer-placeholder">e.g. Send 5 USDT to a saved destination…</span>
-          <button className="send-button" aria-label="Send message">↑</button>
+          <textarea className="composer-input" value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitPaymentInstruction(); } }} placeholder="e.g. Send 5 USDT to 0x… on BNB Smart Chain" aria-label="Payment instruction" />
+          <button className="send-button" aria-label="Prepare payment" onClick={submitPaymentInstruction}>↑</button>
         </div>
         <div className="composer-hint"><span>↗</span> Attach QR or payment link <span className="hint-right">No payment will happen without your approval</span></div>
       </div>
@@ -213,8 +223,8 @@ function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; on
   </div>;
 }
 
-function PayView() {
-  return <PageFrame eyebrow="Payment workspace" title="Choose a payment input" description="All payment rails share one validation, approval, execution, and receipt flow."><div className="pay-options"><PayOption icon="▦" title="Scan or upload QR" text="Binance Pay, supported QR formats" /><PayOption icon="↗" title="Paste a payment link" text="Let AgentPay inspect and route it" /><PayOption icon="→" title="Send to a destination" text="Supported wallet destinations only" /><PayOption icon="402" title="Call an x402 service" text="Pay an HTTP 402 resource" /></div><div className="notice"><span>i</span><div><strong>Nothing is connected yet</strong><p>Payment execution will be enabled after the relevant Binance capability is connected and verified.</p></div></div></PageFrame>;
+function PayView({ initialInstruction }: { initialInstruction: string }) {
+  return <PageFrame eyebrow="Payment workspace" title="Prepare a payment" description="AgentPay validates the wallet, asset, network, balance, and destination before asking for approval."><PaymentWorkflow initialInstruction={initialInstruction} /><div className="pay-options secondary-options"><PayOption icon="▦" title="Binance Pay QR" text="Coming in Phase 4" /><PayOption icon="402" title="x402 service" text="Coming in Phase 4" /></div></PageFrame>;
 }
 
 function PayOption({ icon, title, text }: { icon: string; title: string; text: string }) {
