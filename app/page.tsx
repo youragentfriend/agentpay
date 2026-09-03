@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { PaymentRail } from "@/lib/domain";
+import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
 
 type View = "chat" | "wallet" | "pay" | "activity" | "rules" | "settings";
 
@@ -23,6 +24,7 @@ const railLabels: Record<PaymentRail, string> = {
 
 export default function Home() {
   const [view, setView] = useState<View>("chat");
+  const [walletStatus, setWalletStatus] = useState<WalletConnectionStatus>("UNCONNECTED");
 
   return (
     <main className="app-shell">
@@ -36,8 +38,8 @@ export default function Home() {
         </div>
 
         <div className="connection-pill">
-          <span className="status-dot muted" />
-          <span>Wallet not connected</span>
+          <span className={`status-dot ${walletStatus === "CONNECTED" ? "active-dot" : "muted"}`} />
+          <span>{walletStatus === "CONNECTED" ? "Wallet connected" : walletStatus === "CREATING" ? "Wallet initializing" : "Wallet not connected"}</span>
         </div>
 
         <nav className="nav-list" aria-label="Main navigation">
@@ -80,7 +82,7 @@ export default function Home() {
 
         <div className="page-content">
           {view === "chat" && <ChatView onNavigate={setView} />}
-          {view === "wallet" && <WalletView onNavigate={setView} />}
+          {view === "wallet" && <WalletView onStatusChange={setWalletStatus} />}
           {view === "pay" && <PayView />}
           {view === "activity" && <ActivityView />}
           {view === "rules" && <RulesView />}
@@ -125,8 +127,90 @@ function RailCard({ rail, title, description }: { rail: PaymentRail; title: stri
   return <div className="rail-card"><div className="rail-card-top"><span className="rail-symbol">{rail === "x402" ? "402" : rail === "binance-pay" ? "QR" : "W"}</span><span className="rail-available">Not connected</span></div><strong>{title}</strong><p>{description}</p><span className="rail-name">{railLabels[rail]} <span>→</span></span></div>;
 }
 
-function WalletView({ onNavigate }: { onNavigate: (view: View) => void }) {
-  return <PageFrame eyebrow="Agentic Wallet" title="Your wallet, under your control" description="Connect an Agentic Wallet to load live balances, addresses, history, and approval status."><div className="empty-state large"><div className="empty-icon">◈</div><h2>Connect your Agentic Wallet</h2><p>Balances and transaction history will appear here after a real wallet connection. AgentPay will never invent or estimate wallet data.</p><button className="primary-button" onClick={() => onNavigate("settings")}>Go to connections <span>→</span></button></div></PageFrame>;
+function WalletView({ onStatusChange }: { onStatusChange: (status: WalletConnectionStatus) => void }) {
+  const [overview, setOverview] = useState<WalletOverview | null>(null);
+  const [signIn, setSignIn] = useState<WalletSignIn | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadOverview = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/wallet/overview", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to load Agentic Wallet.");
+      setOverview(data as WalletOverview);
+      onStatusChange((data as WalletOverview).status);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load Agentic Wallet.");
+    } finally {
+      setLoading(false);
+    }
+  }, [onStatusChange]);
+
+  useEffect(() => { void loadOverview(); }, [loadOverview]);
+
+  async function startConnection() {
+    setConnecting(true);
+    setError("");
+    try {
+      const response = await fetch("/api/wallet/connect", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Unable to start wallet sign-in.");
+      if (data.status === "ALREADY_CONNECTED") return void loadOverview();
+      setSignIn(data as WalletSignIn);
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : "Unable to start wallet sign-in.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function verifyConnection() {
+    if (!signIn?.qrCodeId) return;
+    setConnecting(true);
+    setError("");
+    try {
+      const response = await fetch("/api/wallet/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qrCodeId: signIn.qrCodeId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Wallet verification failed.");
+      setSignIn(null);
+      await loadOverview();
+    } catch (verifyError) {
+      setError(verifyError instanceof Error ? verifyError.message : "Wallet verification failed.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  return <PageFrame eyebrow="Agentic Wallet" title="Your wallet, under your control" description="Live balances, addresses, chains, and transaction history from Binance Agentic Wallet.">
+    {loading && <WalletMessage icon="◌" title="Loading wallet" text="Checking the local Agentic Wallet connection…" />}
+    {!loading && error && <WalletMessage icon="!" title="Wallet unavailable" text={error} action={<button className="secondary-button" onClick={() => void loadOverview()}>Retry</button>} />}
+    {!loading && !error && overview?.status === "CREATING" && <WalletMessage icon="◌" title="Wallet is being created" text="Binance is still preparing the Agentic Wallet. Retry shortly." action={<button className="secondary-button" onClick={() => void loadOverview()}>Check again</button>} />}
+    {!loading && !error && overview?.status === "UNCONNECTED" && !signIn && <WalletMessage icon="◈" title="Connect your Agentic Wallet" text="Sign in through Binance Wallet to load real wallet data. Credentials and signing material stay in the server-side wallet session." action={<button className="primary-button" disabled={connecting} onClick={() => void startConnection()}>{connecting ? "Starting…" : "Connect wallet"} <span>→</span></button>} />}
+    {!loading && !error && signIn && <div className="wallet-connect-card"><div className="empty-icon">◈</div><h2>Confirm in Binance Wallet</h2><p>Open the official Binance sign-in page, verify that this pairing code matches, then approve it in the Binance Wallet app.</p><div className="pairing-code" aria-label="Pairing code">{signIn.pairingCode}</div><div className="wallet-actions">{signIn.urlForWeb && <a className="primary-button link-button" href={signIn.urlForWeb} target="_blank" rel="noreferrer">Open Binance sign-in ↗</a>}<button className="secondary-button" disabled={connecting} onClick={() => void verifyConnection()}>{connecting ? "Waiting for confirmation…" : "I approved it"}</button></div></div>}
+    {!loading && !error && overview?.status === "CONNECTED" && <ConnectedWallet overview={overview} onRefresh={loadOverview} />}
+  </PageFrame>;
+}
+
+function WalletMessage({ icon, title, text, action }: { icon: string; title: string; text: string; action?: React.ReactNode }) {
+  return <div className="empty-state large"><div className="empty-icon">{icon}</div><h2>{title}</h2><p>{text}</p>{action}</div>;
+}
+
+function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; onRefresh: () => Promise<void> }) {
+  const totalValue = overview.balances.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  return <div className="wallet-dashboard">
+    <div className="wallet-summary"><div><span className="metric-label">Portfolio value</span><strong>${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><small>Only balances worth at least $0.01 are returned by the wallet CLI.</small></div><button className="secondary-button" onClick={() => void onRefresh()}>Refresh</button></div>
+    <section className="wallet-section"><div className="section-heading"><h2>Balances</h2><span>{overview.balances.length} assets</span></div>{overview.balances.length ? <div className="data-list">{overview.balances.map((balance) => <div className="data-row" key={`${balance.binanceChainId}:${balance.address}`}><div><strong>{balance.symbol}</strong><small>Chain {balance.binanceChainId} · {balance.address}</small></div><div className="amount"><strong>{balance.balance}</strong><small>${Number(balance.value || 0).toFixed(2)}</small></div></div>)}</div> : <p className="inline-empty">No balances above the wallet’s $0.01 display threshold.</p>}</section>
+    <section className="wallet-section"><div className="section-heading"><h2>Addresses</h2><span>{overview.addresses.length} networks</span></div><div className="data-list">{overview.addresses.map((address) => <div className="data-row" key={address.binanceChainId}><div><strong>{address.chainName}</strong><small className="mono-value">{address.address}</small></div><span className="chain-badge">{address.binanceChainId}</span></div>)}</div></section>
+    <section className="wallet-section"><div className="section-heading"><h2>Recent transactions</h2><span>Last {overview.transactions.length}</span></div>{overview.transactions.length ? <div className="data-list">{overview.transactions.map((transaction) => <div className="data-row" key={transaction.txHash}><div><strong>{transaction.txType || "Transaction"}</strong><small className="mono-value">{transaction.txHash}</small></div><div className="amount"><strong className={`tx-status ${transaction.status}`}>{transaction.status}</strong><small>{transaction.txTime}</small></div></div>)}</div> : <p className="inline-empty">No recent transactions returned.</p>}</section>
+  </div>;
 }
 
 function PayView() {
