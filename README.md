@@ -22,6 +22,17 @@ Phase 3A adds a non-executing payment safety workflow:
 
 Phase 3B adds SQLite persistence, guarded Agentic Wallet execution, transaction-status refresh, and Activity records. Real sends remain disabled by default; set `AGENTPAY_ENABLE_WALLET_SEND=true` only for a controlled test after reviewing the exact intent. A returned transaction hash is recorded as submitted, not confirmed.
 
+Phase 4 adds the official Binance Payment skill as a pinned vendored integration:
+
+- Binance C2C payment links and QR payloads;
+- PIX QR payload support;
+- QR image upload through the official decoder;
+- payee, amount, currency, and limit review;
+- explicit confirmation and status polling;
+- fail-closed credential and execution gates.
+
+Binance Pay requires `PAYMENT_API_KEY` and `PAYMENT_API_SECRET` with payment permissions plus Agent Pay limits configured in the Binance app. Image decoding additionally requires `python3.12-venv` and `libzbar0`; after installing those host packages, run `scripts/setup-binance-payment.sh`.
+
 ## Local development
 
 ```bash

@@ -5,13 +5,15 @@ import type { PaymentRail } from "@/lib/domain";
 import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
 import { PaymentWorkflow } from "@/app/components/payment-workflow";
 import { ActivityWorkflow } from "@/app/components/activity-workflow";
+import { BinancePayWorkflow } from "@/app/components/binance-pay-workflow";
 
-type View = "chat" | "wallet" | "pay" | "activity" | "rules" | "settings";
+type View = "chat" | "wallet" | "pay" | "binance-pay" | "activity" | "rules" | "settings";
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: "chat", label: "Chat", icon: "✦" },
   { id: "wallet", label: "Agentic Wallet", icon: "◈" },
   { id: "pay", label: "Pay", icon: "↗" },
+  { id: "binance-pay", label: "Binance Pay", icon: "▦" },
   { id: "activity", label: "Activity", icon: "◷" },
   { id: "rules", label: "Rules", icon: "⌘" },
   { id: "settings", label: "Settings", icon: "⚙" },
@@ -87,6 +89,7 @@ export default function Home() {
           {view === "chat" && <ChatView onNavigate={setView} onPaymentInstruction={setPaymentInstruction} />}
           {view === "wallet" && <WalletView onStatusChange={setWalletStatus} />}
           {view === "pay" && <PayView initialInstruction={paymentInstruction} />}
+          {view === "binance-pay" && <BinancePayView />}
           {view === "activity" && <ActivityView />}
           {view === "rules" && <RulesView />}
           {view === "settings" && <SettingsView />}
@@ -225,7 +228,11 @@ function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; on
 }
 
 function PayView({ initialInstruction }: { initialInstruction: string }) {
-  return <PageFrame eyebrow="Payment workspace" title="Prepare a payment" description="AgentPay validates the wallet, asset, network, balance, and destination before asking for approval."><PaymentWorkflow initialInstruction={initialInstruction} /><div className="pay-options secondary-options"><PayOption icon="▦" title="Binance Pay QR" text="Coming in Phase 4" /><PayOption icon="402" title="x402 service" text="Coming in Phase 4" /></div></PageFrame>;
+  return <PageFrame eyebrow="Payment workspace" title="Prepare a payment" description="AgentPay validates the wallet, asset, network, balance, and destination before asking for approval."><PaymentWorkflow initialInstruction={initialInstruction} /><div className="pay-options secondary-options"><PayOption icon="▦" title="Binance Pay QR" text="Available in the Binance Pay tab" /><PayOption icon="402" title="x402 service" text="Coming in Phase 4" /></div></PageFrame>;
+}
+
+function BinancePayView() {
+  return <PageFrame eyebrow="Binance Pay" title="Pay a QR code or payment link" description="Inspect a supported Binance C2C link or PIX QR, review the payee and amount, then explicitly confirm through Binance Pay."><BinancePayWorkflow /></PageFrame>;
 }
 
 function PayOption({ icon, title, text }: { icon: string; title: string; text: string }) {
