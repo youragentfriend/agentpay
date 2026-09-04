@@ -49,3 +49,15 @@ export interface X402Intent {
   updatedAt: string;
   completedAt?: string;
 }
+
+export interface X402BazaarResource {
+  id: string;
+  source: string;
+  resourceUrl: string;
+  resourceHost: string;
+  description: string;
+  method: string;
+  networks: string[];
+  bscOptions: Array<{ scheme?: string; network: string; asset?: string; amount?: string; payTo?: string }>;
+  allowlisted: boolean;
+}

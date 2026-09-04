@@ -37,6 +37,8 @@ Binance Pay requires `PAYMENT_API_KEY` and `PAYMENT_API_SECRET` with payment per
 
 The x402 workspace discovers HTTP 402 v2 requirements from explicitly allowlisted HTTPS hosts, previews Agentic Wallet payment options, requires exact option approval, signs through the official `baw x402-payment` commands, replays the request without exposing the signature, and persists the result in Activity. Configure `AGENTPAY_X402_ALLOWED_HOSTS`; real signing remains disabled unless `AGENTPAY_ENABLE_X402=true`.
 
+The BNB Bazaar view reads the official public CDP x402 discovery catalog by default and retains only x402 v2 resources advertising BNB Smart Chain (`eip155:56`). Bazaar metadata is display-only; a merchant still requires explicit host allowlisting and a fresh live HTTP 402 validation before preview or payment.
+
 ## Local development
 
 ```bash
