@@ -1,149 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { PaymentRail } from "@/lib/domain";
 import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
 import { PaymentWorkflow } from "@/app/components/payment-workflow";
 import { ActivityWorkflow } from "@/app/components/activity-workflow";
 import { BinancePayWorkflow } from "@/app/components/binance-pay-workflow";
 import { X402Workflow } from "@/app/components/x402-workflow";
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "development";
 
-type View = "chat" | "wallet" | "pay" | "binance-pay" | "x402" | "activity" | "rules" | "settings";
+type View = "overview" | "binance" | "binance-pay" | "wallet" | "x402" | "activity" | "settings";
+const labels: Record<View,string>={overview:"Overview",binance:"Binance", "binance-pay":"Binance Pay",wallet:"Agentic Wallet",x402:"x402",activity:"Activity",settings:"Settings"};
 
-const navItems: Array<{ id: View; label: string; icon: string }> = [
-  { id: "chat", label: "Chat", icon: "✦" },
-  { id: "wallet", label: "Agentic Wallet", icon: "◈" },
-  { id: "pay", label: "Pay", icon: "↗" },
-  { id: "binance-pay", label: "Binance Pay", icon: "▦" },
-  { id: "x402", label: "x402", icon: "402" },
-  { id: "activity", label: "Activity", icon: "◷" },
-  { id: "rules", label: "Rules", icon: "⌘" },
-  { id: "settings", label: "Settings", icon: "⚙" },
-];
-
-const railLabels: Record<PaymentRail, string> = {
-  "agentic-wallet": "Agentic Wallet",
-  "binance-pay": "Binance Pay",
-  x402: "x402 service",
-  "onchain-pay": "Onchain Pay",
-};
-
-export default function Home() {
-  const [view, setView] = useState<View>("chat");
-  const [walletStatus, setWalletStatus] = useState<WalletConnectionStatus>("UNCONNECTED");
-  const [paymentInstruction, setPaymentInstruction] = useState("");
-
-  return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <img className="brand-mark" src="/brand/agentpay-mark.png" alt="" aria-hidden="true" />
-          <div>
-            <strong>AgentPay</strong>
-            <span>Payment OS</span>
-          </div>
-        </div>
-
-        <div className="connection-pill">
-          <span className={`status-dot ${walletStatus === "CONNECTED" ? "active-dot" : "muted"}`} />
-          <span>{walletStatus === "CONNECTED" ? "Wallet connected" : walletStatus === "CREATING" ? "Wallet initializing" : "Wallet not connected"}</span>
-        </div>
-
-        <nav className="nav-list" aria-label="Main navigation">
-          <span className="nav-label">WORKSPACE</span>
-          {navItems.map((item) => (
-            <button
-              className={`nav-item ${view === item.id ? "active" : ""}`}
-              key={item.id}
-              onClick={() => setView(item.id)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              {item.label}
-              {item.id === "activity" && <span className="nav-count">0</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="security-note">
-            <span>▣</span>
-            <div>
-              <strong>Approval-first</strong>
-              <small>Every payment is reviewable</small>
-            </div>
-          </div>
-          <span className="version">Local development · v0.1</span>
-        </div>
-      </aside>
-
-      <section className="content-area">
-        <header className="topbar">
-          <div className="breadcrumbs">
-            <span>AgentPay</span><b>/</b><strong>{navItems.find((item) => item.id === view)?.label}</strong>
-          </div>
-          <div className="topbar-actions">
-            <span className="environment"><span className="status-dot muted" /> Local</span>
-            <button className="avatar" aria-label="Account">M</button>
-          </div>
-        </header>
-
-        <div className="page-content">
-          {view === "chat" && <ChatView onNavigate={setView} onPaymentInstruction={setPaymentInstruction} />}
-          {view === "wallet" && <WalletView onStatusChange={setWalletStatus} />}
-          {view === "pay" && <PayView initialInstruction={paymentInstruction} />}
-          {view === "binance-pay" && <BinancePayView />}
-          {view === "x402" && <X402View />}
-          {view === "activity" && <ActivityView />}
-          {view === "rules" && <RulesView />}
-          {view === "settings" && <SettingsView />}
-        </div>
-      </section>
-    </main>
-  );
+export default function Home(){
+ const [view,setView]=useState<View>("overview"); const [walletStatus,setWalletStatus]=useState<WalletConnectionStatus>("UNCONNECTED"); const [binanceOpen,setBinanceOpen]=useState(true); const [walletOpen,setWalletOpen]=useState(true);
+ return <main className="app-shell"><aside className="sidebar"><div className="brand"><img className="brand-mark" src="/brand/agentpay-mark.png" alt=""/><div><strong>AgentPay</strong><span>Payment OS</span></div></div><div className="connection-pill"><span className={`status-dot ${walletStatus==="CONNECTED"?"active-dot":"muted"}`}/><span>{walletStatus==="CONNECTED"?"Wallet connected":"Execution safely disabled"}</span></div><nav className="nav-list" aria-label="Main navigation"><span className="nav-label">WORKSPACE</span><NavButton active={view==="overview"} icon="⌂" label="Overview" onClick={()=>setView("overview")}/><NavParent label="Binance" icon="B" active={view==="binance"||view==="binance-pay"} open={binanceOpen} onNavigate={()=>setView("binance")} onToggle={()=>setBinanceOpen(v=>!v)}/>{binanceOpen&&<div className="nav-submenu"><NavButton active={view==="binance-pay"} icon="▦" label="Binance Pay" onClick={()=>setView("binance-pay")}/></div>}<NavParent label="Agentic Wallet" icon="◈" active={view==="wallet"||view==="x402"} open={walletOpen} onNavigate={()=>setView("wallet")} onToggle={()=>setWalletOpen(v=>!v)}/>{walletOpen&&<div className="nav-submenu"><NavButton active={view==="x402"} icon="402" label="x402" onClick={()=>setView("x402")}/></div>}<NavButton active={view==="activity"} icon="◷" label="Activity" onClick={()=>setView("activity")}/><NavButton active={view==="settings"} icon="⚙" label="Settings" onClick={()=>setView("settings")}/></nav><div className="sidebar-footer"><div className="security-note"><span>◆</span><div><strong>Approval-first</strong><small>Every payment is reviewable</small></div></div><span className="version">Local development · v{appVersion}</span></div></aside><section className="content-area"><header className="topbar"><div className="breadcrumbs"><span>AgentPay</span><b>/</b><strong>{labels[view]}</strong></div><div className="topbar-actions"><span className="environment"><span className="status-dot muted"/> Local</span><button className="avatar" aria-label="Account">M</button></div></header><div className="page-content">{view==="overview"&&<OverviewView onNavigate={setView}/>} {view==="binance"&&<BinanceView/>}{view==="binance-pay"&&<BinancePayView/>}{view==="wallet"&&<WalletView onStatusChange={setWalletStatus}/>} {view==="x402"&&<X402View/>}{view==="activity"&&<ActivityView/>}{view==="settings"&&<SettingsView/>}</div></section></main>;
 }
+function NavButton({active,icon,label,onClick}:{active:boolean;icon:string;label:string;onClick:()=>void}){return <button className={`nav-item ${active?"active":""}`} onClick={onClick}><span className="nav-icon">{icon}</span><span>{label}</span></button>}
+function NavParent({label,icon,active,open,onNavigate,onToggle}:{label:string;icon:string;active:boolean;open:boolean;onNavigate:()=>void;onToggle:()=>void}){return <div className={`nav-parent ${active?"active":""}`}><button className="nav-parent-main" onClick={onNavigate}><span className="nav-icon">{icon}</span><span>{label}</span></button><button className="nav-chevron" aria-label={`${open?"Collapse":"Expand"} ${label}`} onClick={onToggle}>{open?"⌄":"›"}</button></div>}
 
-function ChatView({ onNavigate, onPaymentInstruction }: { onNavigate: (view: View) => void; onPaymentInstruction: (instruction: string) => void }) {
-  const [message, setMessage] = useState("");
-
-  function submitPaymentInstruction() {
-    if (!message.trim()) return;
-    onPaymentInstruction(message.trim());
-    onNavigate("pay");
-  }
-
-  return (
-    <div className="chat-page">
-      <div className="eyebrow"><span className="spark">✦</span> AgentPay assistant</div>
-      <h1>What would you like<br /><em>to pay for?</em></h1>
-      <p className="lead">Describe a payment goal. AgentPay will identify the right rail, check your rules, and ask for approval before any funds move.</p>
-
-      <div className="chat-card">
-        <div className="chat-header"><span className="status-dot active-dot" /> Ready for an instruction</div>
-        <div className="suggestion-row">
-          <button onClick={() => onNavigate("pay")}>Pay a QR or link <span>↗</span></button>
-          <button onClick={() => onNavigate("wallet")}>View wallet <span>◈</span></button>
-          <button onClick={() => onNavigate("rules")}>Set a payment rule <span>⌘</span></button>
-        </div>
-        <div className="composer">
-          <textarea className="composer-input" value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submitPaymentInstruction(); } }} placeholder="e.g. Send 5 USDT to 0x… on BNB Smart Chain" aria-label="Payment instruction" />
-          <button className="send-button" aria-label="Prepare payment" onClick={submitPaymentInstruction}>↑</button>
-        </div>
-        <div className="composer-hint"><span>↗</span> Attach QR or payment link <span className="hint-right">No payment will happen without your approval</span></div>
-      </div>
-
-      <div className="rail-grid">
-        <RailCard rail="agentic-wallet" title="Wallet transfers" description="Send supported assets to approved destinations." />
-        <RailCard rail="binance-pay" title="Binance Pay" description="Pay a supported QR code or payment link." />
-        <RailCard rail="x402" title="Agent services" description="Pay an HTTP 402 service and receive its result." />
-      </div>
-    </div>
-  );
+function OverviewView({onNavigate}:{onNavigate:(view:View)=>void}){
+ const [message,setMessage]=useState(""); const [instruction,setInstruction]=useState(""); const [qrFile,setQrFile]=useState<File|null>(null);
+ function submit(){const value=message.trim();if(!value)return;const lower=value.toLowerCase();if(lower.includes("activity")||lower.includes("history")){onNavigate("activity");return}if(lower.includes("x402")||lower.includes("service")){onNavigate("x402");return}if(lower.includes("binance pay")){onNavigate("binance-pay");return}if(lower.includes("balance")||lower.includes("wallet")){onNavigate("wallet");return}setInstruction(value)}
+ return <div className="overview-page"><div className="overview-heading"><div className="eyebrow"><span className="spark">✦</span> AgentPay command center</div><h1>What can AgentPay do for you?</h1><p className="lead">Ask AgentPay to check balances, prepare payments, scan QR codes, buy x402 services, or review activity. It chooses the right rail, validates every detail, and asks before funds move.</p></div><div className="overview-grid"><section className="assistant-panel"><div className="assistant-status"><span className="status-dot active-dot"/> Ready for an instruction</div><div className="suggestion-row"><button onClick={()=>onNavigate("wallet")}>Check balances</button><button onClick={()=>onNavigate("binance-pay")}>Pay with Binance</button><button onClick={()=>onNavigate("x402")}>Find x402 service</button></div><div className="composer"><textarea className="composer-input" value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit()}}} placeholder="Ask AgentPay to pay, receive, scan a QR, check balances, or find a service…"/><button className="send-button" onClick={submit} aria-label="Send instruction">↑</button></div><div className="composer-footer"><label className="attach-button">＋ Attach QR<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>setQrFile(e.target.files?.[0]||null)}/></label><span>No funds move without approval</span></div>{instruction&&<div className="assistant-action"><div className="assistant-message"><strong>Payment request recognized</strong><span>AgentPay prepared the approval-first Agentic Wallet workflow below.</span></div><PaymentWorkflow initialInstruction={instruction}/></div>}{qrFile&&<div className="assistant-action"><div className="assistant-message"><strong>QR attached</strong><span>Decoding through the shared Binance Pay validation pipeline.</span></div><BinancePayWorkflow initialFile={qrFile} embedded/></div>}</section><RecentActivity onViewAll={()=>onNavigate("activity")}/></div></div>
 }
+function RecentActivity({onViewAll}:{onViewAll:()=>void}){const [items,setItems]=useState<Array<{id:string;title:string;status:string;time:string;source:string}>>([]);useEffect(()=>{void fetch('/api/payments/activity',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(Array.isArray(data.events)){setItems(data.events.slice(0,10).map((e:any)=>({id:e.id,title:e.title||e.description||e.activityType,status:e.statusGroup,time:e.occurredAt||e.updatedAt,source:e.source})));return}const list=[...(data.x402Intents||[]).map((x:any)=>({id:'x'+x.id,title:`x402 · ${x.resourceHost}`,status:x.status,time:x.updatedAt,source:'x402'})),...(data.binancePayReceipts||[]).map((x:any)=>({id:'b'+x.id,title:`${x.amount||''} ${x.currency||''}`,status:x.status,time:x.updatedAt,source:'Binance Pay'})),...(data.intents||[]).map((x:any)=>({id:'w'+x.id,title:`${x.amount} ${x.asset}`,status:x.status,time:x.createdAt,source:'Agentic Wallet'}))].sort((a,b)=>Date.parse(b.time)-Date.parse(a.time)).slice(0,10);setItems(list)}).catch(()=>setItems([]))},[]);return <aside className="recent-panel"><div className="panel-heading"><div><span>Timeline</span><h2>Recent Activity</h2></div><button onClick={onViewAll}>View all</button></div><div className="recent-list">{items.length?items.map(item=><div className="recent-item" key={item.id}><span className={`activity-dot ${statusClass(item.status)}`}/><div><strong>{item.title}</strong><small>{item.source} · {new Date(item.time).toLocaleString()}</small></div><span className={`status-text ${statusClass(item.status)}`}>{friendlyStatus(item.status)}</span></div>):<p className="inline-empty">No recent activity yet.</p>}</div></aside>}
+function statusClass(status:string){const s=String(status).toLowerCase();if(['failed','failure','rejected'].some(x=>s.includes(x)))return'failed';if(['success','confirmed','completed'].some(x=>s.includes(x)))return'success';if(s.includes('awaiting')||s.includes('approval'))return'awaiting';return'pending'}
+function friendlyStatus(status:string){const c=statusClass(status);return c==='success'?'Successful':c==='failed'?'Failed':c==='awaiting'?'Awaiting approval':'Pending'}
 
-function RailCard({ rail, title, description }: { rail: PaymentRail; title: string; description: string }) {
-  return <div className="rail-card"><div className="rail-card-top"><span className="rail-symbol">{rail === "x402" ? "402" : rail === "binance-pay" ? "QR" : "W"}</span><span className="rail-available">Not connected</span></div><strong>{title}</strong><p>{description}</p><span className="rail-name">{railLabels[rail]} <span>→</span></span></div>;
-}
-
+function BinanceView(){const [tab,setTab]=useState('All');return <PageFrame eyebrow="Binance account" title="Your Binance portfolio" description="A clean read-only view of Spot, Funding, Futures, Earn, and Margin balances. Trading and withdrawals are intentionally out of scope."><div className="portfolio-summary"><div><span className="metric-label">Estimated total balance</span><strong>— USD</strong><small>Connect a least-privilege read-only Binance account to load balances.</small></div><button className="primary-button">Connect read-only account</button></div><div className="account-tabs">{['All','Spot','Funding','Futures','Earn','Margin'].map(x=><button className={tab===x?'active':''} key={x} onClick={()=>setTab(x)}>{x}</button>)}</div><section className="wallet-section"><div className="section-heading"><h2>{tab} balances</h2><span>Top 10 · assets over $0.10</span></div><div className="portfolio-table-head"><span>Asset</span><span>Available</span><span>Total / equity</span><span>USD value</span></div><div className="portfolio-empty"><strong>Read-only Binance connection required</strong><p>No balances are fabricated. Once connected, this table will paginate ten USD-valued assets at a time.</p></div></section></PageFrame>}
 function WalletView({ onStatusChange }: { onStatusChange: (status: WalletConnectionStatus) => void }) {
   const [overview, setOverview] = useState<WalletOverview | null>(null);
   const [signIn, setSignIn] = useState<WalletSignIn | null>(null);
@@ -221,51 +105,22 @@ function WalletMessage({ icon, title, text, action }: { icon: string; title: str
 }
 
 function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; onRefresh: () => Promise<void> }) {
+  const [action,setAction]=useState<""|"send"|"receive">("");
   const totalValue = overview.balances.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
   return <div className="wallet-dashboard">
-    <div className="wallet-summary"><div><span className="metric-label">Portfolio value</span><strong>${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><small>Only balances worth at least $0.01 are returned by the wallet CLI.</small></div><button className="secondary-button" onClick={() => void onRefresh()}>Refresh</button></div>
-    <section className="wallet-section"><div className="section-heading"><h2>Balances</h2><span>{overview.balances.length} assets</span></div>{overview.balances.length ? <div className="data-list">{overview.balances.map((balance) => <div className="data-row" key={`${balance.binanceChainId}:${balance.address}`}><div><strong>{balance.symbol}</strong><small>Chain {balance.binanceChainId} · {balance.address}</small></div><div className="amount"><strong>{balance.balance}</strong><small>${Number(balance.value || 0).toFixed(2)}</small></div></div>)}</div> : <p className="inline-empty">No balances above the wallet’s $0.01 display threshold.</p>}</section>
-    <section className="wallet-section"><div className="section-heading"><h2>Addresses</h2><span>{overview.addresses.length} networks</span></div><div className="data-list">{overview.addresses.map((address) => <div className="data-row" key={address.binanceChainId}><div><strong>{address.chainName}</strong><small className="mono-value">{address.address}</small></div><span className="chain-badge">{address.binanceChainId}</span></div>)}</div></section>
-    <section className="wallet-section"><div className="section-heading"><h2>Recent transactions</h2><span>Last {overview.transactions.length}</span></div>{overview.transactions.length ? <div className="data-list">{overview.transactions.map((transaction) => <div className="data-row" key={transaction.txHash}><div><strong>{transaction.txType || "Transaction"}</strong><small className="mono-value">{transaction.txHash}</small></div><div className="amount"><strong className={`tx-status ${transaction.status}`}>{transaction.status}</strong><small>{transaction.txTime}</small></div></div>)}</div> : <p className="inline-empty">No recent transactions returned.</p>}</section>
+    <div className="wallet-summary"><div><span className="metric-label">Portfolio value</span><strong>${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><small>Live balances from Binance Agentic Wallet.</small></div><div className="summary-actions"><button className="primary-button" onClick={()=>setAction("send")}>Send</button><button className="secondary-button" onClick={()=>setAction("receive")}>Receive</button><button className="ghost-button" onClick={() => void onRefresh()}>Refresh</button></div></div>
+    {action==="send"&&<PaymentWorkflow/>}{action==="receive"&&<section className="wallet-section receive-addresses"><div className="section-heading"><h2>Receive</h2><button onClick={()=>setAction("")}>Close</button></div><p className="panel-note">Choose the correct network before sharing an address. Sending on the wrong network may permanently lose funds.</p><div className="data-list">{overview.addresses.map(address=><div className="data-row" key={address.binanceChainId}><div><strong>{address.chainName}</strong><small className="mono-value">{address.address}</small></div><button className="secondary-button" onClick={()=>void navigator.clipboard.writeText(address.address)}>Copy</button></div>)}</div></section>}
+    <section className="wallet-section"><div className="section-heading"><h2>Balances</h2><span>{overview.balances.length} assets</span></div>{overview.balances.length ? <div className="data-list">{overview.balances.map((balance) => <div className="data-row" key={`${balance.binanceChainId}:${balance.address}`}><div><strong>{balance.symbol}</strong><small>Chain {balance.binanceChainId} · {balance.address}</small></div><div className="amount"><strong>{balance.balance}</strong><small>${Number(balance.value || 0).toFixed(2)}</small></div></div>)}</div> : <p className="inline-empty">No balances above the wallet’s display threshold.</p>}</section>
+    <section className="wallet-section"><div className="section-heading"><h2>Recent transactions</h2><span>Last {Math.min(5,overview.transactions.length)}</span></div>{overview.transactions.length ? <div className="data-list">{overview.transactions.slice(0,5).map((transaction) => <div className="data-row" key={transaction.txHash}><div><strong>{transaction.txType || "Transaction"}</strong><small className="mono-value">{transaction.txHash}</small></div><div className="amount"><strong className={`tx-status ${transaction.status}`}>{transaction.status}</strong><small>{transaction.txTime}</small></div></div>)}</div> : <p className="inline-empty">No recent transactions returned.</p>}</section>
   </div>;
 }
 
-function PayView({ initialInstruction }: { initialInstruction: string }) {
-  return <PageFrame eyebrow="Payment workspace" title="Prepare a payment" description="AgentPay validates the wallet, asset, network, balance, and destination before asking for approval."><PaymentWorkflow initialInstruction={initialInstruction} /><div className="pay-options secondary-options"><PayOption icon="▦" title="Binance Pay QR" text="Available in the Binance Pay tab" /><PayOption icon="402" title="x402 service" text="Coming in Phase 4" /></div></PageFrame>;
-}
 
-function BinancePayView() {
-  return <PageFrame eyebrow="Binance Pay" title="Pay a QR code or payment link" description="Inspect a supported Binance C2C link or PIX QR, review the payee and amount, then explicitly confirm through Binance Pay."><BinancePayWorkflow /></PageFrame>;
-}
-
-function X402View() {
-  return <PageFrame eyebrow="x402" title="Purchase an HTTP resource" description="Inspect a trusted service’s HTTP 402 requirement, choose a signable Agentic Wallet option, approve it, and return the purchased response."><X402Workflow /></PageFrame>;
-}
-
-function PayOption({ icon, title, text }: { icon: string; title: string; text: string }) {
-  return <button className="pay-option"><span className="pay-option-icon">{icon}</span><span><strong>{title}</strong><small>{text}</small></span><span className="arrow">→</span></button>;
-}
-
-function ActivityView() {
-  return <PageFrame eyebrow="Activity" title="Payment history" description="Prepared intents, approvals, broadcasts, confirmations, and failures are persisted here."><ActivityWorkflow /></PageFrame>;
-}
-
-function RulesView() {
-  return <PageFrame eyebrow="Rules & security" title="Decide what AgentPay can do" description="Policies are checked before a payment is prepared. Provider and wallet safety requirements still apply."><div className="rule-list"><RuleRow title="Require approval for every payment" description="Recommended for the first setup" enabled /><RuleRow title="Per-payment spending limit" description="Not configured" /><RuleRow title="Daily spending limit" description="Not configured" /><RuleRow title="Trusted destinations and services" description="No allowlist configured" /></div></PageFrame>;
-}
-
-function RuleRow({ title, description, enabled = false }: { title: string; description: string; enabled?: boolean }) {
-  return <div className="rule-row"><div><strong>{title}</strong><span>{description}</span></div><span className={`toggle ${enabled ? "on" : ""}`}><span /></span></div>;
-}
-
-function SettingsView() {
-  return <PageFrame eyebrow="Settings" title="Connections & diagnostics" description="Connect capabilities here. Secrets belong in the server-side environment, never in the browser."><div className="connection-list"><ConnectionRow title="Agentic Wallet" detail="Balances, transfers, and x402 signing" /><ConnectionRow title="Binance Pay" detail="QR and payment-link execution" /><ConnectionRow title="Onchain Pay" detail="Optional partner API integration" /></div></PageFrame>;
-}
-
-function ConnectionRow({ title, detail }: { title: string; detail: string }) {
-  return <div className="connection-row"><div className="connection-logo">{title === "Agentic Wallet" ? "W" : title === "Binance Pay" ? "B" : "O"}</div><div className="connection-copy"><strong>{title}</strong><span>{detail}</span></div><span className="not-connected">Not connected</span><button className="secondary-button">Connect</button></div>;
-}
-
-function PageFrame({ eyebrow, title, description, children }: { eyebrow: string; title: string; description: string; children: React.ReactNode }) {
-  return <div className="standard-page"><div className="eyebrow"><span className="spark">✦</span> {eyebrow}</div><h1>{title}</h1><p className="lead">{description}</p>{children}</div>;
-}
+function BinancePayView(){return <PageFrame eyebrow="Binance Pay" title="Pay or receive with Binance" description="Inspect a supported Binance QR or payment link, review every detail, or generate an official receive link."><BinancePayWorkflow/></PageFrame>}
+function X402View(){return <PageFrame eyebrow="Agentic Wallet / x402" title="Discover and purchase agent services" description="Browse BNB-compatible services or inspect a trusted HTTP 402 resource directly."><X402Workflow/></PageFrame>}
+function ActivityView(){return <PageFrame eyebrow="Activity" title="All activity" description="Filter approvals, transfers, Binance Pay payments, x402 purchases, successes, pending actions, and failures."><ActivityWorkflow/></PageFrame>}
+function SettingsView(){const [tab,setTab]=useState('Rules & approvals');return <PageFrame eyebrow="Settings" title="Control how AgentPay works" description="Manage approval rules, connections, diagnostics, and product preferences without exposing credentials."><div className="settings-tabs">{['Rules & approvals','Connections','Diagnostics','General'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==='Rules & approvals'&&<div className="rule-list"><RuleRow title="Require approval for every payment" description="Enabled and recommended" enabled/><RuleRow title="Per-payment spending limit" description="Configure after redesign validation"/><RuleRow title="Daily spending limit" description="Configure after redesign validation"/><RuleRow title="Trusted destinations and services" description="Server-side allowlists remain enforced"/></div>}{tab==='Connections'&&<div className="connection-list"><ConnectionRow title="Agentic Wallet" detail="Balances, transfers, and x402 signing"/><ConnectionRow title="Binance Pay" detail="QR, payment links, and receive links"/><ConnectionRow title="Binance Account" detail="Future read-only portfolio connection"/></div>}{tab==='Diagnostics'&&<div className="diagnostic-grid"><Diagnostic title="Database" value="SQLite connected" tone="success"/><Diagnostic title="Payment execution" value="Disabled by default" tone="awaiting"/><Diagnostic title="Environment" value="Local development"/><Diagnostic title="Version" value={`v${appVersion}`}/></div>}{tab==='General'&&<div className="settings-card"><label className="field"><span>Display currency</span><select defaultValue="USD"><option>USD</option></select></label><div className="setting-row"><div><strong>Appearance</strong><small>AgentPay dark theme</small></div><span className="theme-chip">Dark</span></div></div>}</PageFrame>}
+function RuleRow({title,description,enabled=false}:{title:string;description:string;enabled?:boolean}){return <div className="rule-row"><div><strong>{title}</strong><span>{description}</span></div><span className={`toggle ${enabled?'on':''}`}><span/></span></div>}
+function ConnectionRow({title,detail}:{title:string;detail:string}){return <div className="connection-row"><div className="connection-logo">{title==='Agentic Wallet'?'W':title==='Binance Pay'?'B':'A'}</div><div className="connection-copy"><strong>{title}</strong><span>{detail}</span></div><span className="not-connected">Review connection</span><button className="secondary-button">Manage</button></div>}
+function Diagnostic({title,value,tone=''}:{title:string;value:string;tone?:string}){return <div className="diagnostic-card"><span>{title}</span><strong className={tone}>{value}</strong></div>}
+function PageFrame({eyebrow,title,description,children}:{eyebrow:string;title:string;description:string;children:React.ReactNode}){return <div className="standard-page"><div className="eyebrow"><span className="spark">✦</span>{eyebrow}</div><h1>{title}</h1><p className="lead">{description}</p>{children}</div>}
