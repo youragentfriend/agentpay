@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
+import type { BinancePayReceipt } from "@/lib/binance-pay-types";
 
 export function ActivityWorkflow() {
   const [intents, setIntents] = useState<PreparedTransfer[]>([]);
+  const [binancePayReceipts, setBinancePayReceipts] = useState<BinancePayReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -15,6 +17,7 @@ export function ActivityWorkflow() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Unable to load activity.");
       setIntents(data.intents as PreparedTransfer[]);
+      setBinancePayReceipts((data.binancePayReceipts ?? []) as BinancePayReceipt[]);
     } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Unable to load activity."); }
     finally { setLoading(false); }
   }, []);
@@ -44,6 +47,6 @@ export function ActivityWorkflow() {
   }
 
   if (loading) return <div className="workflow-message">Loading payment activity…</div>;
-  if (!intents.length) return <div className="empty-state"><div className="empty-icon">◷</div><h2>No payment activity</h2><p>Prepared, approved, submitted, and confirmed workflows will appear here.</p></div>;
-  return <div className="activity-list">{error && <div className="workflow-error">{error}</div>}{intents.map((intent) => <article className="activity-card" key={intent.id}><div><span className={`review-status ${intent.status}`}>{intent.status.replace("-", " ")}</span><h2>{intent.amount} {intent.asset}</h2><p>{intent.chainName} · <span className="activity-address" title={intent.recipient}>{intent.recipient}</span></p>{intent.txHash && <p className="activity-hash" title={intent.txHash}>{intent.txHash}</p>}{intent.errorMessage && <p className="activity-error">{intent.errorMessage}</p>}</div><div className="activity-side"><small>{new Date(intent.createdAt).toLocaleString()}</small>{intent.txHash && (intent.status === "submitted" || intent.status === "submitting") && <button className="secondary-button" onClick={() => void refresh(intent)}>Refresh status</button>}</div></article>)}</div>;
+  if (!intents.length && !binancePayReceipts.length) return <div className="empty-state"><div className="empty-icon">◷</div><h2>No payment activity</h2><p>Prepared, approved, submitted, and confirmed workflows will appear here.</p></div>;
+  return <div className="activity-list">{error && <div className="workflow-error">{error}</div>}{binancePayReceipts.map((receipt) => <article className="activity-card" key={`binance-pay-${receipt.id}`}><div><span className={`review-status ${receipt.status.toLowerCase()}`}>{receipt.status.replaceAll("_", " ")}</span><h2>{receipt.amount_sent ?? receipt.amount} {receipt.currency}</h2><p>Binance Pay · Payee 「{receipt.payee || "Not provided"}」</p>{receipt.paid_with?.length ? <p>Paid with {receipt.paid_with.map((item) => `${item.amount} ${item.asset}`).join(" + ")}</p> : null}</div><div className="activity-side"><small>{new Date(receipt.updatedAt).toLocaleString()}</small><code>{receipt.pay_order_id ? `${receipt.pay_order_id.slice(0, 6)}…${receipt.pay_order_id.slice(-4)}` : "Prepared"}</code></div></article>)}{intents.map((intent) => <article className="activity-card" key={intent.id}><div><span className={`review-status ${intent.status}`}>{intent.status.replace("-", " ")}</span><h2>{intent.amount} {intent.asset}</h2><p>{intent.chainName} · <span className="activity-address" title={intent.recipient}>{intent.recipient}</span></p>{intent.txHash && <p className="activity-hash" title={intent.txHash}>{intent.txHash}</p>}{intent.errorMessage && <p className="activity-error">{intent.errorMessage}</p>}</div><div className="activity-side"><small>{new Date(intent.createdAt).toLocaleString()}</small>{intent.txHash && (intent.status === "submitted" || intent.status === "submitting") && <button className="secondary-button" onClick={() => void refresh(intent)}>Refresh status</button>}</div></article>)}</div>;
 }

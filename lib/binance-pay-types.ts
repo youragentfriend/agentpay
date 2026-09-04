@@ -38,3 +38,19 @@ export interface BinancePayCapability {
   imageDecodeReady: boolean;
   missing: string[];
 }
+
+export interface BinancePayReceipt extends BinancePayOrder {
+  id: string;
+  checkout_id: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface BinancePayReceiveLink {
+  success: true;
+  shareLink: string;
+  qrImageUrl?: string;
+  currency?: string;
+  amount?: string;
+}

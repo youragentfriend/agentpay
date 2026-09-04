@@ -3,12 +3,14 @@ import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { BinancePayCapability, BinancePayOrder } from "@/lib/binance-pay-types";
+import type { BinancePayCapability, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
+import { saveBinancePayOrder } from "@/lib/server/binance-pay-store";
 
 const execFileAsync = promisify(execFile);
 const SKILL_DIR = path.join(process.cwd(), "vendor", "binance", "payment");
 const SCRIPT = path.join(SKILL_DIR, "payment_skill.py");
 const CONFIG = path.join(SKILL_DIR, "config.json");
+const STATE = path.join(SKILL_DIR, ".payment_state.json");
 const VENV_PYTHON = process.env.AGENTPAY_PAYMENT_PYTHON
   || path.join(os.homedir(), ".local", "share", "agentpay", "payment-venv", "bin", "python");
 const MAX_OUTPUT = 2 * 1024 * 1024;
@@ -73,6 +75,23 @@ function asPaymentOrder(result: Record<string, unknown>): BinancePayOrder {
   return result as unknown as BinancePayOrder;
 }
 
+async function enrichAndPersistOrder(order: BinancePayOrder): Promise<BinancePayOrder> {
+  let state: Record<string, unknown> = {};
+  try { state = JSON.parse(await readFile(STATE, "utf8")) as Record<string, unknown>; } catch { /* no active state */ }
+  const checkoutId = order.checkout_id || (typeof state.checkout_id === "string" ? state.checkout_id : undefined);
+  if (!checkoutId) return order;
+  const stateAmount = state.amount ?? state.suggested_amount ?? state.preset_amount;
+  return saveBinancePayOrder({
+    ...order,
+    checkout_id: checkoutId,
+    pay_order_id: order.pay_order_id || (typeof state.pay_order_id === "string" ? state.pay_order_id : undefined),
+    payment_type: order.payment_type || (state.payment_type === "C2C" || state.payment_type === "PIX" ? state.payment_type : undefined),
+    payee: order.payee || (typeof state.nickname === "string" ? state.nickname : undefined),
+    amount: order.amount ?? order.amount_sent ?? (typeof stateAmount === "string" || typeof stateAmount === "number" ? stateAmount : undefined),
+    currency: order.currency || (typeof state.currency === "string" ? state.currency : undefined),
+  });
+}
+
 export function validateBinancePayInput(rawQr: string): string {
   const value = rawQr.trim();
   if (!value || value.length > 4096) throw new BinancePayError("Enter a valid Binance payment link or PIX QR payload.", "INVALID_QR_INPUT");
@@ -128,22 +147,50 @@ export async function prepareBinancePayment(rawQr: string): Promise<BinancePayOr
   return serialized(async () => {
     await runUnlocked(["--action", "reset"], 45_000, false);
     const validated = validateBinancePayInput(rawQr);
-    return addBinancePayInputHint(validated, asPaymentOrder(await runUnlocked(["--action", "purchase", "--raw_qr", validated])));
+    return enrichAndPersistOrder(addBinancePayInputHint(validated, asPaymentOrder(await runUnlocked(["--action", "purchase", "--raw_qr", validated]))));
   });
 }
 
 export async function setBinancePaymentAmount(amount: string, currency?: string): Promise<BinancePayOrder> {
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(amount) || Number(amount) <= 0) throw new BinancePayError("Enter a positive payment amount.", "INVALID_PAYMENT_AMOUNT");
-  return serialized(async () => asPaymentOrder(await runUnlocked(["--action", "set_amount", "--amount", amount, ...(currency ? ["--currency", currency.toUpperCase()] : [])])));
+  return serialized(async () => enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "set_amount", "--amount", amount, ...(currency ? ["--currency", currency.toUpperCase()] : [])]))));
 }
 
 export async function confirmBinancePayment(): Promise<BinancePayOrder> {
   if (process.env.AGENTPAY_ENABLE_BINANCE_PAY !== "true") throw new BinancePayError("Binance Pay execution is disabled on this server.", "PAYMENT_EXECUTION_DISABLED");
-  return serialized(async () => asPaymentOrder(await runUnlocked(["--action", "pay_confirm"], 90_000)));
+  return serialized(async () => enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "pay_confirm"], 90_000))));
 }
 
 export async function pollBinancePayment(): Promise<BinancePayOrder> {
-  return serialized(async () => asPaymentOrder(await runUnlocked(["--action", "query"], 45_000)));
+  return serialized(async () => enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "query"], 45_000))));
+}
+
+export async function createBinancePayReceiveLink(currency?: string, amount?: string, note?: string): Promise<BinancePayReceiveLink> {
+  const capability = await getBinancePayCapability();
+  if (!capability.configured) throw new BinancePayError("Binance Pay credentials are not configured.", "PAYMENT_CONFIG_REQUIRED");
+  const normalizedCurrency = currency?.trim().toUpperCase();
+  const normalizedAmount = amount?.trim();
+  const normalizedNote = note?.trim();
+  if ((normalizedAmount || normalizedNote) && !normalizedCurrency) throw new BinancePayError("Currency is required when amount or note is set.", "CURRENCY_REQUIRED");
+  if (normalizedCurrency && !/^[A-Z0-9]{2,12}$/.test(normalizedCurrency)) throw new BinancePayError("Enter a valid currency symbol.", "INVALID_CURRENCY");
+  if (normalizedAmount && (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(normalizedAmount) || Number(normalizedAmount) <= 0)) throw new BinancePayError("Enter a positive receive amount.", "INVALID_PAYMENT_AMOUNT");
+  if (normalizedNote && normalizedNote.length > 120) throw new BinancePayError("Receive note must be 120 characters or fewer.", "NOTE_TOO_LONG");
+  const result = await serialized(() => runUnlocked([
+    "--action", "receive",
+    ...(normalizedCurrency ? ["--currency", normalizedCurrency] : []),
+    ...(normalizedAmount ? ["--amount", normalizedAmount] : []),
+    ...(normalizedNote ? ["--note", normalizedNote] : []),
+  ]));
+  if (result.success !== true || typeof result.shareLink !== "string") {
+    throw new BinancePayError(typeof result.message === "string" ? result.message : "Unable to generate a Binance Pay receive link.", "RECEIVE_LINK_FAILED");
+  }
+  return {
+    success: true,
+    shareLink: validateBinancePayInput(result.shareLink),
+    qrImageUrl: typeof result.qrImageUrl === "string" ? result.qrImageUrl : undefined,
+    currency: typeof result.currency === "string" ? result.currency : undefined,
+    amount: typeof result.amount === "string" || typeof result.amount === "number" ? String(result.amount) : undefined,
+  };
 }
 
 export async function decodeBinanceQr(file: File): Promise<{ qr_data?: string; source_type?: string; status?: string; message?: string }> {

@@ -27,8 +27,10 @@ Phase 4 adds the official Binance Payment skill as a pinned vendored integration
 - Binance C2C payment links and QR payloads;
 - PIX QR payload support;
 - QR image upload through the official decoder;
+- official Binance receive-link generation;
 - payee, amount, currency, and limit review;
 - explicit confirmation and status polling;
+- SQLite-backed Binance Pay receipts in unified Activity;
 - fail-closed credential and execution gates.
 
 Binance Pay requires `PAYMENT_API_KEY` and `PAYMENT_API_SECRET` with payment permissions plus Agent Pay limits configured in the Binance app. Image decoding additionally requires `python3.12-venv` and `libzbar0`; after installing those host packages, run `scripts/setup-binance-payment.sh`.
