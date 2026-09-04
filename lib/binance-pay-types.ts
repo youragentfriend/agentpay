@@ -6,7 +6,13 @@ export type BinancePayStatus =
   | "PROCESSING"
   | "SUCCESS"
   | "FAILED"
-  | "ERROR";
+  | "ERROR"
+  | "LIMIT_NOT_CONFIGURED"
+  | "SINGLE_LIMIT_EXCEEDED"
+  | "DAILY_LIMIT_EXCEEDED"
+  | "INSUFFICIENT_FUNDS"
+  | "INVALID_QR_FORMAT"
+  | "QR_EXPIRED_OR_NOT_FOUND";
 
 export interface BinancePayOrder {
   status: BinancePayStatus;
