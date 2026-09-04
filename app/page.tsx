@@ -6,14 +6,16 @@ import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib
 import { PaymentWorkflow } from "@/app/components/payment-workflow";
 import { ActivityWorkflow } from "@/app/components/activity-workflow";
 import { BinancePayWorkflow } from "@/app/components/binance-pay-workflow";
+import { X402Workflow } from "@/app/components/x402-workflow";
 
-type View = "chat" | "wallet" | "pay" | "binance-pay" | "activity" | "rules" | "settings";
+type View = "chat" | "wallet" | "pay" | "binance-pay" | "x402" | "activity" | "rules" | "settings";
 
 const navItems: Array<{ id: View; label: string; icon: string }> = [
   { id: "chat", label: "Chat", icon: "✦" },
   { id: "wallet", label: "Agentic Wallet", icon: "◈" },
   { id: "pay", label: "Pay", icon: "↗" },
   { id: "binance-pay", label: "Binance Pay", icon: "▦" },
+  { id: "x402", label: "x402", icon: "402" },
   { id: "activity", label: "Activity", icon: "◷" },
   { id: "rules", label: "Rules", icon: "⌘" },
   { id: "settings", label: "Settings", icon: "⚙" },
@@ -90,6 +92,7 @@ export default function Home() {
           {view === "wallet" && <WalletView onStatusChange={setWalletStatus} />}
           {view === "pay" && <PayView initialInstruction={paymentInstruction} />}
           {view === "binance-pay" && <BinancePayView />}
+          {view === "x402" && <X402View />}
           {view === "activity" && <ActivityView />}
           {view === "rules" && <RulesView />}
           {view === "settings" && <SettingsView />}
@@ -233,6 +236,10 @@ function PayView({ initialInstruction }: { initialInstruction: string }) {
 
 function BinancePayView() {
   return <PageFrame eyebrow="Binance Pay" title="Pay a QR code or payment link" description="Inspect a supported Binance C2C link or PIX QR, review the payee and amount, then explicitly confirm through Binance Pay."><BinancePayWorkflow /></PageFrame>;
+}
+
+function X402View() {
+  return <PageFrame eyebrow="x402" title="Purchase an HTTP resource" description="Inspect a trusted service’s HTTP 402 requirement, choose a signable Agentic Wallet option, approve it, and return the purchased response."><X402Workflow /></PageFrame>;
 }
 
 function PayOption({ icon, title, text }: { icon: string; title: string; text: string }) {

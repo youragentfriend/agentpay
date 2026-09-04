@@ -11,6 +11,7 @@ import type {
   WalletTransaction,
 } from "@/lib/wallet-types";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
+import type { X402Preview, X402Signature } from "@/lib/x402-types";
 
 const execFileAsync = promisify(execFile);
 const BAW_BIN = path.join(process.cwd(), "node_modules", ".bin", "baw");
@@ -179,6 +180,19 @@ export async function getWalletTransactionStatus(txHash: string): Promise<string
   const data = await runBaw<Record<string, unknown>>(["wallet", "tx-history", "--tx", txHash]);
   const transaction = Array.isArray(data.transactions) ? record(data.transactions[0]) : data;
   return normalizeWalletTransactionStatus(text(transaction.status));
+}
+
+export async function previewX402Payment(paymentRequirements: string): Promise<X402Preview> {
+  if (!paymentRequirements || paymentRequirements.length > 65_536) {
+    throw new AgenticWalletError("The x402 payment requirements are missing or too large.", "INVALID_X402_REQUIREMENTS");
+  }
+  return runBaw<X402Preview>(["x402-payment", "preview", "--paymentRequirements", paymentRequirements]);
+}
+
+export async function signX402Payment(paymentId: string, selectedIndex: number): Promise<X402Signature> {
+  if (!QR_CODE_ID.test(paymentId)) throw new AgenticWalletError("The x402 payment ID is invalid.", "INVALID_X402_PAYMENT_ID");
+  if (!Number.isSafeInteger(selectedIndex) || selectedIndex < 1) throw new AgenticWalletError("The x402 payment option index is invalid.", "INVALID_X402_OPTION");
+  return runBaw<X402Signature>(["x402-payment", "sign", "--paymentId", paymentId, "--selectedIndex", String(selectedIndex)], 120_000);
 }
 
 export function normalizeWalletTransactionStatus(status: string): "pending" | "confirmed" | "failed" | undefined {

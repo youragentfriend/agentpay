@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addBinancePayInputHint, BinancePayError, validateBinancePayInput } from "../lib/server/binance-pay";
+import { addBinancePayInputHint, BinancePayError, getCompatibleBinancePayLink, validateBinancePayInput } from "../lib/server/binance-pay";
 
 test("accepts documented Binance payment-link formats", () => {
   assert.equal(validateBinancePayInput("https://app.binance.com/uni-qr/example"), "https://app.binance.com/uni-qr/example");
@@ -27,4 +27,11 @@ test("adds a specific hint for a rejected Request-to-Pay share link", () => {
     { status: "INVALID_QR_FORMAT", message: "Invalid QR code format" },
   );
   assert.match(result.hint ?? "", /standard Binance Pay receive QR image/i);
+});
+
+test("extracts only direct compatible Binance payment links", () => {
+  assert.equal(getCompatibleBinancePayLink("https://app.binance.com/uni-qr/directToken"), "https://app.binance.com/uni-qr/directToken");
+  assert.equal(getCompatibleBinancePayLink("https://app.binance.com/qr/directToken"), "https://app.binance.com/qr/directToken");
+  assert.equal(getCompatibleBinancePayLink("https://app.binance.com/uni-qr/request-to-pay?billOrderId=x"), undefined);
+  assert.equal(getCompatibleBinancePayLink("000201br.gov.bcb.pix"), undefined);
 });

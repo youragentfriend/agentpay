@@ -35,6 +35,8 @@ Phase 4 adds the official Binance Payment skill as a pinned vendored integration
 
 Binance Pay requires `PAYMENT_API_KEY` and `PAYMENT_API_SECRET` with payment permissions plus Agent Pay limits configured in the Binance app. Image decoding additionally requires `python3.12-venv` and `libzbar0`; after installing those host packages, run `scripts/setup-binance-payment.sh`.
 
+The x402 workspace discovers HTTP 402 v2 requirements from explicitly allowlisted HTTPS hosts, previews Agentic Wallet payment options, requires exact option approval, signs through the official `baw x402-payment` commands, replays the request without exposing the signature, and persists the result in Activity. Configure `AGENTPAY_X402_ALLOWED_HOSTS`; real signing remains disabled unless `AGENTPAY_ENABLE_X402=true`.
+
 ## Local development
 
 ```bash
