@@ -32,6 +32,10 @@ export function normalizeBazaarResource(row: Record<string, unknown>, source: st
   let url: URL; try { url = new URL(resourceUrl); } catch { return; }
   if (url.protocol !== "https:") return;
   const requirements = row.paymentRequirements && typeof row.paymentRequirements === "object" ? row.paymentRequirements as Record<string, unknown> : row;
+  const extensions = row.extensions && typeof row.extensions === "object" ? row.extensions as Record<string, unknown> : {};
+  const bazaar = extensions.bazaar && typeof extensions.bazaar === "object" ? extensions.bazaar as Record<string, unknown> : {};
+  const info = bazaar.info && typeof bazaar.info === "object" ? bazaar.info as Record<string, unknown> : {};
+  const input = info.input && typeof info.input === "object" ? info.input as Record<string, unknown> : {};
   const accepts = Array.isArray(requirements.accepts) ? requirements.accepts.filter((item) => item && typeof item === "object") as Record<string, unknown>[] : [];
   const bsc = accepts.filter((item) => item.network === "eip155:56").map((item) => ({
     scheme: typeof item.scheme === "string" ? item.scheme : undefined,
@@ -45,7 +49,8 @@ export function normalizeBazaarResource(row: Record<string, unknown>, source: st
     id: createHash("sha256").update(`${source}\n${resourceUrl}`).digest("hex").slice(0, 20), source,
     resourceUrl, resourceHost: url.hostname,
     description: typeof resource.description === "string" ? resource.description.slice(0, 240) : "Published x402 resource",
-    method: typeof resource.method === "string" ? resource.method.toUpperCase() : "GET",
+    method: typeof input.method === "string" ? input.method.toUpperCase() : typeof resource.method === "string" ? resource.method.toUpperCase() : "GET",
+    requestBody: input.body,
     networks: [...new Set(accepts.map((item) => typeof item.network === "string" ? item.network : "").filter(Boolean))],
     bscOptions: bsc, allowlisted: allowedHosts.includes(url.hostname.toLowerCase()),
   };

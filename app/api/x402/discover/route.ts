@@ -1,3 +1,3 @@
 import { discoverX402, X402Error, x402ErrorResponse } from "@/lib/server/x402";
 export const runtime="nodejs";
-export async function POST(request:Request){try{const body=await request.json() as {url?:unknown};if(typeof body.url!=="string")throw new X402Error("Resource URL is required.","INVALID_X402_URL");return Response.json(await discoverX402(body.url));}catch(error){return x402ErrorResponse(error);}}
+export async function POST(request:Request){try{const body=await request.json() as {url?:unknown;method?:unknown;requestBody?:unknown};if(typeof body.url!=="string")throw new X402Error("Resource URL is required.","INVALID_X402_URL");if(body.method!==undefined&&body.method!=="GET"&&body.method!=="POST")throw new X402Error("Only GET and POST x402 resources are supported.","INVALID_X402_METHOD");return Response.json(await discoverX402(body.url,body.method as "GET"|"POST"|undefined,body.requestBody));}catch(error){return x402ErrorResponse(error);}}

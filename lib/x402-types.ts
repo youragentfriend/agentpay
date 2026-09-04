@@ -36,6 +36,8 @@ export interface X402Intent {
   id: string;
   resourceUrl: string;
   resourceHost: string;
+  requestMethod: "GET" | "POST";
+  requestBody?: string;
   status: X402IntentStatus;
   paymentId: string;
   options: X402PaymentOption[];
@@ -58,6 +60,7 @@ export interface X402BazaarResource {
   resourceHost: string;
   description: string;
   method: string;
+  requestBody?: unknown;
   networks: string[];
   bscOptions: Array<{ scheme?: string; network: string; asset?: string; amount?: string; payTo?: string }>;
   allowlisted: boolean;
