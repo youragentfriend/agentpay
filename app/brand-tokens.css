@@ -1,0 +1,147 @@
+/* AgentPay brand foundation — intentionally not imported until IA approval. */
+:root {
+  color-scheme: dark;
+
+  --ap-brand-yellow: #fcd535;
+  --ap-brand-yellow-hover: #f0b90b;
+  --ap-brand-yellow-active: #d9a400;
+  --ap-brand-on-yellow: #181a20;
+  --ap-focus-ring: rgba(252, 213, 53, 0.28);
+
+  --ap-bg-canvas: #0b0e11;
+  --ap-bg-sidebar: #0e1116;
+  --ap-bg-surface-1: #181a20;
+  --ap-bg-surface-2: #1e2329;
+  --ap-bg-surface-3: #2b3139;
+  --ap-bg-overlay: rgba(11, 14, 17, 0.76);
+
+  --ap-border-subtle: #2b3139;
+  --ap-border-strong: #474d57;
+
+  --ap-text-primary: #eaecef;
+  --ap-text-secondary: #b7bdc6;
+  --ap-text-tertiary: #848e9c;
+  --ap-text-disabled: #5e6673;
+  --ap-text-inverse: #181a20;
+  --ap-link: #fcd535;
+  --ap-link-hover: #ffe566;
+
+  --ap-positive: #28a473;
+  --ap-positive-soft: rgba(40, 164, 115, 0.14);
+  --ap-positive-border: rgba(40, 164, 115, 0.38);
+  --ap-negative: #f63c55;
+  --ap-negative-soft: rgba(246, 60, 85, 0.14);
+  --ap-negative-border: rgba(246, 60, 85, 0.38);
+  --ap-warning: #f0b90b;
+  --ap-warning-soft: rgba(240, 185, 11, 0.14);
+  --ap-warning-border: rgba(240, 185, 11, 0.38);
+  --ap-info: #2b7cd3;
+  --ap-info-soft: rgba(43, 124, 211, 0.14);
+  --ap-info-border: rgba(43, 124, 211, 0.38);
+
+  --ap-font-sans: Inter, "Helvetica Neue", Arial, sans-serif;
+  --ap-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --ap-weight-regular: 400;
+  --ap-weight-medium: 500;
+  --ap-weight-semibold: 600;
+  --ap-weight-bold: 700;
+
+  --ap-text-display-size: 3.5rem;
+  --ap-text-display-line: 4rem;
+  --ap-text-h1-size: 3rem;
+  --ap-text-h1-line: 3.5rem;
+  --ap-text-h2-size: 2.5rem;
+  --ap-text-h2-line: 3rem;
+  --ap-text-h3-size: 2rem;
+  --ap-text-h3-line: 2.5rem;
+  --ap-text-h4-size: 1.5rem;
+  --ap-text-h4-line: 2rem;
+  --ap-text-h5-size: 1.25rem;
+  --ap-text-h5-line: 1.75rem;
+  --ap-text-h6-size: 1rem;
+  --ap-text-h6-line: 1.5rem;
+  --ap-text-body-lg-size: 1rem;
+  --ap-text-body-lg-line: 1.5rem;
+  --ap-text-body-size: 0.875rem;
+  --ap-text-body-line: 1.375rem;
+  --ap-text-small-size: 0.75rem;
+  --ap-text-small-line: 1.125rem;
+  --ap-text-caption-size: 0.6875rem;
+  --ap-text-caption-line: 1rem;
+  --ap-text-micro-size: 0.625rem;
+  --ap-text-micro-line: 0.875rem;
+
+  --ap-space-1: 0.25rem;
+  --ap-space-2: 0.5rem;
+  --ap-space-3: 0.75rem;
+  --ap-space-4: 1rem;
+  --ap-space-5: 1.25rem;
+  --ap-space-6: 1.5rem;
+  --ap-space-8: 2rem;
+  --ap-space-10: 2.5rem;
+  --ap-space-12: 3rem;
+  --ap-space-16: 4rem;
+  --ap-space-20: 5rem;
+
+  --ap-radius-xs: 0.25rem;
+  --ap-radius-sm: 0.375rem;
+  --ap-radius-md: 0.5rem;
+  --ap-radius-lg: 0.75rem;
+  --ap-radius-xl: 1rem;
+  --ap-radius-pill: 999px;
+
+  --ap-control-sm: 2rem;
+  --ap-control-md: 2.5rem;
+  --ap-control-lg: 3rem;
+  --ap-control-xl: 3.5rem;
+
+  --ap-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --ap-shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.38);
+
+  --ap-page-max: 75rem;
+  --ap-workflow-max: 60rem;
+  --ap-breakpoint-compact: 30rem;
+  --ap-breakpoint-tablet: 48rem;
+  --ap-breakpoint-wide: 75rem;
+
+  --ap-duration-fast: 120ms;
+  --ap-duration-normal: 180ms;
+  --ap-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --ap-bg-canvas: #f5f5f5;
+  --ap-bg-sidebar: #181a20;
+  --ap-bg-surface-1: #ffffff;
+  --ap-bg-surface-2: #fafafa;
+  --ap-bg-surface-3: #f0f1f2;
+  --ap-bg-overlay: rgba(24, 26, 32, 0.58);
+  --ap-border-subtle: #eaecef;
+  --ap-border-strong: #b7bdc6;
+  --ap-text-primary: #1e2329;
+  --ap-text-secondary: #474d57;
+  --ap-text-tertiary: #707a8a;
+  --ap-text-disabled: #b7bdc6;
+  --ap-text-inverse: #ffffff;
+  --ap-link: #946d00;
+  --ap-link-hover: #765800;
+}
+
+@media (max-width: 47.999rem) {
+  :root {
+    --ap-text-h1-size: 2.25rem;
+    --ap-text-h1-line: 2.75rem;
+    --ap-text-h2-size: 1.875rem;
+    --ap-text-h2-line: 2.375rem;
+    --ap-text-h3-size: 1.625rem;
+    --ap-text-h3-line: 2.125rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ap-duration-fast: 0ms;
+    --ap-duration-normal: 0ms;
+  }
+}
