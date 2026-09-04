@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BinancePayError, validateBinancePayInput } from "../lib/server/binance-pay";
+import { addBinancePayInputHint, BinancePayError, validateBinancePayInput } from "../lib/server/binance-pay";
 
 test("accepts documented Binance payment-link formats", () => {
   assert.equal(validateBinancePayInput("https://app.binance.com/uni-qr/example"), "https://app.binance.com/uni-qr/example");
@@ -19,4 +19,12 @@ test("rejects lookalike hosts and insecure links", () => {
       (error) => error instanceof BinancePayError && error.code === "UNSUPPORTED_QR_FORMAT",
     );
   }
+});
+
+test("adds a specific hint for a rejected Request-to-Pay share link", () => {
+  const result = addBinancePayInputHint(
+    "https://app.binance.com/uni-qr/request-to-pay?billOrderId=redacted&billType=PAY_REQUEST",
+    { status: "INVALID_QR_FORMAT", message: "Invalid QR code format" },
+  );
+  assert.match(result.hint ?? "", /standard Binance Pay receive QR image/i);
 });

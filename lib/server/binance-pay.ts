@@ -84,6 +84,20 @@ export function validateBinancePayInput(rawQr: string): string {
   throw new BinancePayError("Only official app.binance.com payment links and PIX QR payloads are supported.", "UNSUPPORTED_QR_FORMAT");
 }
 
+export function addBinancePayInputHint(rawQr: string, order: BinancePayOrder): BinancePayOrder {
+  if (order.status !== "INVALID_QR_FORMAT") return order;
+  try {
+    const url = new URL(rawQr);
+    if (url.hostname === "app.binance.com" && url.pathname === "/uni-qr/request-to-pay") {
+      return {
+        ...order,
+        hint: "Binance Agent Payout rejected this Request-to-Pay share-link subtype. Try the recipient’s standard Binance Pay receive QR image instead.",
+      };
+    }
+  } catch { /* input validation handles malformed URLs */ }
+  return order;
+}
+
 export async function getBinancePayCapability(): Promise<BinancePayCapability> {
   const missing: string[] = [];
   let fileKey = false;
@@ -113,7 +127,8 @@ export async function prepareBinancePayment(rawQr: string): Promise<BinancePayOr
   if (!capability.configured) throw new BinancePayError("Binance Pay credentials are not configured.", "PAYMENT_CONFIG_REQUIRED");
   return serialized(async () => {
     await runUnlocked(["--action", "reset"], 45_000, false);
-    return asPaymentOrder(await runUnlocked(["--action", "purchase", "--raw_qr", validateBinancePayInput(rawQr)]));
+    const validated = validateBinancePayInput(rawQr);
+    return addBinancePayInputHint(validated, asPaymentOrder(await runUnlocked(["--action", "purchase", "--raw_qr", validated])));
   });
 }
 
