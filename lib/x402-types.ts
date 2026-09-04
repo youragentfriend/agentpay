@@ -1,5 +1,5 @@
 export type X402OptionStatus = "READY_TO_SIGN" | "ACTION_REQUIRED" | "NOT_SIGNABLE";
-export type X402IntentStatus = "awaiting-approval" | "signing" | "completed" | "failed";
+export type X402IntentStatus = "awaiting-approval" | "signing" | "approving" | "completed" | "failed";
 
 export interface X402PaymentOption {
   index: number;
@@ -44,6 +44,7 @@ export interface X402Intent {
   responseContentType?: string;
   responseBody?: string;
   settlementTxHash?: string;
+  approvalTxHash?: string;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
