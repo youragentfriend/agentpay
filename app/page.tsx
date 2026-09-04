@@ -37,7 +37,7 @@ export default function Home() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">A</div>
+          <img className="brand-mark" src="/brand/agentpay-mark.png" alt="" aria-hidden="true" />
           <div>
             <strong>AgentPay</strong>
             <span>Payment OS</span>

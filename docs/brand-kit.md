@@ -30,15 +30,16 @@ References:
 
 ## Logo and favicon assets
 
-Preferred delivery:
+Installed assets supplied by Mark on 2026-09-04:
 
-- Logo: SVG with outlined/embedded shapes and a transparent canvas.
-- Logo fallback: transparent PNG at 2× intended display size.
-- Favicon: SVG plus a transparent 512×512 PNG fallback.
-- Optional variants: full lockup, icon-only mark, light-on-dark, dark-on-light.
-- Avoid JPG unless the artwork intentionally requires a photographic background.
+- `public/brand/agentpay-mark.png` — 512×512 AP mark for product navigation.
+- `public/brand/agentpay-logo.png` — 1024×1024 full AgentPay lockup for future marketing/header use.
+- `app/icon.png` — 512×512 browser/app icon.
+- `app/apple-icon.png` — 180×180 Apple touch icon.
 
-Do not embed external raster URLs. Store final assets locally under `public/brand/` when supplied.
+The Canva SVG exports contained embedded raster images and large C2PA metadata blocks rather than true vector paths. AgentPay therefore renders optimized local PNGs from the supplied artwork instead of shipping the oversized SVG wrappers. The visible black/yellow/white design is preserved.
+
+For future variants, prefer a true path-based SVG with outlined shapes and a transparent canvas, plus an icon-only light-on-dark and dark-on-light version.
 
 ## Color system
 
