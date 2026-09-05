@@ -38,6 +38,7 @@ function sourceState(state: string) {
 export function BinancePortfolioView() {
   const [portfolio, setPortfolio] = useState<BinancePortfolio | null>(null);
   const [tab, setTab] = useState<"all" | BinancePortfolioSource>("all");
+  const [sort, setSort] = useState<"high" | "low">("high");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,7 +61,17 @@ export function BinancePortfolioView() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setPage(1); }, [tab]);
 
-  const filtered = useMemo(() => portfolio?.balances.filter((balance) => tab === "all" || balance.source === tab) ?? [], [portfolio, tab]);
+  const filtered = useMemo(() => {
+    const balances = portfolio?.balances.filter((balance) => tab === "all" || balance.source === tab) ?? [];
+    return [...balances].sort((left, right) => {
+      if (left.usdValue === null && right.usdValue !== null) return 1;
+      if (left.usdValue !== null && right.usdValue === null) return -1;
+      if (left.usdValue === null || right.usdValue === null) return left.asset.localeCompare(right.asset);
+      const leftValue = left.usdValue;
+      const rightValue = right.usdValue;
+      return sort === "high" ? rightValue - leftValue : leftValue - rightValue;
+    });
+  }, [portfolio, sort, tab]);
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -72,9 +83,6 @@ export function BinancePortfolioView() {
         <small>{portfolio?.refreshedAt ? `Estimated from Binance market prices · Refreshed ${new Date(portfolio.refreshedAt).toLocaleString()}` : "Connect a separate least-privilege API key to load balances."}</small>
       </div>
       <div className="summary-actions">
-        <span className={`connection-state ${portfolio?.connection === "connected" ? "success" : portfolio?.connection === "partial" ? "awaiting" : "neutral"}`}>
-          {portfolio?.connection === "connected" ? "Connected" : portfolio?.connection === "partial" ? "Partially available" : portfolio?.configured ? "Connection issue" : "Not connected"}
-        </span>
         <button className="primary-button" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : "Refresh balances"}</button>
       </div>
     </div>
@@ -90,14 +98,21 @@ export function BinancePortfolioView() {
     </div>}
 
     {!loading && portfolio && !portfolio.configured ? <BinanceSetup/> : <>
-      <div className="binance-filter-row">
-        <label htmlFor="binance-source">Account source</label>
-        <select id="binance-source" value={tab} onChange={(event) => setTab(event.target.value as typeof tab)}>
-          {TABS.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}
-        </select>
-      </div>
       <section className="wallet-section binance-balance-section">
-        <div className="section-heading"><h2>{TABS.find((item) => item.value === tab)?.label} balances</h2><span>{portfolio ? `${filtered.length} visible · assets under ${usd(portfolio.dustThresholdUsd)} hidden` : "Loading balances"}</span></div>
+        <div className="section-heading">
+          <div><h2>{TABS.find((item) => item.value === tab)?.label} balances</h2><span>{portfolio ? `${filtered.length} visible · assets under ${usd(portfolio.dustThresholdUsd)} hidden` : "Loading balances"}</span></div>
+          <div className="binance-balance-controls">
+            <label htmlFor="binance-source">Account source</label>
+            <select id="binance-source" value={tab} onChange={(event) => setTab(event.target.value as typeof tab)}>
+              {TABS.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}
+            </select>
+            <label htmlFor="binance-sort">Sort</label>
+            <select id="binance-sort" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
+              <option value="high">Highest to lowest</option>
+              <option value="low">Lowest to highest</option>
+            </select>
+          </div>
+        </div>
         <div className="binance-table-head"><span>Asset</span><span>Account</span><span>Available</span><span>Total / equity</span><span>Estimated USD</span></div>
         {loading && !portfolio ? <div className="portfolio-empty"><strong>Loading your Binance portfolio…</strong><p>Each account source is checked independently.</p></div> : visible.length ? <div className="binance-balance-list">
           {visible.map((balance) => <BalanceRow balance={balance} key={balance.id}/>) }
