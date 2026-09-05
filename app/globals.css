@@ -419,12 +419,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .diagnostics-toolbar strong { font-size: 13px; }
 .diagnostics-toolbar span { margin-top: 4px; color: var(--muted-2); font-size: 12px; }
 .live-settings .workflow-error button { margin-left: 8px; color: inherit; font-weight: 700; text-decoration: underline; }
-.live-connection-list { margin-top: 12px; }
+.live-connection-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; overflow: visible; border: 0; background: transparent; }
+.live-connection-list .live-connection-row { border: 1px solid var(--line); border-radius: 13px; background: #fff; }
 .live-connection-row { flex-wrap: wrap; }
 .live-connection-row .connection-state { flex: 0 0 auto; }
 .connection-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .connection-copy .connection-facts small { margin: 0; padding: 4px 7px; border-radius: 999px; background: #f0f0eb; color: var(--muted); font-size: 11px; }
-.diagnostic-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+.diagnostic-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 .diagnostic-card { padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .diagnostic-card span, .diagnostic-card strong { display: block; }
 .diagnostic-card span { color: var(--muted-2); font-size: 13px; }
@@ -492,6 +493,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .composer-wrap { padding: 0 16px 24px; }
   .conversation { padding-right: 16px; padding-left: 16px; }
   .payment-fields, .diagnostic-grid { grid-template-columns: 1fr; }
+  .live-connection-list { grid-template-columns: 1fr; }
   .wallet-data-grid { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }
   .rail-row { grid-template-columns: 35px minmax(0, 1fr) auto; }
