@@ -115,7 +115,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .conversation.has-messages { max-height: 420px; }
 .conversation.empty { overflow: hidden; }
 .conversation.has-messages { min-height: 220px; }
-.conversation-placeholder { display: grid; gap: 6px; padding: 18px 15px; border: 1px dashed var(--line-strong); border-radius: 12px; background: #fafaf7; color: var(--muted); text-align: center; }
+.conversation-placeholder { display: grid; gap: 6px; align-content: center; justify-items: center; min-height: 194px; padding: 18px 15px; border: 1px dashed var(--line-strong); border-radius: 12px; background: #fafaf7; color: var(--muted); text-align: center; }
 .conversation-placeholder strong { color: var(--ink-2); font-size: 15px; font-weight: 600; }
 .conversation-placeholder span { font-size: 14px; line-height: 1.55; }
 .chat-bubble { max-width: 84%; padding: 12px 15px; border-radius: 16px 16px 4px 16px; }
@@ -134,6 +134,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .composer-actions, .composer-actions > div { display: flex; align-items: center; }
 .composer-actions { justify-content: space-between; margin-top: 8px; }
 .composer-actions > div { gap: 11px; color: #3f433b; font-size: 13px; }
+.new-conversation-button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-2); font-size: 13px; font-weight: 600; }
+.new-conversation-button:hover:not(:disabled) { background: var(--soft); }
 .composer-attach { position: relative; display: flex; min-height: 34px; align-items: center; padding: 0 11px; border: 1px solid #e0e1da; border-radius: 7px; background: #f7f7f3; color: #3f433b; font-size: 13px; cursor: pointer; }
 .composer-attach:focus-within { outline: 3px solid rgba(245, 205, 69, .34); outline-offset: 2px; }
 .composer-attach b { font-weight: 500; }
