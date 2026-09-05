@@ -90,7 +90,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .assistant-workspace, .recent-panel, .payment-rails, .wallet-section, .payment-workflow, .binance-pay-workflow, .integration-setup, .settings-card { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .assistant-workspace { display: grid; min-width: 0; grid-template-columns: minmax(0, 7fr) minmax(240px, 3fr); align-items: stretch; overflow: hidden; }
 .assistant-panel, .recent-chats-panel, .recent-panel { min-width: 0; min-height: 0; overflow: hidden; }
-.assistant-panel { display: grid; height: 760px; grid-template-rows: auto auto minmax(0, 1fr) auto; min-height: 0; }
+.assistant-panel { display: grid; height: 720px; grid-template-rows: auto auto minmax(0, 1fr) auto; min-height: 0; }
 .recent-chats-panel, .recent-panel { display: flex; height: 100%; flex-direction: column; }
 .recent-chats-panel { border-left: 1px solid var(--line); }
 .assistant-status { display: flex; min-height: 80px; align-items: center; padding: 23px 24px; border-bottom: 1px solid var(--line); }
@@ -373,7 +373,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 @media (max-width: 1080px) {
   .overview-primary-grid, .overview-secondary-grid, .assistant-workspace { grid-template-columns: 1fr; }
-  .assistant-panel { height: 760px; }
+  .assistant-panel { height: 720px; }
   .recent-panel { height: auto; }
   .recent-list { max-height: 360px; }
   .portfolio-summary, .wallet-summary { flex-direction: column; }
