@@ -35,10 +35,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand > div { display: flex; flex-direction: column; }
 .brand strong { font-size: 18px; line-height: 1.1; letter-spacing: -.02em; }
 .brand span:not(.brand-symbol) { margin-top: 4px; color: #8f9188; font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
-.brand-symbol { position: relative; display: block; width: 32px; height: 32px; overflow: hidden; border-radius: 9px; background: var(--yellow); }
-.brand-symbol i { position: absolute; background: var(--ink); transform: skew(-17deg); }
-.brand-symbol i:first-child { top: 7px; left: 8px; width: 8px; height: 20px; }
-.brand-symbol i:last-child { right: 7px; bottom: 5px; width: 8px; height: 13px; }
+.brand-symbol { display: block; width: 42px; height: 42px; object-fit: contain; border-radius: 9px; }
 .mobile-close, .menu-button { display: none; background: transparent; }
 .mobile-close { color: #fff; font-size: 25px; }
 .safe-state { display: flex; align-items: center; gap: 10px; margin: 28px 4px 24px; padding: 12px; border: 1px solid #303129; border-radius: 12px; background: #22231d; }
@@ -98,9 +95,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .assistant-panel.has-messages { height: auto; }
 .recent-chats-panel, .recent-panel { display: flex; height: 100%; flex-direction: column; }
 .recent-chats-panel { border-left: 1px solid var(--line); }
-.assistant-status { display: flex; min-height: 72px; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+.assistant-status { display: flex; min-height: 80px; align-items: center; padding: 23px 24px; border-bottom: 1px solid var(--line); }
 .assistant-identity { display: flex; align-items: center; gap: 11px; }
-.assistant-badge { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: var(--ink); color: var(--yellow); }
+.assistant-badge { display: block; width: 38px; height: 38px; object-fit: contain; border-radius: 10px; background: var(--ink); }
 .assistant-identity > div { display: flex; flex-direction: column; }
 .assistant-identity strong { font-size: 17px; font-weight: 600; }
 .assistant-identity small { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: #3f433b; font-size: 13px; }
@@ -114,9 +111,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .quick-actions strong { font-size: 15px; font-weight: 600; }
 .quick-actions small { margin-top: 4px; color: #3f433b; font-size: 13px; line-height: 1.45; }
 .quick-actions b { color: #aaaca3; font-weight: 400; }
-.conversation { display: grid; align-content: start; gap: 14px; overflow: auto; padding: 12px 24px; border-top: 1px solid var(--line); scrollbar-gutter: stable; }
+.conversation { display: grid; min-height: 220px; align-content: start; gap: 14px; overflow: auto; padding: 12px 24px; border-top: 1px solid var(--line); scrollbar-gutter: stable; }
 .conversation.has-messages { max-height: 420px; }
-.conversation.empty { flex: 0 0 auto; overflow: hidden; padding: 12px 24px 18px; border-top: 1px solid var(--line); }
+.conversation.empty { overflow: hidden; }
+.conversation.has-messages { min-height: 220px; }
 .conversation-placeholder { display: grid; gap: 6px; padding: 18px 15px; border: 1px dashed var(--line-strong); border-radius: 12px; background: #fafaf7; color: var(--muted); text-align: center; }
 .conversation-placeholder strong { color: var(--ink-2); font-size: 15px; font-weight: 600; }
 .conversation-placeholder span { font-size: 14px; line-height: 1.55; }
@@ -403,7 +401,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .breadcrumbs span, .breadcrumbs b { display: none; }
   .page-content { padding: 31px 17px 55px; }
   .welcome h1, .standard-page h1 { font-size: 30px; }
-  .assistant-status { min-height: 70px; padding: 18px 16px; }
+  .assistant-status, .assistant-workspace .panel-heading { min-height: 70px; padding: 18px 16px; }
   .quick-actions { padding: 16px; }
   .composer-wrap { padding: 0 16px 24px; }
   .conversation { padding-right: 16px; padding-left: 16px; }
