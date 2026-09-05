@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BinancePayCapability, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
 
-export function BinancePayWorkflow({ initialFile = null, embedded = false }: { initialFile?: File | null; embedded?: boolean }) {
+export function BinancePayWorkflow({ initialFile = null, embedded = false, initialMode = "pay" }: { initialFile?: File | null; embedded?: boolean; initialMode?: "pay" | "receive" }) {
   const [capability, setCapability] = useState<BinancePayCapability | null>(null);
-  const [mode, setMode] = useState<"pay" | "receive">("pay");
+  const [mode, setMode] = useState<"pay" | "receive">(initialMode);
   const [rawQr, setRawQr] = useState("");
   const [amount, setAmount] = useState("");
   const [order, setOrder] = useState<BinancePayOrder | null>(null);
