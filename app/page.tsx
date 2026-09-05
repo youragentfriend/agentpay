@@ -217,7 +217,7 @@ function PaymentRails({walletStatus,onNavigate}:{walletStatus:WalletConnectionSt
 function statusClass(status:string){const s=String(status).toLowerCase();if(['failed','failure','rejected'].some(x=>s.includes(x)))return'failed';if(['success','confirmed','completed'].some(x=>s.includes(x)))return'success';if(s.includes('awaiting')||s.includes('approval'))return'awaiting';return'pending'}
 function friendlyStatus(status:string){const c=statusClass(status);return c==='success'?'Successful':c==='failed'?'Failed':c==='awaiting'?'Awaiting approval':'Pending'}
 
-function BinanceView(){return <PageFrame eyebrow="Binance account" title="Your Binance portfolio" description="Read-only visibility across Spot, Funding, USDⓈ-M Futures, Simple Earn, and Margin. Every source is checked independently."><BinancePortfolioView/></PageFrame>}
+function BinanceView(){return <PageFrame eyebrow="Binance account" title="Your Binance portfolio" description="Balances across your Binance account sources, with each source checked independently."><BinancePortfolioView/></PageFrame>}
 function WalletView({ onStatusChange }: { onStatusChange: (status: WalletConnectionStatus) => void }) {
   const [overview, setOverview] = useState<WalletOverview | null>(null);
   const [signIn, setSignIn] = useState<WalletSignIn | null>(null);

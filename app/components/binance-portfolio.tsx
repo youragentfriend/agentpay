@@ -14,7 +14,6 @@ const TABS: Array<{ value: "all" | BinancePortfolioSource; label: string }> = [
   { value: "funding", label: "Funding" },
   { value: "futures", label: "Futures" },
   { value: "earn", label: "Earn" },
-  { value: "margin", label: "Margin" },
 ];
 const PAGE_SIZE = 10;
 
@@ -74,13 +73,11 @@ export function BinancePortfolioView() {
       </div>
       <div className="summary-actions">
         <span className={`connection-state ${portfolio?.connection === "connected" ? "success" : portfolio?.connection === "partial" ? "awaiting" : "neutral"}`}>
-          {portfolio?.connection === "connected" ? "Connected · read only" : portfolio?.connection === "partial" ? "Partially available" : portfolio?.configured ? "Connection issue" : "Not connected"}
+          {portfolio?.connection === "connected" ? "Connected" : portfolio?.connection === "partial" ? "Partially available" : portfolio?.configured ? "Connection issue" : "Not connected"}
         </span>
         <button className="primary-button" onClick={() => void load()} disabled={loading}>{loading ? "Refreshing…" : "Refresh balances"}</button>
       </div>
     </div>
-
-    <div className="read-only-banner"><span>✓</span><div><strong>Read-only by design</strong><p>This connection can inspect portfolio balances only. AgentPay does not expose Binance trading, withdrawal, leverage, or recommendation controls.</p></div></div>
 
     {error && <div className="workflow-error">{error}</div>}
 
@@ -93,8 +90,11 @@ export function BinancePortfolioView() {
     </div>}
 
     {!loading && portfolio && !portfolio.configured ? <BinanceSetup/> : <>
-      <div className="account-tabs" role="tablist" aria-label="Binance account source">
-        {TABS.map((item) => <button role="tab" aria-selected={tab === item.value} className={tab === item.value ? "active" : ""} key={item.value} onClick={() => setTab(item.value)}>{item.label}</button>)}
+      <div className="binance-filter-row">
+        <label htmlFor="binance-source">Account source</label>
+        <select id="binance-source" value={tab} onChange={(event) => setTab(event.target.value as typeof tab)}>
+          {TABS.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}
+        </select>
       </div>
       <section className="wallet-section binance-balance-section">
         <div className="section-heading"><h2>{TABS.find((item) => item.value === tab)?.label} balances</h2><span>{portfolio ? `${filtered.length} visible · assets under ${usd(portfolio.dustThresholdUsd)} hidden` : "Loading balances"}</span></div>
@@ -112,7 +112,7 @@ export function BinancePortfolioView() {
 function BalanceRow({ balance }: { balance: BinanceBalance }) {
   return <div className="binance-balance-row">
     <span className="asset-cell"><b>{balance.asset.slice(0, 1)}</b><strong>{balance.asset}</strong></span>
-    <span><strong>{balance.sourceLabel}</strong><small>{balance.source === "margin" ? "Net equity" : balance.valuation === "derived" ? "Derived estimate" : "Read only"}</small></span>
+    <span><strong>{balance.sourceLabel}</strong><small>{balance.source === "margin" ? "Net equity" : balance.valuation === "derived" ? "Derived estimate" : "Account balance"}</small></span>
     <span className="numeric-cell">{quantity(balance.available)}</span>
     <span className="numeric-cell">{quantity(balance.total)}</span>
     <span className="numeric-cell"><strong>{balance.usdValue === null ? "Not priced" : usd(balance.usdValue)}</strong>{balance.priceUsd !== null && <small>{usd(balance.priceUsd)} / {balance.asset}</small>}</span>
@@ -122,8 +122,8 @@ function BalanceRow({ balance }: { balance: BinanceBalance }) {
 function BinanceSetup() {
   return <section className="binance-setup-card">
     <span className="empty-icon">B</span>
-    <h2>Connect a separate Binance read-only key</h2>
-    <p>Create an API key dedicated to AgentPay, enable account reading only, disable trading and withdrawals, and restrict it to this server’s IP. Binance Pay credentials remain separate.</p>
+    <h2>Connect your Binance account</h2>
+    <p>Connect your Binance account to load balances from each supported account source. Binance Pay credentials remain separate.</p>
     <div className="binance-secret-names"><code>BINANCE_READONLY_API_KEY</code><code>BINANCE_READONLY_API_SECRET</code></div>
     <small>Credentials must be injected through protected server configuration—never pasted into chat or a browser form.</small>
   </section>;
