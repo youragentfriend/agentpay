@@ -76,7 +76,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .breadcrumbs b { color: #cacbc5; font-weight: 400; }
 .breadcrumbs strong { font-weight: 600; }
 .avatar { border: 0; background: var(--ink); }
-.page-content { max-width: 1320px; margin: 0 auto; padding: 48px 44px 70px; }
+.page-content { max-width: 1320px; margin: 0 auto; padding: 28px 44px 70px; }
 
 /* Overview */
 .welcome { margin-bottom: 30px; }
@@ -399,7 +399,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .topbar { height: 61px; padding: 0 17px; }
   .menu-button { font-size: 19px; }
   .breadcrumbs span, .breadcrumbs b { display: none; }
-  .page-content { padding: 31px 17px 55px; }
+  .page-content { padding: 24px 17px 55px; }
   .welcome h1, .standard-page h1 { font-size: 30px; }
   .assistant-status, .assistant-workspace .panel-heading { min-height: 70px; padding: 18px 16px; }
   .quick-actions { padding: 16px; }
