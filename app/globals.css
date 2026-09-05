@@ -432,8 +432,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .diagnostic-card strong { margin-top: 9px; }
 .settings-card { padding: 22px; }
 .profile-settings-card { display: grid; gap: 22px; }
-.rules-settings-card { display: grid; gap: 22px; }
-.locked-rule { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.rules-settings-card { display: grid; gap: 18px; margin-top: 30px; }
+.rules-settings-card > .settings-card { margin-top: 0; }
+.trusted-rules-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.trusted-rule-card { display: grid; gap: 16px; margin-top: 0; overflow: visible; }
+.spending-rules-card { display: grid; gap: 18px; margin-top: 0; }
+.spending-limit-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px; border-radius: 12px; background: #f0f0eb; }
+.spending-limit-tabs button { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 700; cursor: pointer; }
+.spending-limit-tabs button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(23,24,21,.1); }
+.spending-limit-panel { display: grid; gap: 10px; }
+.two-column-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.locked-rule { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .locked-rule strong, .locked-rule div > span { display: block; }
 .locked-rule div > span { margin-top: 5px; color: var(--muted); font-size: 13px; }
 .money-input { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
@@ -492,7 +501,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .quick-actions { padding: 16px; }
   .composer-wrap { padding: 0 16px 24px; }
   .conversation { padding-right: 16px; padding-left: 16px; }
-  .payment-fields, .diagnostic-grid { grid-template-columns: 1fr; }
+  .payment-fields, .diagnostic-grid, .trusted-rules-grid, .two-column-settings { grid-template-columns: 1fr; }
+  .spending-limit-tabs { grid-template-columns: 1fr; }
   .live-connection-list { grid-template-columns: 1fr; }
   .wallet-data-grid { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }

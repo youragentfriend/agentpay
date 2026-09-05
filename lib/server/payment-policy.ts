@@ -71,16 +71,17 @@ export function evaluatePaymentPolicy(
 ): void {
   if (settings.requireApproval !== true) throw new PaymentPolicyError("Mandatory payment approval is not enabled.", "POLICY_APPROVAL_REQUIRED");
 
-  const hasMonetaryRule = settings.perPaymentUsdLimit !== null || settings.dailyUsdLimit !== null;
+  const limits = settings.spendingLimits[input.rail];
+  const hasMonetaryRule = limits.perPaymentUsdLimit !== null || limits.dailyUsdLimit !== null;
   const amountUsd = input.amountUsd?.trim();
   if (hasMonetaryRule && (!amountUsd || !decimalParts(amountUsd))) {
     throw new PaymentPolicyError("This payment has no reliable USD valuation, so configured spending limits cannot be evaluated.", "POLICY_AMOUNT_USD_REQUIRED");
   }
-  if (amountUsd && settings.perPaymentUsdLimit && greaterThan(amountUsd, settings.perPaymentUsdLimit)) {
-    throw new PaymentPolicyError(`Payment exceeds the $${settings.perPaymentUsdLimit} per-payment limit.`, "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");
+  if (amountUsd && limits.perPaymentUsdLimit && greaterThan(amountUsd, limits.perPaymentUsdLimit)) {
+    throw new PaymentPolicyError(`Payment exceeds the $${limits.perPaymentUsdLimit} ${input.rail} per-payment limit.`, "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");
   }
-  if (amountUsd && settings.dailyUsdLimit && greaterThan(addDecimalStrings(currentDailySpendUsd, amountUsd), settings.dailyUsdLimit)) {
-    throw new PaymentPolicyError(`Payment would exceed the $${settings.dailyUsdLimit} daily limit.`, "POLICY_DAILY_LIMIT_EXCEEDED");
+  if (amountUsd && limits.dailyUsdLimit && greaterThan(addDecimalStrings(currentDailySpendUsd, amountUsd), limits.dailyUsdLimit)) {
+    throw new PaymentPolicyError(`Payment would exceed the $${limits.dailyUsdLimit} ${input.rail} daily limit.`, "POLICY_DAILY_LIMIT_EXCEEDED");
   }
 
   if (input.destination && settings.trustedWalletDestinations.length > 0) {
@@ -109,21 +110,21 @@ function tableExists(name: string): boolean {
   return Boolean(db().prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
 }
 
-export function getDailySpendUsd(now = new Date()): string {
+export function getDailySpendUsd(rail: PaymentPolicyInput["rail"], now = new Date()): string {
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
   const amounts: Array<string | undefined> = [];
-  if (tableExists("payment_intents")) {
+  if (rail === "agentic-wallet" && tableExists("payment_intents")) {
     const columns = new Set((db().prepare("PRAGMA table_info(payment_intents)").all() as unknown as Array<{ name: string }>).map((column) => column.name));
     if (columns.has("amount_usd")) {
       for (const row of db().prepare("SELECT amount_usd FROM payment_intents WHERE status IN ('submitting','submitted','confirmed') AND COALESCE(submitted_at, approved_at, created_at) >= ?").all(since) as unknown as Array<{ amount_usd: string | null }>) amounts.push(row.amount_usd ?? undefined);
     }
   }
-  if (tableExists("binance_pay_orders")) {
+  if (rail === "binance-pay" && tableExists("binance_pay_orders")) {
     for (const row of db().prepare("SELECT amount, currency FROM binance_pay_orders WHERE status IN ('PROCESSING','SUCCESS') AND updated_at >= ?").all(since) as unknown as Array<{ amount: string | null; currency: string | null }>) {
       amounts.push(usdAmountForCurrency(row.amount, row.currency));
     }
   }
-  if (tableExists("x402_intents")) {
+  if (rail === "x402" && tableExists("x402_intents")) {
     for (const row of db().prepare("SELECT options_json, selected_index FROM x402_intents WHERE status IN ('signing','approving','completed') AND updated_at >= ?").all(since) as unknown as Array<{ options_json: string; selected_index: number | null }>) {
       try {
         const options = JSON.parse(row.options_json) as Array<{ index?: number; amountUsd?: string }>;
@@ -139,7 +140,7 @@ export function getDailySpendUsd(now = new Date()): string {
 
 export function enforcePaymentPolicy(input: PaymentPolicyInput): void {
   const settings = getAgentPaySettings();
-  const dailySpend = settings.dailyUsdLimit === null ? "0" : getDailySpendUsd();
+  const dailySpend = settings.spendingLimits[input.rail].dailyUsdLimit === null ? "0" : getDailySpendUsd(input.rail);
   evaluatePaymentPolicy(input, settings, dailySpend);
 }
 

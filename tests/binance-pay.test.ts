@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addBinancePayInputHint, BinancePayError, getCompatibleBinancePayLink, validateBinancePayInput } from "../lib/server/binance-pay";
+import { addBinancePayInputHint, BinancePayError, getBinancePayReceiveCurrencies, getCompatibleBinancePayLink, validateBinancePayInput } from "../lib/server/binance-pay";
+
+test("exposes server-controlled receive currency choices", () => {
+  const result = getBinancePayReceiveCurrencies();
+  assert.ok(result.currencies.includes("USDT"));
+  assert.ok(result.currencies.includes("USDC"));
+  assert.ok(result.currencies.includes("BTC"));
+  assert.ok(result.currencies.includes("BNB"));
+});
 
 test("accepts documented Binance payment-link formats", () => {
   assert.equal(validateBinancePayInput("https://app.binance.com/uni-qr/example"), "https://app.binance.com/uni-qr/example");

@@ -1,11 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AgentPaySettings } from "@/lib/settings-types";
+import type { AgentPaySettings, PaymentRail, SpendingLimits } from "@/lib/settings-types";
+
+const RAILS: Array<{ id: PaymentRail; label: string; help: string }> = [
+  { id: "binance-pay", label: "Binance Pay", help: "Binance API-key maximums: $50 per payment and $100 per UTC day." },
+  { id: "x402", label: "x402", help: "Applied only to approved x402 purchases with a reliable USD valuation." },
+  { id: "agentic-wallet", label: "Agentic Wallet", help: "Applied only to direct Agentic Wallet transfers." },
+];
 
 export function RulesSettings({ settings, onSaved }: { settings: AgentPaySettings; onSaved: (settings: AgentPaySettings) => void }) {
-  const [perPaymentUsdLimit, setPerPaymentUsdLimit] = useState(settings.perPaymentUsdLimit ?? "");
-  const [dailyUsdLimit, setDailyUsdLimit] = useState(settings.dailyUsdLimit ?? "");
+  const [activeRail, setActiveRail] = useState<PaymentRail>("binance-pay");
+  const [limits, setLimits] = useState<SpendingLimits>(settings.spendingLimits);
   const [walletDestinations, setWalletDestinations] = useState(settings.trustedWalletDestinations.join("\n"));
   const [x402Hosts, setX402Hosts] = useState(settings.trustedX402Hosts.join("\n"));
   const [saving, setSaving] = useState(false);
@@ -13,47 +19,57 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setPerPaymentUsdLimit(settings.perPaymentUsdLimit ?? "");
-    setDailyUsdLimit(settings.dailyUsdLimit ?? "");
+    setLimits(settings.spendingLimits);
     setWalletDestinations(settings.trustedWalletDestinations.join("\n"));
     setX402Hosts(settings.trustedX402Hosts.join("\n"));
-  }, [settings.perPaymentUsdLimit, settings.dailyUsdLimit, settings.trustedWalletDestinations, settings.trustedX402Hosts]);
+  }, [settings.spendingLimits, settings.trustedWalletDestinations, settings.trustedX402Hosts]);
+
+  function setLimit(field: "perPaymentUsdLimit" | "dailyUsdLimit", value: string) {
+    setLimits((current) => ({ ...current, [activeRail]: { ...current[activeRail], [field]: value } }));
+  }
 
   async function save() {
-    setSaving(true);
-    setError("");
-    setSaved(false);
+    setSaving(true); setError(""); setSaved(false);
     try {
+      const normalizedLimits = Object.fromEntries(Object.entries(limits).map(([rail, value]) => [rail, {
+        perPaymentUsdLimit: value.perPaymentUsdLimit?.trim() || null,
+        dailyUsdLimit: value.dailyUsdLimit?.trim() || null,
+      }])) as SpendingLimits;
       const response = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          displayName: settings.displayName,
-          displayCurrency: settings.displayCurrency,
-          timeZone: settings.timeZone,
-          perPaymentUsdLimit: perPaymentUsdLimit.trim() || null,
-          dailyUsdLimit: dailyUsdLimit.trim() || null,
+          displayName: settings.displayName, displayCurrency: settings.displayCurrency, timeZone: settings.timeZone,
+          spendingLimits: normalizedLimits,
           trustedWalletDestinations: walletDestinations.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
           trustedX402Hosts: x402Hosts.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
         }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save rules.");
-      onSaved(data as AgentPaySettings);
-      setSaved(true);
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save rules.");
-    } finally { setSaving(false); }
+      onSaved(data as AgentPaySettings); setSaved(true);
+    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Unable to save rules."); }
+    finally { setSaving(false); }
   }
 
-  return <div className="settings-card rules-settings-card">
-    <div className="locked-rule"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
-    <div className="settings-fields">
-      <label className="field"><span>Per-payment USD limit</span><div className="money-input"><b>$</b><input inputMode="decimal" value={perPaymentUsdLimit} onChange={(event) => setPerPaymentUsdLimit(event.target.value)} placeholder="No limit"/></div><small className="field-help">Leave blank for no limit. Payments without reliable USD data fail closed when set.</small></label>
-      <label className="field"><span>Daily USD limit</span><div className="money-input"><b>$</b><input inputMode="decimal" value={dailyUsdLimit} onChange={(event) => setDailyUsdLimit(event.target.value)} placeholder="No limit"/></div><small className="field-help">UTC day, across all payment rails. Leave blank for no limit.</small></label>
-      <label className="field full"><span>Trusted wallet destinations</span><textarea rows={4} value={walletDestinations} onChange={(event) => setWalletDestinations(event.target.value)} placeholder="One EVM or Solana address per line"/><small className="field-help">When populated, Agentic Wallet transfers to every other address are rejected.</small></label>
-      <label className="field full"><span>Trusted x402 hosts</span><textarea rows={4} value={x402Hosts} onChange={(event) => setX402Hosts(event.target.value)} placeholder="api.example.com"/><small className="field-help">Hostnames only. The server environment allowlist still applies independently.</small></label>
+  const active = limits[activeRail];
+  const rail = RAILS.find((item) => item.id === activeRail) as (typeof RAILS)[number];
+  return <div className="rules-settings-card">
+    <div className="locked-rule settings-card"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
+    <div className="trusted-rules-grid">
+      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted wallet destinations</strong><span>Agentic Wallet rejects every other destination when this list is populated.</span></div></div><label className="field"><textarea rows={4} value={walletDestinations} onChange={(event) => setWalletDestinations(event.target.value)} placeholder="One EVM or Solana address per line"/></label></section>
+      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted x402 hosts</strong><span>Hostnames only. The server environment allowlist still applies independently.</span></div></div><label className="field"><textarea rows={4} value={x402Hosts} onChange={(event) => setX402Hosts(event.target.value)} placeholder="api.example.com"/></label></section>
     </div>
+    <section className="settings-card spending-rules-card">
+      <div className="settings-section-heading"><div><strong>Spending limits</strong><span>Configure independent limits for each payment rail.</span></div></div>
+      <div className="spending-limit-tabs" role="tablist" aria-label="Payment rail spending limits">{RAILS.map((item) => <button type="button" role="tab" aria-selected={activeRail === item.id} className={activeRail === item.id ? "active" : ""} key={item.id} onClick={() => setActiveRail(item.id)}>{item.label}</button>)}</div>
+      <div className="spending-limit-panel" role="tabpanel">
+        <div className="settings-fields two-column-settings">
+          <label className="field"><span>Per-payment USD limit</span><div className="money-input"><b>$</b><input inputMode="decimal" value={active.perPaymentUsdLimit ?? ""} onChange={(event) => setLimit("perPaymentUsdLimit", event.target.value)} placeholder="No limit"/></div></label>
+          <label className="field"><span>Daily USD limit</span><div className="money-input"><b>$</b><input inputMode="decimal" value={active.dailyUsdLimit ?? ""} onChange={(event) => setLimit("dailyUsdLimit", event.target.value)} placeholder="No limit"/></div></label>
+        </div>
+        <small className="field-help">{rail.help} Payments without reliable USD data fail closed when a limit is set.</small>
+      </div>
+    </section>
     {error && <div className="workflow-error">{error}</div>}
     {saved && <div className="settings-success">Rules saved and active on the server.</div>}
     <div className="settings-actions"><button className="primary-button" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save rules"}</button></div>

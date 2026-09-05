@@ -3,7 +3,7 @@ import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { BinancePayCapability, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
+import type { BinancePayCapability, BinancePayCurrencies, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
 import { saveBinancePayOrder } from "@/lib/server/binance-pay-store";
 import { enforcePaymentPolicy, PaymentPolicyError, usdAmountForCurrency } from "@/lib/server/payment-policy";
 
@@ -15,6 +15,7 @@ const STATE = path.join(SKILL_DIR, ".payment_state.json");
 const VENV_PYTHON = process.env.AGENTPAY_PAYMENT_PYTHON
   || path.join(os.homedir(), ".local", "share", "agentpay", "payment-venv", "bin", "python");
 const MAX_OUTPUT = 2 * 1024 * 1024;
+const RECEIVE_CURRENCIES = ["USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB", "BRL"];
 let queue = Promise.resolve();
 
 export class BinancePayError extends Error {
@@ -166,6 +167,10 @@ export async function getBinancePayCapability(): Promise<BinancePayCapability> {
   return { configured: missing.length === 0, executionEnabled: process.env.AGENTPAY_ENABLE_BINANCE_PAY === "true", imageDecodeReady, missing };
 }
 
+export function getBinancePayReceiveCurrencies(): BinancePayCurrencies {
+  return { currencies: RECEIVE_CURRENCIES, source: "agent-payout-supported-set" };
+}
+
 export async function prepareBinancePayment(rawQr: string): Promise<BinancePayOrder> {
   const capability = await getBinancePayCapability();
   if (!capability.configured) throw new BinancePayError("Binance Pay credentials are not configured.", "PAYMENT_CONFIG_REQUIRED");
@@ -208,6 +213,7 @@ export async function createBinancePayReceiveLink(currency?: string, amount?: st
   const normalizedNote = note?.trim();
   if ((normalizedAmount || normalizedNote) && !normalizedCurrency) throw new BinancePayError("Currency is required when amount or note is set.", "CURRENCY_REQUIRED");
   if (normalizedCurrency && !/^[A-Z0-9]{2,12}$/.test(normalizedCurrency)) throw new BinancePayError("Enter a valid currency symbol.", "INVALID_CURRENCY");
+  if (normalizedCurrency && !RECEIVE_CURRENCIES.includes(normalizedCurrency)) throw new BinancePayError("Choose a supported Binance Pay receive currency.", "UNSUPPORTED_RECEIVE_CURRENCY");
   if (normalizedAmount && (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(normalizedAmount) || Number(normalizedAmount) <= 0)) throw new BinancePayError("Enter a positive receive amount.", "INVALID_PAYMENT_AMOUNT");
   if (normalizedNote && normalizedNote.length > 120) throw new BinancePayError("Receive note must be 120 characters or fewer.", "NOTE_TOO_LONG");
   const result = await serialized(() => runUnlocked([

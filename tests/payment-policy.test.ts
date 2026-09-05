@@ -21,7 +21,7 @@ const trusted = "0x1111111111111111111111111111111111111111";
 const other = "0x2222222222222222222222222222222222222222";
 const settings: AgentPaySettings = {
   displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", updatedAt: new Date().toISOString(), requireApproval: true,
-  perPaymentUsdLimit: "10", dailyUsdLimit: "20", trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
+  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, x402: { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" } }, trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
 };
 
 test("computes wallet USD values without floating-point arithmetic", () => {
@@ -33,6 +33,17 @@ test("enforces per-payment and daily USD limits", () => {
   assert.doesNotThrow(() => evaluatePaymentPolicy({ rail: "agentic-wallet", amountUsd: "10", destination: trusted }, settings, "10"));
   assert.throws(() => evaluatePaymentPolicy({ rail: "agentic-wallet", amountUsd: "10.01", destination: trusted }, settings, "0"), (error) => error instanceof PaymentPolicyError && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");
   assert.throws(() => evaluatePaymentPolicy({ rail: "agentic-wallet", amountUsd: "6", destination: trusted }, settings, "15"), (error) => error instanceof PaymentPolicyError && error.code === "POLICY_DAILY_LIMIT_EXCEEDED");
+});
+
+test("keeps spending limits independent by payment rail", () => {
+  const independent: AgentPaySettings = { ...settings, spendingLimits: {
+    "binance-pay": { perPaymentUsdLimit: "5", dailyUsdLimit: "10" },
+    x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "40" },
+    "agentic-wallet": { perPaymentUsdLimit: "100", dailyUsdLimit: "200" },
+  } };
+  assert.throws(() => evaluatePaymentPolicy({ rail: "binance-pay", amountUsd: "6" }, independent), /binance-pay per-payment limit/i);
+  assert.doesNotThrow(() => evaluatePaymentPolicy({ rail: "x402", amountUsd: "6", x402Host: "api.example.com" }, independent));
+  assert.doesNotThrow(() => evaluatePaymentPolicy({ rail: "agentic-wallet", amountUsd: "6", destination: trusted }, independent));
 });
 
 test("fails closed without USD valuation and rejects untrusted destinations and hosts", () => {
@@ -58,7 +69,7 @@ test("aggregates persisted daily spend across all payment rails", () => {
   database.prepare("INSERT INTO binance_pay_orders VALUES ('3','USDT','SUCCESS',?)").run(now);
   database.prepare("INSERT INTO x402_intents VALUES (?,0,'completed',?)").run(JSON.stringify([{ index: 0, amountUsd: "4.25" }]), now);
   database.close();
-  try { assert.equal(getDailySpendUsd(), "9.75"); }
+  try { assert.equal(getDailySpendUsd("agentic-wallet"), "2.5"); assert.equal(getDailySpendUsd("binance-pay"), "3"); assert.equal(getDailySpendUsd("x402"), "4.25"); }
   finally {
     resetPaymentPolicyStoreForTests();
     if (previous === undefined) delete process.env.AGENTPAY_DB_PATH;
@@ -75,7 +86,7 @@ test("all execution-rail guards re-read persisted rules before execution", () =>
   resetPaymentPolicyStoreForTests();
   try {
     updateAgentPaySettings({
-      displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", perPaymentUsdLimit: "1", dailyUsdLimit: null,
+      displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", spendingLimits: { "binance-pay": { perPaymentUsdLimit: "1", dailyUsdLimit: null }, x402: { perPaymentUsdLimit: "1", dailyUsdLimit: null }, "agentic-wallet": { perPaymentUsdLimit: "1", dailyUsdLimit: null } },
       trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
     });
     assert.throws(() => enforcePaymentPolicy({ rail: "agentic-wallet", amountUsd: "2", destination: trusted }), (error) => error instanceof PaymentPolicyError && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");

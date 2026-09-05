@@ -30,6 +30,12 @@ function db() {
       time_zone TEXT NOT NULL,
       per_payment_usd_limit TEXT,
       daily_usd_limit TEXT,
+      binance_pay_per_payment_usd_limit TEXT,
+      binance_pay_daily_usd_limit TEXT,
+      x402_per_payment_usd_limit TEXT,
+      x402_daily_usd_limit TEXT,
+      wallet_per_payment_usd_limit TEXT,
+      wallet_daily_usd_limit TEXT,
       trusted_wallet_destinations TEXT NOT NULL DEFAULT '[]',
       trusted_x402_hosts TEXT NOT NULL DEFAULT '[]',
       updated_at TEXT NOT NULL
@@ -38,13 +44,26 @@ function db() {
   const columns = new Set((database.prepare("PRAGMA table_info(app_settings)").all() as unknown as Array<{ name: string }>).map((column) => column.name));
   if (!columns.has("per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN per_payment_usd_limit TEXT");
   if (!columns.has("daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN daily_usd_limit TEXT");
+  if (!columns.has("binance_pay_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN binance_pay_per_payment_usd_limit TEXT");
+  if (!columns.has("binance_pay_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN binance_pay_daily_usd_limit TEXT");
+  if (!columns.has("x402_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN x402_per_payment_usd_limit TEXT");
+  if (!columns.has("x402_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN x402_daily_usd_limit TEXT");
+  if (!columns.has("wallet_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN wallet_per_payment_usd_limit TEXT");
+  if (!columns.has("wallet_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN wallet_daily_usd_limit TEXT");
   if (!columns.has("trusted_wallet_destinations")) database.exec("ALTER TABLE app_settings ADD COLUMN trusted_wallet_destinations TEXT NOT NULL DEFAULT '[]'");
   if (!columns.has("trusted_x402_hosts")) database.exec("ALTER TABLE app_settings ADD COLUMN trusted_x402_hosts TEXT NOT NULL DEFAULT '[]'");
   const now = new Date().toISOString();
   database.prepare(`
-    INSERT OR IGNORE INTO app_settings (id, display_name, display_currency, time_zone, updated_at)
-    VALUES (1, ?, ?, ?, ?)
-  `).run(DEFAULT_AGENTPAY_SETTINGS.displayName, DEFAULT_AGENTPAY_SETTINGS.displayCurrency, DEFAULT_AGENTPAY_SETTINGS.timeZone, now);
+    INSERT OR IGNORE INTO app_settings (id, display_name, display_currency, time_zone, binance_pay_per_payment_usd_limit, binance_pay_daily_usd_limit, updated_at)
+    VALUES (1, ?, ?, ?, ?, ?, ?)
+  `).run(DEFAULT_AGENTPAY_SETTINGS.displayName, DEFAULT_AGENTPAY_SETTINGS.displayCurrency, DEFAULT_AGENTPAY_SETTINGS.timeZone,
+    DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].dailyUsdLimit, now);
+  if (!columns.has("binance_pay_per_payment_usd_limit")) database.exec("UPDATE app_settings SET binance_pay_per_payment_usd_limit=COALESCE(per_payment_usd_limit,'50') WHERE id=1");
+  if (!columns.has("binance_pay_daily_usd_limit")) database.exec("UPDATE app_settings SET binance_pay_daily_usd_limit=COALESCE(daily_usd_limit,'100') WHERE id=1");
+  if (!columns.has("x402_per_payment_usd_limit")) database.exec("UPDATE app_settings SET x402_per_payment_usd_limit=per_payment_usd_limit WHERE id=1");
+  if (!columns.has("x402_daily_usd_limit")) database.exec("UPDATE app_settings SET x402_daily_usd_limit=daily_usd_limit WHERE id=1");
+  if (!columns.has("wallet_per_payment_usd_limit")) database.exec("UPDATE app_settings SET wallet_per_payment_usd_limit=per_payment_usd_limit WHERE id=1");
+  if (!columns.has("wallet_daily_usd_limit")) database.exec("UPDATE app_settings SET wallet_daily_usd_limit=daily_usd_limit WHERE id=1");
   return database;
 }
 
@@ -113,6 +132,21 @@ function validateX402Hosts(value: unknown): string[] {
   return [...new Set(hosts)];
 }
 
+function validateSpendingLimits(value: unknown): UpdateAgentPaySettings["spendingLimits"] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Spending limits must be provided for each payment rail.");
+  const input = value as Record<string, unknown>;
+  const read = (rail: string, label: string) => {
+    const candidate = input[rail];
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new SettingsValidationError(`${label} spending limits are required.`);
+    const fields = candidate as Record<string, unknown>;
+    return { perPaymentUsdLimit: validateUsdLimit(fields.perPaymentUsdLimit, `${label} per-payment limit`), dailyUsdLimit: validateUsdLimit(fields.dailyUsdLimit, `${label} daily limit`) };
+  };
+  const limits = { "binance-pay": read("binance-pay", "Binance Pay"), x402: read("x402", "x402"), "agentic-wallet": read("agentic-wallet", "Agentic Wallet") };
+  if (limits["binance-pay"].perPaymentUsdLimit && Number(limits["binance-pay"].perPaymentUsdLimit) > 50) throw new SettingsValidationError("Binance Pay per-payment limit cannot exceed $50.");
+  if (limits["binance-pay"].dailyUsdLimit && Number(limits["binance-pay"].dailyUsdLimit) > 100) throw new SettingsValidationError("Binance Pay daily limit cannot exceed $100.");
+  return limits;
+}
+
 export function validateSettingsUpdate(value: unknown): UpdateAgentPaySettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Settings must be a JSON object.");
   const input = value as Record<string, unknown>;
@@ -120,8 +154,7 @@ export function validateSettingsUpdate(value: unknown): UpdateAgentPaySettings {
     displayName: validateDisplayName(input.displayName),
     displayCurrency: validateDisplayCurrency(input.displayCurrency),
     timeZone: validateTimeZone(input.timeZone),
-    perPaymentUsdLimit: validateUsdLimit(input.perPaymentUsdLimit, "Per-payment limit"),
-    dailyUsdLimit: validateUsdLimit(input.dailyUsdLimit, "Daily limit"),
+    spendingLimits: validateSpendingLimits(input.spendingLimits),
     trustedWalletDestinations: validateWalletDestinations(input.trustedWalletDestinations),
     trustedX402Hosts: validateX402Hosts(input.trustedX402Hosts),
   };
@@ -140,8 +173,11 @@ function mapSettings(row: Record<string, unknown>): AgentPaySettings {
     displayCurrency: "USD",
     timeZone: String(row.time_zone),
     requireApproval: true,
-    perPaymentUsdLimit: row.per_payment_usd_limit === null ? null : String(row.per_payment_usd_limit),
-    dailyUsdLimit: row.daily_usd_limit === null ? null : String(row.daily_usd_limit),
+    spendingLimits: {
+      "binance-pay": { perPaymentUsdLimit: row.binance_pay_per_payment_usd_limit === null ? null : String(row.binance_pay_per_payment_usd_limit), dailyUsdLimit: row.binance_pay_daily_usd_limit === null ? null : String(row.binance_pay_daily_usd_limit) },
+      x402: { perPaymentUsdLimit: row.x402_per_payment_usd_limit === null ? null : String(row.x402_per_payment_usd_limit), dailyUsdLimit: row.x402_daily_usd_limit === null ? null : String(row.x402_daily_usd_limit) },
+      "agentic-wallet": { perPaymentUsdLimit: row.wallet_per_payment_usd_limit === null ? null : String(row.wallet_per_payment_usd_limit), dailyUsdLimit: row.wallet_daily_usd_limit === null ? null : String(row.wallet_daily_usd_limit) },
+    },
     trustedWalletDestinations: parseStoredList(row.trusted_wallet_destinations),
     trustedX402Hosts: parseStoredList(row.trusted_x402_hosts),
     updatedAt: String(row.updated_at),
@@ -149,7 +185,7 @@ function mapSettings(row: Record<string, unknown>): AgentPaySettings {
 }
 
 export function getAgentPaySettings(): AgentPaySettings {
-  const row = db().prepare("SELECT display_name, display_currency, time_zone, per_payment_usd_limit, daily_usd_limit, trusted_wallet_destinations, trusted_x402_hosts, updated_at FROM app_settings WHERE id = 1").get() as Record<string, unknown>;
+  const row = db().prepare("SELECT * FROM app_settings WHERE id = 1").get() as Record<string, unknown>;
   return mapSettings(row);
 }
 
@@ -163,11 +199,15 @@ export function updateAgentPaySettings(value: unknown): AgentPaySettings {
   const updatedAt = new Date().toISOString();
   db().prepare(`
     UPDATE app_settings
-    SET display_name = ?, display_currency = ?, time_zone = ?, per_payment_usd_limit = ?, daily_usd_limit = ?,
+    SET display_name = ?, display_currency = ?, time_zone = ?,
+        binance_pay_per_payment_usd_limit=?, binance_pay_daily_usd_limit=?, x402_per_payment_usd_limit=?, x402_daily_usd_limit=?, wallet_per_payment_usd_limit=?, wallet_daily_usd_limit=?,
         trusted_wallet_destinations = ?, trusted_x402_hosts = ?, updated_at = ?
     WHERE id = 1
-  `).run(settings.displayName, settings.displayCurrency, settings.timeZone, settings.perPaymentUsdLimit,
-    settings.dailyUsdLimit, JSON.stringify(settings.trustedWalletDestinations), JSON.stringify(settings.trustedX402Hosts), updatedAt);
+  `).run(settings.displayName, settings.displayCurrency, settings.timeZone,
+    settings.spendingLimits["binance-pay"].perPaymentUsdLimit, settings.spendingLimits["binance-pay"].dailyUsdLimit,
+    settings.spendingLimits.x402.perPaymentUsdLimit, settings.spendingLimits.x402.dailyUsdLimit,
+    settings.spendingLimits["agentic-wallet"].perPaymentUsdLimit, settings.spendingLimits["agentic-wallet"].dailyUsdLimit,
+    JSON.stringify(settings.trustedWalletDestinations), JSON.stringify(settings.trustedX402Hosts), updatedAt);
   return getAgentPaySettings();
 }
 

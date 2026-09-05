@@ -1,12 +1,14 @@
 export type DisplayCurrency = "USD";
+export type PaymentRail = "binance-pay" | "x402" | "agentic-wallet";
+export type SpendingLimit = { perPaymentUsdLimit: string | null; dailyUsdLimit: string | null };
+export type SpendingLimits = Record<PaymentRail, SpendingLimit>;
 
 export type AgentPaySettings = {
   displayName: string;
   displayCurrency: DisplayCurrency;
   timeZone: string;
   requireApproval: true;
-  perPaymentUsdLimit: string | null;
-  dailyUsdLimit: string | null;
+  spendingLimits: SpendingLimits;
   trustedWalletDestinations: string[];
   trustedX402Hosts: string[];
   updatedAt: string;
@@ -16,8 +18,7 @@ export type UpdateAgentPaySettings = {
   displayName: string;
   displayCurrency: DisplayCurrency;
   timeZone: string;
-  perPaymentUsdLimit: string | null;
-  dailyUsdLimit: string | null;
+  spendingLimits: SpendingLimits;
   trustedWalletDestinations: string[];
   trustedX402Hosts: string[];
 };
@@ -26,8 +27,11 @@ export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
   displayName: "Mark",
   displayCurrency: "USD",
   timeZone: "UTC",
-  perPaymentUsdLimit: null,
-  dailyUsdLimit: null,
+  spendingLimits: {
+    "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" },
+    x402: { perPaymentUsdLimit: null, dailyUsdLimit: null },
+    "agentic-wallet": { perPaymentUsdLimit: null, dailyUsdLimit: null },
+  },
   trustedWalletDestinations: [],
   trustedX402Hosts: [],
 };
