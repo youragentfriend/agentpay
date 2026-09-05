@@ -319,6 +319,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .approved-note { margin: 16px 18px; padding: 12px; border: 1px solid rgba(36, 116, 90, .3); border-radius: 8px; background: #eaf5f0; color: var(--green); font-size: 13px; }
 .binance-pay-inputs { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
 .binance-pay-inputs .full { grid-column: 1 / -1; }
+.binance-pay-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.binance-pay-option { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.option-heading { margin-bottom: 20px; }
+.option-heading .eyebrow { margin-bottom: 7px; }
+.option-heading h2 { margin: 0; font-size: 20px; }
+.option-heading p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .or-divider { align-self: center; justify-self: center; color: var(--muted-2); font-size: 13px; }
 .upload-button { position: relative; cursor: pointer; }
 .upload-button:focus-within { outline: 3px solid rgba(245, 205, 69, .34); outline-offset: 2px; }
@@ -511,6 +517,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .rail-row { grid-template-columns: 35px minmax(0, 1fr) auto; }
   .rail-status { display: none; }
   .binance-pay-inputs { grid-template-columns: 1fr; }
+  .binance-pay-options { grid-template-columns: 1fr; }
   .or-divider { justify-self: start; }
   .portfolio-table-head { display: none; }
   .mono-value { max-width: 260px; }
