@@ -20,6 +20,14 @@ export function ProfileSettings({ settings, onSaved }: { settings: AgentPaySetti
     catch { return "UTC"; }
   }, []);
 
+  const timeZoneOptions = useMemo(() => {
+    let values = ["UTC"];
+    try {
+      values = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : values;
+    } catch { /* keep the UTC fallback */ }
+    return values.includes(settings.timeZone) ? values : [settings.timeZone, ...values];
+  }, [settings.timeZone]);
+
   async function save() {
     setSaving(true);
     setError("");
@@ -61,7 +69,7 @@ export function ProfileSettings({ settings, onSaved }: { settings: AgentPaySetti
     <div className="settings-fields">
       <label className="field"><span>Display name</span><input value={displayName} maxLength={50} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your display name"/><small className="field-help">Your avatar initials update automatically.</small></label>
       <label className="field"><span>Display currency</span><select value="USD" disabled><option value="USD">USD</option></select><small className="field-help">USD is the currently supported valuation currency.</small></label>
-      <label className="field"><span>Time zone</span><div className="timezone-control"><input value={timeZone} onChange={(event) => setTimeZone(event.target.value)} placeholder="UTC or America/New_York"/><button className="secondary-button" type="button" onClick={() => setTimeZone(browserTimeZone)}>Use browser time zone</button></div><small className="field-help">Preview: {datePreview}</small></label>
+      <label className="field"><span>Time zone</span><div className="timezone-control"><select value={timeZone} onChange={(event) => setTimeZone(event.target.value)}>{timeZoneOptions.map((zone) => <option key={zone} value={zone}>{zone}</option>)}</select><button className="secondary-button" type="button" onClick={() => setTimeZone(browserTimeZone)}>Use browser time zone</button></div><small className="field-help">Preview: {datePreview}</small></label>
     </div>
     {error && <div className="workflow-error">{error}</div>}
     {saved && <div className="settings-success">Settings saved. Your AgentPay identity has been updated.</div>}

@@ -447,7 +447,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .settings-saved-at { color: var(--muted-2); font-size: 12px; white-space: nowrap; }
 .settings-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; }
 .timezone-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-.timezone-control input { width: 100%; }
+.timezone-control input, .timezone-control select { width: 100%; min-width: 0; }
 .settings-actions { display: flex; justify-content: flex-end; padding-top: 2px; }
 .settings-success { padding: 12px 14px; border: 1px solid rgba(36, 116, 90, .3); border-radius: 11px; background: #eaf5f0; color: var(--green); font-size: 13px; }
 .setting-row { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
