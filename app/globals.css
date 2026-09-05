@@ -201,6 +201,42 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .portfolio-summary strong, .wallet-summary strong { display: block; margin-top: 8px; font-size: 36px; }
 .portfolio-summary small, .wallet-summary small { display: block; margin-top: 8px; color: #aeb4ad; font-size: 13px; }
 .summary-actions, .wallet-actions { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.binance-portfolio-page { margin-top: 30px; }
+.binance-summary { margin-top: 0; }
+.connection-state { display: inline-flex; min-height: 32px; align-items: center; padding: 6px 10px; border-radius: 999px; background: #f0f0eb; color: var(--muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.connection-state.success { background: #eaf5f0; }
+.connection-state.awaiting { background: #fff1b8; color: #765a00 !important; }
+.read-only-banner { display: flex; align-items: flex-start; gap: 12px; margin-top: 18px; padding: 16px 18px; border: 1px solid #e8dca6; border-radius: 13px; background: #fff8d9; }
+.read-only-banner > span { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--ink); color: var(--yellow); font-weight: 700; }
+.read-only-banner strong { display: block; font-size: 15px; }
+.read-only-banner p { margin: 4px 0 0; color: #42463e; font-size: 13px; line-height: 1.6; }
+.binance-source-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.binance-source-card { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.binance-source-card strong, .binance-source-card small { display: block; }
+.binance-source-card strong { font-size: 14px; }
+.binance-source-card small { margin-top: 4px; color: var(--muted); font-size: 13px; }
+.binance-source-card p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.source-health { align-self: start; padding: 5px 8px; border-radius: 999px; background: #f0f0eb; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.source-health.success { background: #eaf5f0; }
+.source-health.failed { background: rgba(179, 38, 61, .09); }
+.binance-balance-section { overflow-x: auto; }
+.binance-table-head, .binance-balance-row { display: grid; min-width: 780px; grid-template-columns: minmax(120px, .75fr) minmax(150px, 1fr) minmax(130px, .9fr) minmax(140px, .9fr) minmax(150px, 1fr); align-items: center; gap: 16px; }
+.binance-table-head { padding: 12px 20px; border-bottom: 1px solid var(--line); background: #f4f3ed; color: var(--muted-2); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+.binance-balance-row { padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.binance-balance-row:last-child { border-bottom: 0; }
+.binance-balance-row > span, .binance-balance-row strong, .binance-balance-row small { min-width: 0; }
+.binance-balance-row strong, .binance-balance-row small { display: block; }
+.binance-balance-row small { margin-top: 4px; color: var(--muted); font-size: 13px; }
+.asset-cell { display: flex; align-items: center; gap: 10px; }
+.asset-cell > b { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: #fff1a8; color: #765a00; }
+.numeric-cell { text-align: right; overflow-wrap: anywhere; }
+.binance-setup-card { margin-top: 24px; padding: 45px 28px; border: 1px dashed var(--line-strong); border-radius: 15px; background: rgba(255, 254, 249, .75); text-align: center; }
+.binance-setup-card h2 { margin: 0 0 9px; font-size: 20px; }
+.binance-setup-card p { max-width: 650px; margin: 0 auto; color: var(--muted); line-height: 1.7; }
+.binance-secret-names { display: flex; justify-content: center; gap: 10px; margin: 20px 0 12px; flex-wrap: wrap; }
+.binance-secret-names code { padding: 9px 12px; border-radius: 8px; background: var(--ink); color: #fff8d9; font-size: 13px; }
+.binance-setup-card > small, .binance-valuation-note { display: block; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.binance-valuation-note { margin: 14px 2px 0; }
 .account-tabs, .settings-tabs, .workflow-tabs { display: flex; width: max-content; max-width: 100%; gap: 5px; overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: #fff; }
 .account-tabs, .settings-tabs { margin: 20px 0; }
 .workflow-tabs { margin-bottom: 22px; background: var(--soft); }
@@ -377,6 +413,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .recent-panel { height: auto; }
   .recent-list { max-height: 360px; }
   .portfolio-summary, .wallet-summary { flex-direction: column; }
+  .binance-source-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recent-chats-panel { border-top: 1px solid var(--line); border-left: 0; }
 }
 
@@ -412,6 +449,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .or-divider { justify-self: start; }
   .portfolio-table-head { display: none; }
   .mono-value { max-width: 260px; }
+  .binance-source-grid { grid-template-columns: 1fr; }
+  .binance-summary .summary-actions { align-items: stretch; }
+  .binance-summary .primary-button { width: 100%; }
 }
 
 @media (max-width: 480px) {

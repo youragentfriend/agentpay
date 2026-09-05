@@ -39,6 +39,8 @@ The x402 workspace discovers HTTP 402 v2 requirements from explicitly allowliste
 
 The BNB Bazaar view reads the official public CDP x402 discovery catalog by default and retains only x402 v2 resources advertising BNB Smart Chain (`eip155:56`). Bazaar metadata is display-only; a merchant still requires explicit host allowlisting and a fresh live HTTP 402 validation before preview or payment.
 
+The Binance menu also provides a separate, server-only read-only account portfolio across Spot, Funding, USDⓈ-M Futures, Simple Earn, and Margin. Configure a dedicated reading-only, IP-restricted key with `BINANCE_READONLY_API_KEY` and `BINANCE_READONLY_API_SECRET`; do not reuse Binance Pay credentials. Sources fail independently, USD values are estimates from public Binance market prices, and no trading or withdrawal endpoint is present. See `docs/binance-readonly.md`.
+
 ## Local development
 
 ```bash
