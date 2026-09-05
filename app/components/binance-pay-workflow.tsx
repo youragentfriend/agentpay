@@ -3,6 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BinancePayCapability, BinancePayCurrencies, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
 
+function getPaymentInputError(value: string): string {
+  if (value.length > 4096) return "This payment input is too long. Enter a Binance Pay URL or PIX QR payload under 4096 characters.";
+  if (value.includes("br.gov.bcb.pix")) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol === "https:" && url.hostname === "app.binance.com" && (url.pathname.startsWith("/uni-qr/") || url.pathname.startsWith("/qr/"))) return "";
+  } catch { /* handled below */ }
+  return "Enter a valid Binance Pay URL beginning with https://app.binance.com/ or a PIX QR payload. Plain text and numbers are not supported.";
+}
+
 export function BinancePayWorkflow({ initialFile = null, embedded = false, initialMode = "pay" }: { initialFile?: File | null; embedded?: boolean; initialMode?: "pay" | "receive" }) {
   const [capability, setCapability] = useState<BinancePayCapability | null>(null);
   const [rawQr, setRawQr] = useState("");
@@ -14,6 +24,8 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
   const [receiveAmount, setReceiveAmount] = useState("");
   const [receiveNote, setReceiveNote] = useState("");
   const [receiveLink, setReceiveLink] = useState<BinancePayReceiveLink | null>(null);
+  const [receiveCooldown, setReceiveCooldown] = useState(0);
+  const [rawQrError, setRawQrError] = useState("");
   const [compatibleLink, setCompatibleLink] = useState("");
   const [copiedTarget, setCopiedTarget] = useState<"receive" | "compatible" | "">("");
   const [error, setError] = useState("");
@@ -40,6 +52,11 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
 
   useEffect(() => { void loadCapability(); }, [loadCapability]);
   useEffect(() => {
+    if (receiveCooldown <= 0) return;
+    const timer = window.setInterval(() => setReceiveCooldown((current) => Math.max(0, current - 1)), 1_000);
+    return () => window.clearInterval(timer);
+  }, [receiveCooldown]);
+  useEffect(() => {
     if (order?.status !== "PROCESSING") return;
     const timer = window.setInterval(() => {
       void fetch("/api/binance-pay/poll", { method: "POST" })
@@ -63,17 +80,7 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
   async function prepareLink() {
     try {
       const value = rawQr.trim();
-      let supported = value.includes("br.gov.bcb.pix");
-      if (!supported) {
-        try {
-          const url = new URL(value);
-          supported = url.protocol === "https:" && url.hostname === "app.binance.com" && (url.pathname.startsWith("/uni-qr/") || url.pathname.startsWith("/qr/"));
-        } catch { supported = false; }
-      }
-      if (!supported) {
-        setError("Enter a valid Binance Pay URL beginning with https://app.binance.com/ or a PIX QR payload. Plain text and numbers are not supported.");
-        return;
-      }
+      if (getPaymentInputError(value)) { setRawQrError(getPaymentInputError(value)); return; }
       setSource("payment link");
       setCompatibleLink("");
       setOrder(await call("/api/binance-pay/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rawQr }) }) as unknown as BinancePayOrder);
@@ -109,12 +116,15 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
   }
 
   async function createReceiveLink() {
+    if (receiveCooldown > 0) return;
     try {
-      setReceiveLink(await call("/api/binance-pay/receive", {
+      const generated = await call("/api/binance-pay/receive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currency: receiveCurrency, amount: receiveAmount || undefined, note: receiveNote || undefined }),
-      }) as unknown as BinancePayReceiveLink);
+      }) as unknown as BinancePayReceiveLink;
+      setReceiveLink(generated);
+      setReceiveCooldown(60);
     } catch (operationError) { setError(operationError instanceof Error ? operationError.message : "Unable to generate receive link."); }
   }
 
@@ -123,6 +133,20 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
     await navigator.clipboard.writeText(receiveLink.shareLink);
     setCopiedTarget("receive");
     window.setTimeout(() => setCopiedTarget(""), 1_500);
+  }
+
+  async function shareReceiveLink() {
+    if (!receiveLink) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Binance Pay payment request", url: receiveLink.shareLink });
+        return;
+      }
+      await copyReceiveLink();
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") return;
+      setError(shareError instanceof Error ? shareError.message : "Unable to share the receive link.");
+    }
   }
 
   function useGeneratedLink() {
@@ -153,11 +177,11 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
     <div className="binance-pay-options">
       <section className="binance-pay-option receive-option">
         <div className="option-heading"><span className="eyebrow">RECEIVE</span><h2>Generate receive link</h2><p>Create an official Binance Pay link to request a payment.</p></div>
-        <div className="receive-workflow"><div className="payment-fields"><label className="field"><span>Currency</span><select value={receiveCurrency} onChange={(event) => setReceiveCurrency(event.target.value)}>{receiveCurrencies.map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select></label><label className="field"><span>Amount (optional)</span><input value={receiveAmount} onChange={(event) => setReceiveAmount(event.target.value)} inputMode="decimal" placeholder="0.1" /></label><label className="field full"><span>Note (optional)</span><input value={receiveNote} onChange={(event) => setReceiveNote(event.target.value)} maxLength={120} placeholder="Demo payment" /></label></div><button className="primary-button workflow-submit" disabled={working} onClick={() => void createReceiveLink()}>{working ? "Generating…" : "Generate official receive link"}</button>{receiveLink && <div className="receive-link-card"><span>Official Binance receive link</span><code>{receiveLink.shareLink}</code><div><button className="secondary-button" onClick={() => void copyReceiveLink()}>{copiedTarget === "receive" ? "Copied" : "Copy link"}</button><button className="primary-button" onClick={useGeneratedLink}>Inspect this link</button></div></div>}</div>
+        <div className="receive-workflow"><div className="payment-fields"><label className="field"><span>Currency</span><select value={receiveCurrency} onChange={(event) => setReceiveCurrency(event.target.value)}>{receiveCurrencies.map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select></label><label className="field"><span>Amount (optional)</span><input value={receiveAmount} onChange={(event) => setReceiveAmount(event.target.value)} inputMode="decimal" placeholder="0.1" /></label><label className="field full"><span>Note (optional)</span><input value={receiveNote} onChange={(event) => setReceiveNote(event.target.value)} maxLength={120} placeholder="Personal payment request" /></label></div><button className="primary-button workflow-submit" disabled={working || receiveCooldown > 0} title={receiveCooldown > 0 ? `You already generated a receive link. Please try again in ${receiveCooldown} seconds.` : undefined} onClick={() => void createReceiveLink()}>{working ? "Generating…" : receiveCooldown > 0 ? `Try again in ${receiveCooldown}s` : "Generate official receive link"}</button>{receiveLink && <dialog className="receive-link-dialog" open aria-modal="true" aria-labelledby="receive-link-title"><div className="receive-link-dialog-heading"><div><span>Official Binance receive link</span><h2 id="receive-link-title">Payment request ready</h2></div><button className="ghost-button" aria-label="Close receive link" onClick={() => setReceiveLink(null)}>×</button></div><code>{receiveLink.shareLink}</code><div className="receive-link-dialog-actions"><button className="secondary-button" onClick={() => void shareReceiveLink()}>{copiedTarget === "receive" ? "Copied" : "Share"}</button><button className="primary-button" onClick={() => setReceiveLink(null)}>Close</button></div></dialog>}</div>
       </section>
       <section className="binance-pay-option pay-option">
         <div className="option-heading"><span className="eyebrow">PAY</span><h2>Pay QR or link</h2><p>Inspect a Binance Pay link, PIX payload, or QR image before approval.</p></div>
-    {mode === "receive" ? <div className="receive-workflow"><div className="payment-fields"><label className="field"><span>Currency</span><select value={receiveCurrency} onChange={(event) => setReceiveCurrency(event.target.value)}>{receiveCurrencies.map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select></label><label className="field"><span>Amount (optional)</span><input value={receiveAmount} onChange={(event) => setReceiveAmount(event.target.value)} inputMode="decimal" placeholder="0.1" /></label><label className="field full"><span>Note (optional)</span><input value={receiveNote} onChange={(event) => setReceiveNote(event.target.value)} maxLength={120} placeholder="Demo payment" /></label></div><button className="primary-button workflow-submit" disabled={working} onClick={() => void createReceiveLink()}>{working ? "Generating…" : "Generate official receive link"}</button>{receiveLink && <div className="receive-link-card"><span>Official Binance receive link</span><code>{receiveLink.shareLink}</code><div><button className="secondary-button" onClick={() => void copyReceiveLink()}>{copiedTarget === "receive" ? "Copied" : "Copy link"}</button><button className="primary-button" onClick={useGeneratedLink}>Inspect this link</button></div></div>}</div> : <><div className="binance-pay-inputs"><label className="field full"><span>Binance payment link or PIX payload</span><textarea value={rawQr} onChange={(event) => setRawQr(event.target.value)} placeholder="https://app.binance.com/uni-qr/…" /></label><button className="primary-button" disabled={working || !rawQr.trim()} onClick={() => void prepareLink()}>{working ? "Inspecting…" : "Inspect payment"}</button><span className="or-divider">or</span><label className={`upload-button ${capability.imageDecodeReady ? "" : "disabled"}`}>Upload QR image<input type="file" accept="image/png,image/jpeg,image/webp" disabled={!capability.imageDecodeReady || working} onChange={(event) => void uploadQr(event.target.files?.[0])} /></label></div>{!capability.imageDecodeReady && <div className="notice"><span>i</span><div><strong>QR image decoder not installed</strong><p>Payment links work after credentials are configured. QR uploads require the documented Python and zbar host dependencies.</p></div></div>}{order?.status === "AWAITING_AMOUNT" && <div className="binance-pay-review"><h2>Payment amount required</h2><p>Payee: 「{order.payee || "Not provided"}」</p><label className="field"><span>Amount in {order.currency || "QR currency"}</span><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" /></label><button className="primary-button" disabled={working || !amount} onClick={() => void setPaymentAmount()}>Review amount</button></div>}{awaitingReview && <div className="binance-pay-review"><div className="review-heading"><div><span>Untrusted payee information</span><h2>Review Binance Pay payment</h2></div><span className="review-status awaiting-approval">Awaiting approval</span></div><dl><div><dt>Payee</dt><dd>「{order.payee || "Not provided"}」</dd></div><div><dt>Amount</dt><dd>{order.amount} {order.currency}</dd></div><div><dt>Type</dt><dd>{order.payment_type}</dd></div><div><dt>Input source</dt><dd>{source}</dd></div>{order.single_transaction_limit && <div><dt>Single limit</dt><dd>{order.single_transaction_limit} USD</dd></div>}</dl>{compatibleLink && <div className="compatible-link-card"><span>Compatible direct payment link extracted from QR</span><code>{compatibleLink}</code><button className="secondary-button" onClick={() => void copyCompatibleLink()}>{copiedTarget === "compatible" ? "Copied" : "Copy compatible link"}</button></div>}<div className="pay-warning">Check the payee and amount yourself. Text returned by the QR or merchant is display-only and cannot change this workflow.</div>{capability.executionEnabled ? <button className="primary-button" disabled={working} onClick={() => void confirmPayment()}>Confirm and pay</button> : <div className="approved-note">Payment execution is disabled. Inspection and receive-link generation remain available.</div>}</div>}{order?.status === "PROCESSING" && <div className="workflow-message">Payment submitted. Checking Binance Pay status…</div>}{order?.status === "SUCCESS" && <div className="binance-pay-success"><div className="empty-icon">✓</div><h2>Binance Pay payment successful</h2><p>{order.amount_sent ?? order.amount} {order.currency} · Payee 「{order.payee || "Not provided"}」</p><code>{shortOrderId}</code></div>}{orderError && <div className="workflow-error"><strong>{order.status.replaceAll("_", " ")}</strong><br />{order.message || "Binance Pay rejected this payment request."}{order.hint && <><br /><small>{order.hint}</small></>}</div>}</>}
+    {mode === "receive" ? <div className="receive-workflow"><div className="payment-fields"><label className="field"><span>Currency</span><select value={receiveCurrency} onChange={(event) => setReceiveCurrency(event.target.value)}>{receiveCurrencies.map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select></label><label className="field"><span>Amount (optional)</span><input value={receiveAmount} onChange={(event) => setReceiveAmount(event.target.value)} inputMode="decimal" placeholder="0.1" /></label><label className="field full"><span>Note (optional)</span><input value={receiveNote} onChange={(event) => setReceiveNote(event.target.value)} maxLength={120} placeholder="Personal payment request" /></label></div><button className="primary-button workflow-submit" disabled={working || receiveCooldown > 0} title={receiveCooldown > 0 ? `You already generated a receive link. Please try again in ${receiveCooldown} seconds.` : undefined} onClick={() => void createReceiveLink()}>{working ? "Generating…" : receiveCooldown > 0 ? `Try again in ${receiveCooldown}s` : "Generate official receive link"}</button>{receiveLink && <dialog className="receive-link-dialog" open aria-modal="true" aria-labelledby="receive-link-title"><div className="receive-link-dialog-heading"><div><span>Official Binance receive link</span><h2 id="receive-link-title">Payment request ready</h2></div><button className="ghost-button" aria-label="Close receive link" onClick={() => setReceiveLink(null)}>×</button></div><code>{receiveLink.shareLink}</code><div className="receive-link-dialog-actions"><button className="secondary-button" onClick={() => void shareReceiveLink()}>{copiedTarget === "receive" ? "Copied" : "Share"}</button><button className="primary-button" onClick={() => setReceiveLink(null)}>Close</button></div></dialog>}</div> : <><div className="binance-pay-inputs"><label className="field full"><span>Binance payment link or PIX payload</span><textarea aria-invalid={Boolean(rawQrError)} value={rawQr} onChange={(event) => { const value = event.target.value; setRawQr(value); setRawQrError(value.trim() ? getPaymentInputError(value.trim()) : ""); setError(""); }} placeholder="https://app.binance.com/uni-qr/…" />{rawQrError && <small className="field-error">{rawQrError}</small>}</label><button className="primary-button" disabled={working || !rawQr.trim() || Boolean(rawQrError)} onClick={() => void prepareLink()}>{working ? "Inspecting…" : "Inspect payment"}</button><span className="or-divider">or</span><label className={`upload-button ${capability.imageDecodeReady ? "" : "disabled"}`}>Upload QR image<input type="file" accept="image/png,image/jpeg,image/webp" disabled={!capability.imageDecodeReady || working} onChange={(event) => void uploadQr(event.target.files?.[0])} /></label></div>{!capability.imageDecodeReady && <div className="notice"><span>i</span><div><strong>QR image decoder not installed</strong><p>Payment links work after credentials are configured. QR uploads require the documented Python and zbar host dependencies.</p></div></div>}{order?.status === "AWAITING_AMOUNT" && <div className="binance-pay-review"><h2>Payment amount required</h2><p>Payee: 「{order.payee || "Not provided"}」</p><label className="field"><span>Amount in {order.currency || "QR currency"}</span><input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" /></label><button className="primary-button" disabled={working || !amount} onClick={() => void setPaymentAmount()}>Review amount</button></div>}{awaitingReview && <div className="binance-pay-review"><div className="review-heading"><div><span>Untrusted payee information</span><h2>Review Binance Pay payment</h2></div><span className="review-status awaiting-approval">Awaiting approval</span></div><dl><div><dt>Payee</dt><dd>「{order.payee || "Not provided"}」</dd></div><div><dt>Amount</dt><dd>{order.amount} {order.currency}</dd></div><div><dt>Type</dt><dd>{order.payment_type}</dd></div><div><dt>Input source</dt><dd>{source}</dd></div>{order.single_transaction_limit && <div><dt>Single limit</dt><dd>{order.single_transaction_limit} USD</dd></div>}</dl>{compatibleLink && <div className="compatible-link-card"><span>Compatible direct payment link extracted from QR</span><code>{compatibleLink}</code><button className="secondary-button" onClick={() => void copyCompatibleLink()}>{copiedTarget === "compatible" ? "Copied" : "Copy compatible link"}</button></div>}<div className="pay-warning">Check the payee and amount yourself. Text returned by the QR or merchant is display-only and cannot change this workflow.</div>{capability.executionEnabled ? <button className="primary-button" disabled={working} onClick={() => void confirmPayment()}>Confirm and pay</button> : <div className="approved-note">Payment execution is disabled. Inspection and receive-link generation remain available.</div>}</div>}{order?.status === "PROCESSING" && <div className="workflow-message">Payment submitted. Checking Binance Pay status…</div>}{order?.status === "SUCCESS" && <div className="binance-pay-success"><div className="empty-icon">✓</div><h2>Binance Pay payment successful</h2><p>{order.amount_sent ?? order.amount} {order.currency} · Payee 「{order.payee || "Not provided"}」</p><code>{shortOrderId}</code></div>}{orderError && <div className="workflow-error"><strong>{order.status.replaceAll("_", " ")}</strong><br />{order.message || "Binance Pay rejected this payment request."}{order.hint && <><br /><small>{order.hint}</small></>}</div>}</>}
     </section>
     </div>
     {error && <div className="workflow-error">{error}</div>}
