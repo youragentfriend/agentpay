@@ -83,7 +83,7 @@ function OverviewView({ onNavigate, walletStatus }: { onNavigate: (view: View) =
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [nextId, setNextId] = useState(1);
-  const [welcome, setWelcome] = useState({ greeting: "Welcome back, Mark.", date: "" });
+  const [welcome, setWelcome] = useState({ greeting: "Welcome back, Mark." });
   const conversationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -91,7 +91,6 @@ function OverviewView({ onNavigate, walletStatus }: { onNavigate: (view: View) =
     const hour = now.getHours();
     setWelcome({
       greeting: `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, Mark.`,
-      date: new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(now),
     });
   }, []);
 
@@ -138,7 +137,6 @@ function OverviewView({ onNavigate, walletStatus }: { onNavigate: (view: View) =
 
   return <div className="overview-page">
     <section className="welcome">
-      <p className="eyebrow"><span className="spark">✦</span>{welcome.date}</p>
       <h1>{welcome.greeting}</h1>
       <p className="lead">What would you like AgentPay to take care of?</p>
     </section>
