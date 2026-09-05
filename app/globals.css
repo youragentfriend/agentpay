@@ -364,13 +364,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .receive-link-card > span, .compatible-link-card span { color: var(--muted); font-size: 13px; text-transform: uppercase; }
 .receive-link-card code, .compatible-link-card code { overflow-wrap: anywhere; }
 .receive-link-card > div { display: flex; justify-content: flex-end; gap: 8px; }
-.receive-link-dialog { position: fixed; inset: 0; z-index: 10000; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow: auto; border: 1px solid var(--line); border-radius: 15px; background: #fff; box-shadow: 0 24px 70px rgba(28, 31, 26, .28); }
+.receive-link-dialog { position: fixed; inset: 0; z-index: 10000; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: 0; overflow: auto; border: 0; outline: none; border-radius: 15px; background: #fff; box-shadow: 0 24px 70px rgba(28, 31, 26, .28); }
 .receive-link-dialog::backdrop { background: rgba(24, 27, 23, .52); }
 .receive-link-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid var(--line); background: #171815; color: #fff; }
 .receive-link-dialog-heading span { color: #fff; font-size: 13px; text-transform: uppercase; }
 .receive-link-dialog-heading h2 { margin: 5px 0 0; color: #fff; font-size: 18px; }
 .receive-link-dialog > code { display: block; margin: 20px; padding: 14px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 9px; background: #fafaf7; color: var(--ink); font-size: 13px; }
 .receive-link-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 20px; }
+.receive-link-dialog:not(.wallet-send-dialog) .receive-link-dialog-actions .secondary-button { background: #fff; border: 1px solid var(--line); }
+.receive-link-dialog:not(.wallet-send-dialog) .receive-link-dialog-actions .secondary-button:hover { background: var(--soft); }
 .wallet-send-dialog { width: min(720px, calc(100% - 32px)); }
 .wallet-send-dialog > .payment-workflow { margin: 0; padding: 20px; border: 0; border-radius: 0; box-shadow: none; }
 .wallet-send-dialog > .workflow-message, .wallet-send-dialog > .notice { margin: 20px; }
