@@ -55,7 +55,7 @@ export default function Home() {
   return <main className="app-shell">
     <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
       <div className="brand-row">
-        <div className="brand"><img className="brand-symbol" src="/brand/agentpay-logo.png" alt="AgentPay"/><div><strong>AgentPay</strong><span>Payment intelligence</span></div></div>
+        <div className="brand"><img className="brand-symbol" src="/brand/agentpay-logo.png" alt="AgentPay"/><div><strong>AgentPay</strong></div></div>
         <button className="mobile-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}>×</button>
       </div>
       <div className="safe-state"><span className={`status-dot ${walletStatus === "CONNECTED" ? "active-dot" : ""}`}/><div><strong>{walletStatus === "CONNECTED" ? "Wallet connected" : "Approval mode"}</strong><small>Funds move only after review</small></div></div>
