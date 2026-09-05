@@ -1,4 +1,7 @@
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type {
   BinanceAccountStatus,
   BinanceBalance,
@@ -11,6 +14,8 @@ const SPOT_BASE = "https://api.binance.com";
 const FUTURES_BASE = "https://fapi.binance.com";
 const REQUEST_TIMEOUT_MS = 12_000;
 const DEFAULT_DUST_THRESHOLD_USD = 0.1;
+const CONFIG_PATH = process.env.AGENTPAY_BINANCE_READONLY_CONFIG
+  || path.join(os.homedir(), ".local", "share", "agentpay", "binance-readonly.json");
 const SOURCE_LABELS: Record<BinancePortfolioSource, string> = {
   spot: "Spot",
   funding: "Funding",
@@ -31,16 +36,35 @@ export class BinanceReadonlyError extends Error {
   }
 }
 
+function fileCredentials() {
+  try {
+    const parsed = JSON.parse(readFileSync(/* turbopackIgnore: true */ CONFIG_PATH, "utf8")) as { apiKey?: unknown; apiSecret?: unknown };
+    if (typeof parsed.apiKey === "string" && parsed.apiKey.length > 0 && typeof parsed.apiSecret === "string" && parsed.apiSecret.length > 0) {
+      return { key: parsed.apiKey, secret: parsed.apiSecret };
+    }
+  } catch { /* setup has not been completed */ }
+  return null;
+}
+
+function credentials() {
+  if (process.env.BINANCE_READONLY_API_KEY && process.env.BINANCE_READONLY_API_SECRET) {
+    return { key: process.env.BINANCE_READONLY_API_KEY, secret: process.env.BINANCE_READONLY_API_SECRET, source: "environment" as const };
+  }
+  const configured = fileCredentials();
+  return configured ? { ...configured, source: "protected_file" as const } : null;
+}
+
 export function getBinanceAccountStatus(): BinanceAccountStatus {
+  const configured = credentials();
   const missing = [
-    !process.env.BINANCE_READONLY_API_KEY ? "BINANCE_READONLY_API_KEY" : "",
-    !process.env.BINANCE_READONLY_API_SECRET ? "BINANCE_READONLY_API_SECRET" : "",
+    !configured ? "BINANCE_READONLY_API_KEY" : "",
+    !configured ? "BINANCE_READONLY_API_SECRET" : "",
   ].filter(Boolean);
   return {
-    configured: missing.length === 0,
+    configured: Boolean(configured),
     readOnly: true,
     missing,
-    credentialSource: missing.length === 0 ? "environment" : "not_configured",
+    credentialSource: configured?.source ?? "not_configured",
   };
 }
 
@@ -106,13 +130,12 @@ async function signedRequest<T>(options: {
   params?: Record<string, QueryValue>;
   timestamp: number;
 }): Promise<T> {
-  const key = process.env.BINANCE_READONLY_API_KEY;
-  const secret = process.env.BINANCE_READONLY_API_SECRET;
-  if (!key || !secret) throw new BinanceReadonlyError("Binance read-only credentials are not configured.", "NOT_CONFIGURED", 503);
+  const configured = credentials();
+  if (!configured) throw new BinanceReadonlyError("Binance read-only credentials are not configured.", "NOT_CONFIGURED", 503);
 
   const method = options.method ?? "GET";
   const query = canonicalQuery({ ...(options.params ?? {}), recvWindow: 5000, timestamp: options.timestamp });
-  const signed = `${query}&signature=${signCanonicalQuery(query, secret)}`;
+  const signed = `${query}&signature=${signCanonicalQuery(query, configured.secret)}`;
   const base = options.base ?? SPOT_BASE;
   const response = await fetch(method === "GET" ? `${base}${options.path}?${signed}` : `${base}${options.path}`, {
     method,
@@ -121,7 +144,7 @@ async function signedRequest<T>(options: {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/x-www-form-urlencoded",
-      "X-MBX-APIKEY": key,
+      "X-MBX-APIKEY": configured.key,
     },
     body: method === "POST" ? signed : undefined,
   });

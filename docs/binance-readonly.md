@@ -10,6 +10,8 @@ AgentPay uses a Binance API key that is separate from Binance Pay credentials. I
 
 Create a dedicated Binance key, enable account reading only, leave trading and withdrawals disabled, and restrict the key to the AgentPay server IP. Never paste these values into chat or a browser form.
 
+For local AgentPay setup, run `npm run setup:binance-account` in a trusted host terminal. The command masks both inputs and saves them to `~/.local/share/agentpay/binance-readonly.json` with file mode `0600`. This is the same server-side configuration area used by the project, but a separate credential record from Binance Pay so the two products can be rotated and disabled independently. Environment variables remain supported for production deployment secret managers.
+
 ## Read-only endpoints
 
 The implementation follows the official Binance REST documentation and calls only account-information endpoints:

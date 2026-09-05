@@ -39,5 +39,5 @@ export type BinanceAccountStatus = {
   configured: boolean;
   readOnly: true;
   missing: string[];
-  credentialSource: "environment" | "not_configured";
+  credentialSource: "environment" | "protected_file" | "not_configured";
 };

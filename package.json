@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "setup:binance-account": "python3 scripts/setup-binance-readonly.py",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts"
   },

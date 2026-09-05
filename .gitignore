@@ -6,6 +6,7 @@ out/
 *.log
 *.tsbuildinfo
 data/*.sqlite*
+binance-readonly.json
 vendor/binance/payment/config.json
 vendor/binance/payment/config.json.*
 vendor/binance/payment/.payment_state.json
