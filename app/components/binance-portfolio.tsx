@@ -14,6 +14,7 @@ const TABS: Array<{ value: "all" | BinancePortfolioSource; label: string }> = [
   { value: "funding", label: "Funding" },
   { value: "futures", label: "Futures" },
   { value: "earn", label: "Earn" },
+  { value: "margin", label: "Margin" },
 ];
 const PAGE_SIZE = 10;
 
@@ -102,18 +103,16 @@ export function BinancePortfolioView() {
         <div className="section-heading">
           <div><h2>{TABS.find((item) => item.value === tab)?.label} balances</h2><span>{portfolio ? `${filtered.length} visible · assets under ${usd(portfolio.dustThresholdUsd)} hidden` : "Loading balances"}</span></div>
           <div className="binance-balance-controls">
-            <label htmlFor="binance-source">Account source</label>
-            <select id="binance-source" value={tab} onChange={(event) => setTab(event.target.value as typeof tab)}>
+            <select id="binance-source" aria-label="Account source" value={tab} onChange={(event) => setTab(event.target.value as typeof tab)}>
               {TABS.map((item) => <option value={item.value} key={item.value}>{item.label}</option>)}
             </select>
-            <label htmlFor="binance-sort">Sort</label>
-            <select id="binance-sort" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
+            <select id="binance-sort" aria-label="Sort balances" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
               <option value="high">Highest to lowest</option>
               <option value="low">Lowest to highest</option>
             </select>
           </div>
         </div>
-        <div className="binance-table-head"><span>Asset</span><span>Account</span><span>Available</span><span>Total / equity</span><span>Estimated USD</span></div>
+        <div className="binance-table-head"><span>Asset</span><span>Account</span><span className="numeric-heading">Available</span><span className="numeric-heading">Total / equity</span><span className="numeric-heading">Estimated USD</span></div>
         {loading && !portfolio ? <div className="portfolio-empty"><strong>Loading your Binance portfolio…</strong><p>Each account source is checked independently.</p></div> : visible.length ? <div className="binance-balance-list">
           {visible.map((balance) => <BalanceRow balance={balance} key={balance.id}/>) }
         </div> : <div className="portfolio-empty"><strong>No {tab === "all" ? "visible" : TABS.find((item) => item.value === tab)?.label} balances</strong><p>{portfolio?.connection === "error" ? "The configured key could not read any account source. Check its reading permission and IP restriction." : "There are no priced balances above the configured dust threshold for this view."}</p></div>}
@@ -126,7 +125,7 @@ export function BinancePortfolioView() {
 
 function BalanceRow({ balance }: { balance: BinanceBalance }) {
   return <div className="binance-balance-row">
-    <span className="asset-cell"><b>{balance.asset.slice(0, 1)}</b><strong>{balance.asset}</strong></span>
+    <span className="asset-cell"><strong>{balance.asset}</strong></span>
     <span><strong>{balance.sourceLabel}</strong><small>{balance.source === "margin" ? "Net equity" : balance.valuation === "derived" ? "Derived estimate" : "Account balance"}</small></span>
     <span className="numeric-cell">{quantity(balance.available)}</span>
     <span className="numeric-cell">{quantity(balance.total)}</span>

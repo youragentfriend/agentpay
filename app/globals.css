@@ -220,16 +220,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .source-health { align-self: start; padding: 5px 8px; border-radius: 999px; background: #f0f0eb; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .source-health.success { background: #eaf5f0; }
 .source-health.failed { background: rgba(179, 38, 61, .09); }
-.binance-balance-section { overflow-x: auto; }
+.binance-balance-section { margin-top: 24px; overflow-x: auto; }
 .binance-table-head, .binance-balance-row { display: grid; min-width: 780px; grid-template-columns: minmax(120px, .75fr) minmax(150px, 1fr) minmax(130px, .9fr) minmax(140px, .9fr) minmax(150px, 1fr); align-items: center; gap: 16px; }
 .binance-table-head { padding: 12px 20px; border-bottom: 1px solid var(--line); background: #f4f3ed; color: var(--muted-2); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+.numeric-heading { text-align: right; }
 .binance-balance-row { padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .binance-balance-row:last-child { border-bottom: 0; }
 .binance-balance-row > span, .binance-balance-row strong, .binance-balance-row small { min-width: 0; }
 .binance-balance-row strong, .binance-balance-row small { display: block; }
 .binance-balance-row small { margin-top: 4px; color: var(--muted); font-size: 13px; }
-.asset-cell { display: flex; align-items: center; gap: 10px; }
-.asset-cell > b { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 10px; background: #fff1a8; color: #765a00; }
+.asset-cell { display: flex; align-items: center; }
 .numeric-cell { text-align: right; overflow-wrap: anywhere; }
 .binance-setup-card { margin-top: 24px; padding: 45px 28px; border: 1px dashed var(--line-strong); border-radius: 15px; background: rgba(255, 254, 249, .75); text-align: center; }
 .binance-setup-card h2 { margin: 0 0 9px; font-size: 20px; }
@@ -243,7 +243,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .workflow-tabs { margin-bottom: 22px; background: var(--soft); }
 .account-tabs button, .settings-tabs button, .workflow-tabs button { padding: 9px 13px; border-radius: 999px; background: transparent; color: var(--muted); white-space: nowrap; }
 .binance-balance-controls { display: flex; align-items: center; gap: 8px; }
-.binance-balance-controls label { color: var(--muted); font-size: 13px; font-weight: 600; }
 .binance-balance-controls select { min-height: 38px; padding: 7px 30px 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 600; }
 .account-tabs button.active, .settings-tabs button.active, .workflow-tabs button.active { background: var(--ink); color: #fff; }
 .wallet-dashboard { display: grid; gap: 18px; margin-top: 35px; }
