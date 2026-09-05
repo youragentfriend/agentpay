@@ -4,20 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import type { AgentPaySettings } from "@/lib/settings-types";
 
 const FRIENDLY_TIME_ZONES = [
-  { value: "UTC", label: "GMT / UTC — Coordinated Universal Time" },
-  { value: "America/New_York", label: "EST / EDT — New York, Toronto" },
-  { value: "America/Chicago", label: "CST / CDT — Chicago, Mexico City" },
-  { value: "America/Denver", label: "MST / MDT — Denver, Calgary" },
-  { value: "America/Los_Angeles", label: "PST / PDT — Los Angeles, Vancouver" },
-  { value: "America/Sao_Paulo", label: "UTC−3 — São Paulo, Buenos Aires" },
-  { value: "Europe/London", label: "GMT / BST — London, Dublin" },
-  { value: "Europe/Paris", label: "UTC+1 / UTC+2 — Paris, Berlin, Rome" },
-  { value: "Asia/Dubai", label: "UTC+4 — Dubai, Abu Dhabi" },
-  { value: "Asia/Kolkata", label: "UTC+5:30 — India, Sri Lanka" },
-  { value: "Asia/Bangkok", label: "UTC+7 — Bangkok, Jakarta, Hanoi" },
-  { value: "Asia/Singapore", label: "UTC+8 — Singapore, Beijing, Manila" },
-  { value: "Asia/Tokyo", label: "UTC+9 — Tokyo, Seoul" },
-  { value: "Australia/Sydney", label: "UTC+10 / UTC+11 — Sydney, Melbourne" },
+  { value: "UTC", label: "GMT / UTC" },
+  { value: "America/New_York", label: "EST / EDT" },
+  { value: "America/Chicago", label: "CST / CDT" },
+  { value: "America/Denver", label: "MST / MDT" },
+  { value: "America/Los_Angeles", label: "PST / PDT" },
+  { value: "America/Sao_Paulo", label: "UTC−3" },
+  { value: "Europe/London", label: "GMT / BST" },
+  { value: "Europe/Paris", label: "UTC+1 / UTC+2" },
+  { value: "Asia/Dubai", label: "UTC+4" },
+  { value: "Asia/Kolkata", label: "UTC+5:30" },
+  { value: "Asia/Bangkok", label: "UTC+7" },
+  { value: "Asia/Singapore", label: "UTC+8" },
+  { value: "Asia/Tokyo", label: "UTC+9" },
+  { value: "Australia/Sydney", label: "UTC+10 / UTC+11" },
 ] as const;
 
 export function ProfileSettings({ settings, onSaved }: { settings: AgentPaySettings; onSaved: (settings: AgentPaySettings) => void }) {
