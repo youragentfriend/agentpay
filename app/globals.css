@@ -377,7 +377,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .wallet-send-dialog > .workflow-message, .wallet-send-dialog > .notice { margin: 20px; }
 .wallet-receive-dialog { width: min(680px, calc(100% - 32px)); }
 .wallet-receive-content { display: grid; gap: 16px; padding: 20px; }
-.wallet-receive-warning { display: grid; gap: 4px; padding: 13px 14px; border-radius: 10px; background: #fff7d6; color: #765a00; font-size: 13px; line-height: 1.5; }
 .wallet-receive-families, .wallet-receive-addresses { display: grid; gap: 12px; }
 .wallet-receive-family { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .wallet-receive-family-heading { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: #fafaf7; }
