@@ -320,7 +320,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .binance-pay-inputs { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
 .binance-pay-inputs .full { grid-column: 1 / -1; }
 .binance-pay-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.binance-pay-option { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.binance-pay-option { display: flex; min-width: 0; flex-direction: column; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.pay-option { order: 1; }
+.receive-option { order: 2; }
 .option-heading { margin-bottom: 20px; }
 .option-heading .eyebrow { margin-bottom: 7px; }
 .option-heading h2 { margin: 0; font-size: 20px; }
@@ -344,6 +346,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .binance-pay-success { margin-top: 22px; padding: 32px; border: 1px solid rgba(36, 116, 90, .3); border-radius: 11px; background: #eaf5f0; color: var(--green); text-align: center; }
 .binance-pay-success h2 { margin: 0 0 8px; }
 .receive-workflow { display: grid; gap: 16px; }
+.pay-option > .binance-pay-inputs, .receive-option .receive-workflow { margin-top: auto; }
+.receive-option .receive-workflow { display: flex; flex-direction: column; }
+.receive-option .workflow-submit { margin-top: auto; }
 .receive-link-card, .compatible-link-card { display: grid; gap: 12px; margin-top: 4px; padding: 17px; border: 1px solid rgba(36, 116, 90, .3); border-radius: 9px; background: #f4fbf7; }
 .receive-link-card > span, .compatible-link-card span { color: var(--muted); font-size: 13px; text-transform: uppercase; }
 .receive-link-card code, .compatible-link-card code { overflow-wrap: anywhere; }
