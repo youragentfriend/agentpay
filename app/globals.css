@@ -119,7 +119,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .chat-bubble span { display: block; margin-bottom: 4px; color: var(--yellow); font-size: 13px; font-weight: 700; }
 .chat-bubble p { margin: 0; overflow-wrap: anywhere; font-size: 15px; line-height: 1.6; }
 .chat-result { display: grid; min-width: 0; max-width: 100%; gap: 10px; }
-.assistant-message { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid #d5d4cc; border-radius: 16px 16px 16px 4px; background: #e5e4de; }
+.assistant-message { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid #e8dca6; border-radius: 16px 16px 16px 4px; background: #fff8d9; }
 .assistant-message strong { color: #765a00; font-size: 13px; }
 .assistant-message span { overflow-wrap: anywhere; color: #242620; font-size: 15px; line-height: 1.65; }
 .composer-wrap { padding: 0 24px 30px; }
