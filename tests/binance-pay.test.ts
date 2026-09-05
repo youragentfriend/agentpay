@@ -5,12 +5,12 @@ import { addBinancePayInputHint, BinancePayError, getBinancePayReceiveCurrencies
 test("exposes server-controlled receive currency choices", () => {
   const result = getBinancePayReceiveCurrencies();
   assert.equal(result.currencies.length, 20);
-  assert.deepEqual(result.currencies.slice(0, 5), ["USDT", "USDC", "DAI", "USDE", "USD1"]);
+  assert.deepEqual(result.currencies.slice(0, 5), ["USDT", "USDC", "DAI", "FDUSD", "USD1"]);
   assert.ok(result.currencies.includes("USDT"));
   assert.ok(result.currencies.includes("USDC"));
   assert.ok(result.currencies.includes("BTC"));
   assert.ok(result.currencies.includes("BNB"));
-  assert.ok(result.currencies.includes("UNI"));
+  assert.ok(result.currencies.includes("POL"));
 });
 
 test("accepts documented Binance payment-link formats", () => {

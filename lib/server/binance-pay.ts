@@ -19,9 +19,9 @@ const MAX_OUTPUT = 2 * 1024 * 1024;
 // grouped first for faster receive-link selection. The server whitelist remains
 // the authority for symbols accepted by this workflow.
 const RECEIVE_CURRENCIES = [
-  "USDT", "USDC", "DAI", "USDE", "USD1",
-  "BTC", "ETH", "BNB", "XRP", "SOL", "TRX", "ZEC", "DOGE", "LINK", "LEO",
-  "ADA", "XLM", "BCH", "LTC", "UNI",
+  "USDT", "USDC", "DAI", "FDUSD", "USD1",
+  "BTC", "ETH", "BNB", "XRP", "SOL", "TRX", "ARB", "DOGE", "LINK", "ATOM",
+  "ADA", "XLM", "AVAX", "LTC", "POL",
 ];
 let queue = Promise.resolve();
 
