@@ -1,6 +1,7 @@
 import { AgenticWalletError, getWalletLockStatus, getWalletOverview, sendWalletTransfer } from "@/lib/server/agentic-wallet";
 import { PaymentIntentError, prepareTransfer } from "@/lib/server/payment-intents";
 import { getPaymentIntent, markPaymentFailed, markPaymentSubmitted, markPaymentSubmitting, walletSendEnabled } from "@/lib/server/payment-store";
+import { enforcePaymentPolicy, PaymentPolicyError } from "@/lib/server/payment-policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
       amount: intent.amount, recipient: intent.recipient, tokenAddress: intent.tokenAddress,
       binanceChainId: intent.binanceChainId, gasLevel: intent.gasLevel,
     }, await getWalletOverview());
+    enforcePaymentPolicy({ rail: "agentic-wallet", amountUsd: intent.amountUsd, destination: intent.recipient });
     if (await getWalletLockStatus(intent.binanceChainId) === "LOCKED") {
       throw new PaymentIntentError("The wallet is locked by another pending transaction or Binance confirmation.", "WALLET_LOCKED");
     }
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
     const txHash = await sendWalletTransfer(intent);
     return Response.json(markPaymentSubmitted(intent.id, txHash));
   } catch (error) {
-    const paymentError = error instanceof PaymentIntentError
+    const paymentError = error instanceof PaymentIntentError || error instanceof PaymentPolicyError
       ? error
       : error instanceof AgenticWalletError
         ? new PaymentIntentError(error.message, error.code)

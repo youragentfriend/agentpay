@@ -14,6 +14,7 @@ export interface PreparedTransfer {
   status: "awaiting-approval" | "approved" | "submitting" | "submitted" | "confirmed" | "failed";
   instruction?: string;
   amount: string;
+  amountUsd?: string;
   asset: string;
   availableBalance: string;
   recipient: string;

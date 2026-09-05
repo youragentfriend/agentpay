@@ -9,6 +9,7 @@ type PaymentDraft = Omit<PreparedTransfer, "id">;
 
 interface PaymentRow {
   id: string; status: PreparedTransfer["status"]; instruction: string | null; amount: string; asset: string;
+  amount_usd: string | null;
   available_balance: string; recipient: string; token_address: string; chain_id: string; chain_name: string;
   gas_level: PreparedTransfer["gasLevel"]; created_at: string; expires_at: string; approved_at: string | null;
   submitted_at: string | null; confirmed_at: string | null; tx_hash: string | null; error_code: string | null;
@@ -27,6 +28,7 @@ function getDatabase(): DatabaseSync {
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS payment_intents (
       id TEXT PRIMARY KEY, status TEXT NOT NULL, instruction TEXT, amount TEXT NOT NULL, asset TEXT NOT NULL,
+      amount_usd TEXT,
       available_balance TEXT NOT NULL, recipient TEXT NOT NULL, token_address TEXT NOT NULL, chain_id TEXT NOT NULL,
       chain_name TEXT NOT NULL, gas_level TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
       approved_at TEXT, submitted_at TEXT, confirmed_at TEXT, tx_hash TEXT UNIQUE, error_code TEXT,
@@ -34,12 +36,14 @@ function getDatabase(): DatabaseSync {
     );
     CREATE INDEX IF NOT EXISTS payment_intents_created_at ON payment_intents(created_at DESC);
   `);
+  const columns = new Set((database.prepare("PRAGMA table_info(payment_intents)").all() as unknown as Array<{ name: string }>).map((column) => column.name));
+  if (!columns.has("amount_usd")) database.exec("ALTER TABLE payment_intents ADD COLUMN amount_usd TEXT");
   return database;
 }
 
 function toPayment(row: PaymentRow): PreparedTransfer {
   return {
-    id: row.id, status: row.status, instruction: row.instruction ?? undefined, amount: row.amount, asset: row.asset,
+    id: row.id, status: row.status, instruction: row.instruction ?? undefined, amount: row.amount, amountUsd: row.amount_usd ?? undefined, asset: row.asset,
     availableBalance: row.available_balance, recipient: row.recipient, tokenAddress: row.token_address,
     binanceChainId: row.chain_id, chainName: row.chain_name, gasLevel: row.gas_level,
     createdAt: row.created_at, expiresAt: row.expires_at, approvedAt: row.approved_at ?? undefined,
@@ -52,9 +56,9 @@ function toPayment(row: PaymentRow): PreparedTransfer {
 export function createPaymentIntent(draft: PaymentDraft): PreparedTransfer {
   const id = randomUUID();
   getDatabase().prepare(`INSERT INTO payment_intents
-    (id,status,instruction,amount,asset,available_balance,recipient,token_address,chain_id,chain_name,gas_level,created_at,expires_at,warnings)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
-      id, draft.status, draft.instruction ?? null, draft.amount, draft.asset, draft.availableBalance, draft.recipient,
+    (id,status,instruction,amount,amount_usd,asset,available_balance,recipient,token_address,chain_id,chain_name,gas_level,created_at,expires_at,warnings)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      id, draft.status, draft.instruction ?? null, draft.amount, draft.amountUsd ?? null, draft.asset, draft.availableBalance, draft.recipient,
       draft.tokenAddress, draft.binanceChainId, draft.chainName, draft.gasLevel, draft.createdAt, draft.expiresAt,
       JSON.stringify(draft.warnings),
     );

@@ -43,6 +43,7 @@ test("prepares and explicitly approves an exact transfer intent", () => {
   const prepared = createPaymentIntent(prepareTransfer({ amount: "5", recipient, tokenAddress, binanceChainId: "56", gasLevel: "MEDIUM" }, wallet));
   assert.equal(prepared.status, "awaiting-approval");
   assert.equal(prepared.asset, "USDT");
+  assert.equal(prepared.amountUsd, "5");
   assert.equal(approvePaymentIntent(prepared.id).status, "approved");
 });
 

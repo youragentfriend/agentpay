@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { BinancePayCapability, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
 import { saveBinancePayOrder } from "@/lib/server/binance-pay-store";
+import { enforcePaymentPolicy, PaymentPolicyError, usdAmountForCurrency } from "@/lib/server/payment-policy";
 
 const execFileAsync = promisify(execFile);
 const SKILL_DIR = path.join(process.cwd(), "vendor", "binance", "payment");
@@ -73,6 +74,18 @@ function serialized<T>(operation: () => Promise<T>): Promise<T> {
 function asPaymentOrder(result: Record<string, unknown>): BinancePayOrder {
   if (typeof result.status !== "string") throw new BinancePayError("Binance Payment skill returned no order status.", "INVALID_PAYMENT_RESPONSE");
   return result as unknown as BinancePayOrder;
+}
+
+export function enforceBinancePaymentPolicy(order: BinancePayOrder): void {
+  try {
+    enforcePaymentPolicy({
+      rail: "binance-pay",
+      amountUsd: usdAmountForCurrency(order.amount_sent ?? order.amount, order.currency),
+    });
+  } catch (error) {
+    if (error instanceof PaymentPolicyError) throw new BinancePayError(error.message, error.code);
+    throw error;
+  }
 }
 
 async function enrichAndPersistOrder(order: BinancePayOrder): Promise<BinancePayOrder> {
@@ -159,18 +172,28 @@ export async function prepareBinancePayment(rawQr: string): Promise<BinancePayOr
   return serialized(async () => {
     await runUnlocked(["--action", "reset"], 45_000, false);
     const validated = validateBinancePayInput(rawQr);
-    return enrichAndPersistOrder(addBinancePayInputHint(validated, asPaymentOrder(await runUnlocked(["--action", "purchase", "--raw_qr", validated]))));
+    const order = await enrichAndPersistOrder(addBinancePayInputHint(validated, asPaymentOrder(await runUnlocked(["--action", "purchase", "--raw_qr", validated]))));
+    enforceBinancePaymentPolicy(order);
+    return order;
   });
 }
 
 export async function setBinancePaymentAmount(amount: string, currency?: string): Promise<BinancePayOrder> {
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(amount) || Number(amount) <= 0) throw new BinancePayError("Enter a positive payment amount.", "INVALID_PAYMENT_AMOUNT");
-  return serialized(async () => enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "set_amount", "--amount", amount, ...(currency ? ["--currency", currency.toUpperCase()] : [])]))));
+  return serialized(async () => {
+    const order = await enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "set_amount", "--amount", amount, ...(currency ? ["--currency", currency.toUpperCase()] : [])])));
+    enforceBinancePaymentPolicy(order);
+    return order;
+  });
 }
 
 export async function confirmBinancePayment(): Promise<BinancePayOrder> {
   if (process.env.AGENTPAY_ENABLE_BINANCE_PAY !== "true") throw new BinancePayError("Binance Pay execution is disabled on this server.", "PAYMENT_EXECUTION_DISABLED");
-  return serialized(async () => enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "pay_confirm"], 90_000))));
+  return serialized(async () => {
+    const current = await enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "query"], 45_000)));
+    enforceBinancePaymentPolicy(current);
+    return enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "pay_confirm"], 90_000)));
+  });
 }
 
 export async function pollBinancePayment(): Promise<BinancePayOrder> {

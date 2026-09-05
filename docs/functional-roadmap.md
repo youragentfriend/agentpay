@@ -14,7 +14,7 @@ This roadmap prioritizes incomplete, static, or non-enforced behavior before ano
 
 ## Priority 1 — Settings foundation and dynamic identity
 
-Status: **in progress**
+Status: **complete**
 
 - Add persistent SQLite-backed application settings.
 - Add a validated Settings API.
@@ -27,7 +27,7 @@ Completion: changing the profile in Settings immediately updates the greeting, s
 
 ## Priority 2 — Rules and approval enforcement
 
-Status: pending
+Status: **complete — enforcement shipped September 5, 2026**
 
 - Keep approval for every payment mandatory and visibly locked on.
 - Add persisted per-payment and daily USD limits.
@@ -36,6 +36,17 @@ Status: pending
 - Record policy rejections in normalized Activity.
 
 Completion: rules can be edited, survive restart, and have tests proving every payment rail fails closed when a rule is violated.
+
+Implemented evidence:
+
+- Mandatory approval is a server-owned constant and cannot be disabled through Settings.
+- SQLite migrations persist optional per-payment/daily USD limits, trusted wallet destinations, and trusted x402 hosts.
+- A shared server policy evaluator uses wallet price data, Binance USD/stablecoin denominations, and x402 `amountUsd`; configured monetary rules fail closed when reliable USD data is unavailable.
+- Agentic Wallet validates at prepare and approval, then revalidates immediately before send. Binance Pay validates prepared/updated orders and revalidates immediately before confirmation. x402 validates discovery options and revalidates the selected option immediately before signing.
+- Daily spend is aggregated in UTC across in-flight/completed Agentic Wallet, Binance Pay, and x402 records.
+- Automated coverage includes validation, migration/persistence, per-payment and daily limits, trusted destinations/hosts, and all three execution-time guards.
+
+Concrete remaining subtask: add first-class normalized Activity events for policy rejections. Enforcement does not depend on this audit projection and was not weakened to fit it into this phase.
 
 ## Priority 3 — Connections and diagnostics
 

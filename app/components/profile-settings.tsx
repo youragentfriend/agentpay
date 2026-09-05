@@ -28,7 +28,15 @@ export function ProfileSettings({ settings, onSaved }: { settings: AgentPaySetti
       const response = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName, displayCurrency: "USD", timeZone }),
+        body: JSON.stringify({
+          displayName,
+          displayCurrency: "USD",
+          timeZone,
+          perPaymentUsdLimit: settings.perPaymentUsdLimit,
+          dailyUsdLimit: settings.dailyUsdLimit,
+          trustedWalletDestinations: settings.trustedWalletDestinations,
+          trustedX402Hosts: settings.trustedX402Hosts,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to save settings.");

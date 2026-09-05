@@ -403,6 +403,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .diagnostic-card strong { margin-top: 9px; }
 .settings-card { padding: 22px; }
 .profile-settings-card { display: grid; gap: 22px; }
+.rules-settings-card { display: grid; gap: 22px; }
+.locked-rule { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.locked-rule strong, .locked-rule div > span { display: block; }
+.locked-rule div > span { margin-top: 5px; color: var(--muted); font-size: 13px; }
+.money-input { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
+.money-input:focus-within { border-color: var(--ink); }
+.money-input b { padding-left: 12px; color: var(--muted); }
+.money-input input { border: 0; }
 .settings-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .settings-section-heading strong, .settings-section-heading span { display: block; }
 .settings-section-heading strong { font-size: 16px; }

@@ -1,4 +1,5 @@
 import type { PrepareTransferRequest, PreparedTransfer } from "@/lib/payment-workflow";
+import { multiplyDecimalStrings } from "@/lib/server/payment-policy";
 import type { WalletOverview } from "@/lib/wallet-types";
 
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -105,9 +106,10 @@ export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletO
   if (compareDecimalStrings(amount, balance.balance) > 0) throw new PaymentIntentError(`Amount exceeds the available ${balance.symbol} balance.`, "INSUFFICIENT_BALANCE");
 
   const now = new Date();
+  const amountUsd = multiplyDecimalStrings(amount, balance.price);
   return {
     status: "awaiting-approval", instruction: request.instruction?.trim(),
-    amount, asset: balance.symbol, availableBalance: balance.balance, recipient,
+    amount, amountUsd, asset: balance.symbol, availableBalance: balance.balance, recipient,
     tokenAddress: balance.address, binanceChainId: chainId, chainName: chain.name,
     gasLevel: request.gasLevel ?? "HIGH", createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
