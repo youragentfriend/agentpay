@@ -121,7 +121,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .chat-bubble { max-width: 84%; padding: 12px 15px; border-radius: 16px 16px 4px 16px; }
 .user-bubble { justify-self: end; background: var(--ink); color: #fff; }
 .chat-bubble span { display: block; margin-bottom: 4px; color: var(--yellow); font-size: 13px; font-weight: 700; }
-.chat-bubble p { margin: 0; font-size: 15px; line-height: 1.6; }
+.chat-bubble p { margin: 0; overflow-wrap: anywhere; font-size: 15px; line-height: 1.6; }
 .chat-result { display: grid; min-width: 0; max-width: 100%; gap: 10px; }
 .assistant-message { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid #d5d4cc; border-radius: 16px 16px 16px 4px; background: #e5e4de; }
 .assistant-message strong { color: #765a00; font-size: 13px; }
@@ -132,8 +132,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .composer-input { display: block; width: 100%; min-height: 48px; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 15px; line-height: 1.5; }
 .composer-input::placeholder { color: #a1a39a; }
 .composer-actions, .composer-actions > div { display: flex; align-items: center; }
-.composer-actions { justify-content: space-between; margin-top: 8px; }
-.composer-actions > div { gap: 11px; color: #3f433b; font-size: 13px; }
+.composer-actions { justify-content: space-between; gap: 10px; margin-top: 8px; }
+.composer-actions > div { display: flex; flex-wrap: wrap; gap: 11px; align-items: center; justify-content: flex-end; min-width: 0; color: #3f433b; font-size: 13px; }
 .new-conversation-button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-2); font-size: 13px; font-weight: 600; }
 .new-conversation-button:hover:not(:disabled) { background: var(--soft); }
 .composer-attach { position: relative; display: flex; min-height: 34px; align-items: center; padding: 0 11px; border: 1px solid #e0e1da; border-radius: 7px; background: #f7f7f3; color: #3f433b; font-size: 13px; cursor: pointer; }
@@ -151,10 +151,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .panel-heading p { margin: 4px 0 0; color: #4f534b; font-size: 13px; }
 .recent-chat-list, .recent-list { min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .recent-chat-list { flex: 1; }
-.recent-chat-item { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+.recent-chat-item { display: grid; width: 100%; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 18px; border-bottom: 1px solid var(--line); text-align: left; }
 .recent-chat-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--ink); color: var(--yellow); }
 .recent-chat-item strong, .recent-chat-item small { display: block; }
-.recent-chat-item strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.recent-chat-item strong { display: -webkit-box; overflow: hidden; font-size: 14px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .recent-chat-item small { margin-top: 4px; color: #4f534b; font-size: 13px; }
 .recent-chat-empty, .recent-empty { display: flex; min-height: 240px; flex: 1; align-items: center; justify-content: center; flex-direction: column; padding: 24px; background: #fafaf7; text-align: center; }
 .recent-chat-empty > span, .recent-empty > span { color: #8d9087; font-size: 24px; }
