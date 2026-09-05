@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SPENDING_LIMIT_RULES, spendingLimitError } from "@/lib/settings-types";
 import type { AgentPaySettings, PaymentRail, SpendingLimits } from "@/lib/settings-types";
 
-const RAILS: Array<{ id: PaymentRail; label: string; perPaymentRange: string; dailyRange: string; minimum: string; perPaymentMaximum: string; dailyMaximum: string; step: string; help: string }> = [
-  { id: "binance-pay", label: "Binance Pay", perPaymentRange: "0.0001 - 50", dailyRange: "0.0001 - 100", minimum: "0.0001", perPaymentMaximum: "50", dailyMaximum: "100", step: "0.0001", help: "Applied only to Binance Pay transactions." },
-  { id: "x402", label: "x402", perPaymentRange: "0.0001 - 20", dailyRange: "0.0001 - 20", minimum: "0.0001", perPaymentMaximum: "20", dailyMaximum: "20", step: "0.0001", help: "Applied only to approved x402 purchases with a reliable USD valuation." },
-  { id: "agentic-wallet", label: "Agentic Wallet", perPaymentRange: "0.00001 - 50", dailyRange: "0.00001 - 100", minimum: "0.00001", perPaymentMaximum: "50", dailyMaximum: "100", step: "0.00001", help: "Applied only to direct Agentic Wallet transfers." },
+const RAILS: Array<{ id: PaymentRail; label: string; help: string }> = [
+  { id: "binance-pay", label: "Binance Pay", help: "Applied only to Binance Pay transactions." },
+  { id: "x402", label: "x402", help: "Applied only to approved x402 purchases with a reliable USD valuation." },
+  { id: "agentic-wallet", label: "Agentic Wallet", help: "Applied only to direct Agentic Wallet transfers." },
 ];
 
 export function RulesSettings({ settings, onSaved }: { settings: AgentPaySettings; onSaved: (settings: AgentPaySettings) => void }) {
@@ -29,6 +30,13 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   }
 
   async function save() {
+    const invalidRail = RAILS.find(({ id }) => spendingLimitError(id, "perPaymentUsdLimit", limits[id].perPaymentUsdLimit) || spendingLimitError(id, "dailyUsdLimit", limits[id].dailyUsdLimit));
+    if (invalidRail) {
+      setActiveRail(invalidRail.id);
+      setError("Fix the highlighted spending limit before saving.");
+      setSaved(false);
+      return;
+    }
     setSaving(true); setError(""); setSaved(false);
     try {
       const normalizedLimits = Object.fromEntries(Object.entries(limits).map(([rail, value]) => [rail, {
@@ -53,15 +61,19 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
 
   const active = limits[activeRail];
   const rail = RAILS.find((item) => item.id === activeRail) as (typeof RAILS)[number];
+  const rule = SPENDING_LIMIT_RULES[activeRail];
+  const perPaymentError = spendingLimitError(activeRail, "perPaymentUsdLimit", active.perPaymentUsdLimit);
+  const dailyError = spendingLimitError(activeRail, "dailyUsdLimit", active.dailyUsdLimit);
+  const hasAnyLimitError = RAILS.some(({ id }) => spendingLimitError(id, "perPaymentUsdLimit", limits[id].perPaymentUsdLimit) || spendingLimitError(id, "dailyUsdLimit", limits[id].dailyUsdLimit));
   return <div className="rules-settings-card">
     <div className="locked-rule settings-card"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
     <section className="settings-card spending-rules-card">
       <div className="settings-section-heading"><div><strong>Spending limits</strong><span>Configure independent limits for each payment rail.</span></div></div>
-      <div className="spending-limit-tabs" role="tablist" aria-label="Payment rail spending limits">{RAILS.map((item) => <button type="button" role="tab" aria-selected={activeRail === item.id} className={activeRail === item.id ? "active" : ""} key={item.id} onClick={() => setActiveRail(item.id)}>{item.label}</button>)}</div>
+      <div className="spending-limit-tabs" role="tablist" aria-label="Payment rail spending limits">{RAILS.map((item) => { const invalid = Boolean(spendingLimitError(item.id, "perPaymentUsdLimit", limits[item.id].perPaymentUsdLimit) || spendingLimitError(item.id, "dailyUsdLimit", limits[item.id].dailyUsdLimit)); return <button type="button" role="tab" aria-selected={activeRail === item.id} className={`${activeRail === item.id ? "active" : ""}${invalid ? " has-error" : ""}`} key={item.id} onClick={() => setActiveRail(item.id)}>{item.label}</button>; })}</div>
       <div className="spending-limit-panel" role="tabpanel">
         <div className="settings-fields two-column-settings">
-          <label className="field"><span>Per-payment USD limit</span><div className="money-input"><b>$</b><input type="number" inputMode="decimal" min={rail.minimum} max={rail.perPaymentMaximum} step={rail.step} required value={active.perPaymentUsdLimit ?? ""} onChange={(event) => setLimit("perPaymentUsdLimit", event.target.value)} placeholder={rail.perPaymentRange}/></div><small className="field-help">Allowed range: {rail.perPaymentRange}</small></label>
-          <label className="field"><span>Daily USD limit</span><div className="money-input"><b>$</b><input type="number" inputMode="decimal" min={rail.minimum} max={rail.dailyMaximum} step={rail.step} required value={active.dailyUsdLimit ?? ""} onChange={(event) => setLimit("dailyUsdLimit", event.target.value)} placeholder={rail.dailyRange}/></div><small className="field-help">Allowed range: {rail.dailyRange}</small></label>
+          <label className="field"><span>Per-payment USD limit</span><div className={`money-input ${perPaymentError ? "invalid" : ""}`}><b>$</b><input type="number" inputMode="decimal" min={rule.minimum} max={rule.perPaymentMaximum} step={rule.minimum} required aria-invalid={Boolean(perPaymentError)} value={active.perPaymentUsdLimit ?? ""} onChange={(event) => setLimit("perPaymentUsdLimit", event.target.value)} placeholder={`${rule.minimum} - ${rule.perPaymentMaximum}`}/></div>{perPaymentError ? <small className="field-error">{perPaymentError}</small> : <small className="field-help">Allowed range: {rule.minimum} - {rule.perPaymentMaximum}</small>}</label>
+          <label className="field"><span>Daily USD limit</span><div className={`money-input ${dailyError ? "invalid" : ""}`}><b>$</b><input type="number" inputMode="decimal" min={rule.minimum} max={rule.dailyMaximum} step={rule.minimum} required aria-invalid={Boolean(dailyError)} value={active.dailyUsdLimit ?? ""} onChange={(event) => setLimit("dailyUsdLimit", event.target.value)} placeholder={`${rule.minimum} - ${rule.dailyMaximum}`}/></div>{dailyError ? <small className="field-error">{dailyError}</small> : <small className="field-help">Allowed range: {rule.minimum} - {rule.dailyMaximum}</small>}</label>
         </div>
         <small className="field-help">{rail.help} Payments without reliable USD data fail closed when a limit is set.</small>
       </div>
@@ -72,6 +84,6 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
     </div>
     {error && <div className="workflow-error">{error}</div>}
     {saved && <div className="settings-success">Rules saved and active on the server.</div>}
-    <div className="settings-actions"><button className="primary-button" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save rules"}</button></div>
+    <div className="settings-actions"><button className="primary-button" disabled={saving || hasAnyLimitError} onClick={() => void save()}>{saving ? "Saving…" : "Save rules"}</button></div>
   </div>;
 }

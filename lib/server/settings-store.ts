@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { AgentPaySettings, UpdateAgentPaySettings } from "@/lib/settings-types";
-import { DEFAULT_AGENTPAY_SETTINGS } from "@/lib/settings-types";
+import { DEFAULT_AGENTPAY_SETTINGS, spendingLimitError } from "@/lib/settings-types";
 
 let database: DatabaseSync | undefined;
 let databaseFile = "";
@@ -146,24 +146,22 @@ function validateX402Hosts(value: unknown): string[] {
 function validateSpendingLimits(value: unknown): UpdateAgentPaySettings["spendingLimits"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Spending limits must be provided for each payment rail.");
   const input = value as Record<string, unknown>;
-  const read = (rail: string, label: string, minimum: number, perPaymentMaximum: number, dailyMaximum: number) => {
+  const read = (rail: keyof UpdateAgentPaySettings["spendingLimits"], label: string) => {
     const candidate = input[rail];
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new SettingsValidationError(`${label} spending limits are required.`);
     const fields = candidate as Record<string, unknown>;
     const perPaymentUsdLimit = validateUsdLimit(fields.perPaymentUsdLimit, `${label} per-payment limit`);
     const dailyUsdLimit = validateUsdLimit(fields.dailyUsdLimit, `${label} daily limit`);
-    if (perPaymentUsdLimit === null || Number(perPaymentUsdLimit) < minimum || Number(perPaymentUsdLimit) > perPaymentMaximum) {
-      throw new SettingsValidationError(`${label} per-payment limit must be between $${minimum} and $${perPaymentMaximum}.`);
-    }
-    if (dailyUsdLimit === null || Number(dailyUsdLimit) < minimum || Number(dailyUsdLimit) > dailyMaximum) {
-      throw new SettingsValidationError(`${label} daily limit must be between $${minimum} and $${dailyMaximum}.`);
-    }
+    const perPaymentError = spendingLimitError(rail, "perPaymentUsdLimit", perPaymentUsdLimit);
+    const dailyError = spendingLimitError(rail, "dailyUsdLimit", dailyUsdLimit);
+    if (perPaymentError) throw new SettingsValidationError(`${label} ${perPaymentError.toLowerCase()}`);
+    if (dailyError) throw new SettingsValidationError(`${label} ${dailyError.toLowerCase()}`);
     return { perPaymentUsdLimit, dailyUsdLimit };
   };
   return {
-    "binance-pay": read("binance-pay", "Binance Pay", 0.0001, 50, 100),
-    x402: read("x402", "x402", 0.0001, 20, 20),
-    "agentic-wallet": read("agentic-wallet", "Agentic Wallet", 0.00001, 50, 100),
+    "binance-pay": read("binance-pay", "Binance Pay"),
+    x402: read("x402", "x402"),
+    "agentic-wallet": read("agentic-wallet", "Agentic Wallet"),
   };
 }
 

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { spendingLimitError } from "../lib/settings-types";
 import {
   SettingsValidationError,
   getAgentPaySettings,
@@ -71,6 +72,14 @@ test("migrates a Priority 1 settings database without losing profile values", ()
   assert.equal(settings.requireApproval, true);
   assert.deepEqual(settings.trustedX402Hosts, []);
 }));
+
+test("provides immediate field-level spending range errors", () => {
+  assert.match(spendingLimitError("binance-pay", "perPaymentUsdLimit", "0.00001"), /between \$0.0001 and \$50/);
+  assert.match(spendingLimitError("binance-pay", "dailyUsdLimit", "100.0001"), /between \$0.0001 and \$100/);
+  assert.match(spendingLimitError("x402", "dailyUsdLimit", "20.0001"), /between \$0.0001 and \$20/);
+  assert.match(spendingLimitError("agentic-wallet", "perPaymentUsdLimit", "1.000001"), /5 decimal places/);
+  assert.equal(spendingLimitError("agentic-wallet", "perPaymentUsdLimit", "0.00001"), "");
+});
 
 test("normalizes fields and validates unsupported values", () => {
   assert.deepEqual(validateSettingsUpdate({ displayName: "  Mark   Agent  ", displayCurrency: "USD", timeZone: "UTC", ...policyFields }), {
