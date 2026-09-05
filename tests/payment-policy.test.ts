@@ -86,7 +86,7 @@ test("all execution-rail guards re-read persisted rules before execution", () =>
   resetPaymentPolicyStoreForTests();
   try {
     updateAgentPaySettings({
-      displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", spendingLimits: { "binance-pay": { perPaymentUsdLimit: "1", dailyUsdLimit: null }, x402: { perPaymentUsdLimit: "1", dailyUsdLimit: null }, "agentic-wallet": { perPaymentUsdLimit: "1", dailyUsdLimit: null } },
+      displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", spendingLimits: { "binance-pay": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "1", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" } },
       trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
     });
     assert.throws(() => enforcePaymentPolicy({ rail: "agentic-wallet", amountUsd: "2", destination: trusted }), (error) => error instanceof PaymentPolicyError && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");

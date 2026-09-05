@@ -29,8 +29,8 @@ export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
   timeZone: "UTC",
   spendingLimits: {
     "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" },
-    x402: { perPaymentUsdLimit: null, dailyUsdLimit: null },
-    "agentic-wallet": { perPaymentUsdLimit: null, dailyUsdLimit: null },
+    x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" },
+    "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" },
   },
   trustedWalletDestinations: [],
   trustedX402Hosts: [],

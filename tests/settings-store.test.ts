@@ -13,7 +13,7 @@ import {
 } from "../lib/server/settings-store";
 
 const policyFields = {
-  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: null, dailyUsdLimit: null }, "agentic-wallet": { perPaymentUsdLimit: null, dailyUsdLimit: null } },
+  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" } },
   trustedWalletDestinations: [] as string[],
   trustedX402Hosts: [] as string[],
 };
@@ -40,6 +40,8 @@ test("creates persistent default AgentPay settings with mandatory approval", () 
   assert.equal(settings.timeZone, "UTC");
   assert.equal(settings.requireApproval, true);
   assert.deepEqual(settings.spendingLimits["binance-pay"], { perPaymentUsdLimit: "50", dailyUsdLimit: "100" });
+  assert.deepEqual(settings.spendingLimits.x402, { perPaymentUsdLimit: "20", dailyUsdLimit: "20" });
+  assert.deepEqual(settings.spendingLimits["agentic-wallet"], { perPaymentUsdLimit: "50", dailyUsdLimit: "100" });
   assert.deepEqual(settings.trustedWalletDestinations, []);
   assert.ok(Date.parse(settings.updatedAt));
 }));
@@ -75,7 +77,11 @@ test("normalizes fields and validates unsupported values", () => {
     displayName: "Mark Agent", displayCurrency: "USD", timeZone: "UTC", ...policyFields,
   });
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "EUR", timeZone: "UTC", ...policyFields }), SettingsValidationError);
-  assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, x402: { perPaymentUsdLimit: "0", dailyUsdLimit: null } } }), SettingsValidationError);
+  assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, "binance-pay": { perPaymentUsdLimit: "0.00001", dailyUsdLimit: "100" } } }), /between \$0.0001 and \$50/);
+  assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, "binance-pay": { perPaymentUsdLimit: "50.0001", dailyUsdLimit: "100" } } }), /between \$0.0001 and \$50/);
+  assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20.0001" } } }), /between \$0.0001 and \$20/);
+  assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, "agentic-wallet": { perPaymentUsdLimit: "0.000001", dailyUsdLimit: "100" } } }), SettingsValidationError);
+  assert.doesNotThrow(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { "binance-pay": { perPaymentUsdLimit: "0.0001", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "0.0001", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "0.00001", dailyUsdLimit: "100" } } }));
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, trustedX402Hosts: ["https://api.example.com/path"] }), SettingsValidationError);
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, trustedWalletDestinations: ["not-an-address"] }), SettingsValidationError);
 });
