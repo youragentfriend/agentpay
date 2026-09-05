@@ -1,9 +1,8 @@
 import type { PrepareTransferRequest, PreparedTransfer } from "@/lib/payment-workflow";
+import { isValidRecipientForChain } from "@/lib/payment-validation";
 import { multiplyDecimalStrings } from "@/lib/server/payment-policy";
 import type { WalletOverview } from "@/lib/wallet-types";
 
-const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
-const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const DECIMAL_AMOUNT = /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/;
 const GAS_LEVELS = new Set(["LOW", "MEDIUM", "HIGH"]);
 const EVM_NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -50,10 +49,6 @@ export function compareDecimalStrings(left: string, right: string): number {
   return paddedLeft === paddedRight ? 0 : paddedLeft > paddedRight ? 1 : -1;
 }
 
-function validAddress(value: string, chainId: string): boolean {
-  return chainId === "CT_501" ? SOLANA_ADDRESS.test(value) : EVM_ADDRESS.test(value);
-}
-
 export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletOverview): Omit<PreparedTransfer, "id"> {
   if (wallet.status !== "CONNECTED") {
     throw new PaymentIntentError("Connect Agentic Wallet before preparing a transfer.", "WALLET_NOT_CONNECTED");
@@ -94,8 +89,8 @@ export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletO
   }
   const chain = wallet.chains.find((item) => item.binanceChainId === chainId);
   if (!chain) throw new PaymentIntentError("Choose a chain supported by this wallet.", "UNSUPPORTED_CHAIN");
-  if (!validAddress(recipient, chainId)) throw new PaymentIntentError("Recipient address format does not match the selected chain.", "INVALID_RECIPIENT");
-  if (!validAddress(tokenAddress, chainId)) throw new PaymentIntentError("Token address format does not match the selected chain.", "INVALID_TOKEN_ADDRESS");
+  if (!isValidRecipientForChain(recipient, chainId)) throw new PaymentIntentError("Recipient address format does not match the selected chain.", "INVALID_RECIPIENT");
+  if (!isValidRecipientForChain(tokenAddress, chainId)) throw new PaymentIntentError("Token address format does not match the selected chain.", "INVALID_TOKEN_ADDRESS");
 
   const balance = wallet.balances.find((item) => item.binanceChainId === chainId && item.address.toLowerCase() === tokenAddress.toLowerCase());
   if (!balance) throw new PaymentIntentError("That token is not available in the connected wallet.", "ASSET_NOT_AVAILABLE");
@@ -111,7 +106,7 @@ export function prepareTransfer(request: PrepareTransferRequest, wallet: WalletO
     status: "awaiting-approval", instruction: request.instruction?.trim(),
     amount, amountUsd, asset: balance.symbol, availableBalance: balance.balance, recipient,
     tokenAddress: balance.address, binanceChainId: chainId, chainName: chain.name,
-    gasLevel: request.gasLevel ?? "HIGH", createdAt: now.toISOString(),
+    gasLevel: request.gasLevel ?? "MEDIUM", createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
     warnings: [
       "The recipient must already exist in your Binance Wallet address book.",

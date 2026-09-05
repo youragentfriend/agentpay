@@ -47,6 +47,11 @@ test("prepares and explicitly approves an exact transfer intent", () => {
   assert.equal(approvePaymentIntent(prepared.id).status, "approved");
 });
 
+test("uses medium gas priority when the form does not override it", () => {
+  const prepared = prepareTransfer({ amount: "1", recipient, tokenAddress, binanceChainId: "56" }, wallet);
+  assert.equal(prepared.gasLevel, "MEDIUM");
+});
+
 test("rejects an amount above the live wallet balance", () => {
   assert.throws(
     () => prepareTransfer({ amount: "12.500000000000000001", recipient, tokenAddress, binanceChainId: "56" }, wallet),
