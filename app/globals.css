@@ -88,14 +88,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .welcome h1, .standard-page h1 { margin: 0; font-size: clamp(35px, 4vw, 53px); font-weight: 600; line-height: 1.1; letter-spacing: -.045em; }
 .welcome .lead { margin-top: 10px; font-size: 16px; }
 .lead { max-width: 700px; margin: 12px 0 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
-.overview-primary-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr); align-items: stretch; gap: 18px; }
+.overview-primary-grid { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 18px; }
 .overview-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 18px; margin-top: 18px; }
-.assistant-panel, .recent-chats-panel, .recent-panel, .payment-rails, .wallet-section, .payment-workflow, .binance-pay-workflow, .integration-setup, .settings-card { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.assistant-workspace, .recent-panel, .payment-rails, .wallet-section, .payment-workflow, .binance-pay-workflow, .integration-setup, .settings-card { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.assistant-workspace { display: grid; min-width: 0; grid-template-columns: minmax(0, 7fr) minmax(240px, 3fr); align-items: stretch; overflow: hidden; }
 .assistant-panel, .recent-chats-panel, .recent-panel { min-height: 0; overflow: hidden; }
 .assistant-panel { display: flex; height: auto; flex-direction: column; }
 .assistant-panel.empty { height: auto; }
 .assistant-panel.has-messages { height: auto; }
 .recent-chats-panel, .recent-panel { display: flex; height: 100%; flex-direction: column; }
+.recent-chats-panel { border-left: 1px solid var(--line); }
 .assistant-status { display: flex; min-height: 72px; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--line); }
 .assistant-identity { display: flex; align-items: center; gap: 11px; }
 .assistant-badge { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: var(--ink); color: var(--yellow); }
@@ -114,7 +116,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .quick-actions b { color: #aaaca3; font-weight: 400; }
 .conversation { display: grid; align-content: start; gap: 14px; overflow: auto; padding: 12px 24px; border-top: 1px solid var(--line); scrollbar-gutter: stable; }
 .conversation.has-messages { max-height: 420px; }
-.conversation.empty { flex: 0 0 0; overflow: hidden; padding-top: 0; padding-bottom: 0; border-top: 0; }
+.conversation.empty { flex: 0 0 auto; overflow: hidden; padding: 12px 24px 18px; border-top: 1px solid var(--line); }
+.conversation-placeholder { display: grid; gap: 6px; padding: 18px 15px; border: 1px dashed var(--line-strong); border-radius: 12px; background: #fafaf7; color: var(--muted); text-align: center; }
+.conversation-placeholder strong { color: var(--ink-2); font-size: 15px; font-weight: 600; }
+.conversation-placeholder span { font-size: 14px; line-height: 1.55; }
 .chat-bubble { max-width: 84%; padding: 12px 15px; border-radius: 16px 16px 4px 16px; }
 .user-bubble { justify-self: end; background: var(--ink); color: #fff; }
 .chat-bubble span { display: block; margin-bottom: 4px; color: var(--yellow); font-size: 13px; font-weight: 700; }
@@ -371,11 +376,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 @media (max-width: 1080px) {
-  .overview-primary-grid, .overview-secondary-grid { grid-template-columns: 1fr; }
+  .overview-primary-grid, .overview-secondary-grid, .assistant-workspace { grid-template-columns: 1fr; }
   .assistant-panel { height: auto; }
   .recent-panel { height: auto; }
   .recent-list { max-height: 360px; }
   .portfolio-summary, .wallet-summary { flex-direction: column; }
+  .recent-chats-panel { border-top: 1px solid var(--line); border-left: 0; }
 }
 
 @media (max-width: 820px) {
