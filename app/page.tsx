@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
+import { isSolanaChain } from "@/lib/payment-validation";
 import { PaymentWorkflow } from "@/app/components/payment-workflow";
 import { ActivityWorkflow } from "@/app/components/activity-workflow";
 import { BinancePayWorkflow } from "@/app/components/binance-pay-workflow";
@@ -297,14 +298,17 @@ function WalletMessage({ icon, title, text, action }: { icon: string; title: str
 function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; onRefresh: () => Promise<void> }) {
   const [action,setAction]=useState<""|"send"|"receive">("");
   const [sort,setSort]=useState<"high"|"low">("high");
+  const [copiedReceiveAddress,setCopiedReceiveAddress]=useState("");
   const sendDialogRef=useRef<HTMLDialogElement|null>(null);
+  const receiveDialogRef=useRef<HTMLDialogElement|null>(null);
   useEffect(()=>{
-    const dialog=sendDialogRef.current;
-    if(action!=="send"||!dialog||dialog.open)return;
+    const dialog=action==="send"?sendDialogRef.current:action==="receive"?receiveDialogRef.current:null;
+    if(!dialog||dialog.open)return;
     if(typeof dialog.showModal==="function")dialog.showModal();
     else dialog.setAttribute("open","");
   },[action]);
-  function closeSendDialog(){sendDialogRef.current?.close();setAction("");}
+  function closeWalletDialog(){sendDialogRef.current?.close();receiveDialogRef.current?.close();setCopiedReceiveAddress("");setAction("");}
+  async function copyReceiveAddress(address:string){await navigator.clipboard.writeText(address);setCopiedReceiveAddress(address);window.setTimeout(()=>setCopiedReceiveAddress(current=>current===address?"":current),1500);}
   const totalValue = overview.balances.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
   const balances = [...overview.balances].sort((left, right) => {
     const leftValue = Number(left.value);
@@ -314,12 +318,33 @@ function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; on
     if (!Number.isFinite(leftValue) || !Number.isFinite(rightValue)) return left.symbol.localeCompare(right.symbol);
     return sort === "high" ? rightValue - leftValue : leftValue - rightValue;
   });
+  const receiveFamilies=groupWalletReceiveAddresses(overview);
   return <div className="wallet-dashboard">
     <div className="wallet-summary"><div><span className="metric-label">Portfolio value</span><strong>${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><small>Live balances from Binance Agentic Wallet.</small></div><div className="summary-actions"><button type="button" className="primary-button" onClick={()=>setAction("send")}>Send</button><button type="button" className="secondary-button" onClick={()=>setAction("receive")}>Receive</button><button type="button" className="ghost-button wallet-refresh-button" onClick={() => void onRefresh()}>Refresh</button></div></div>
-    {action==="send"&&<dialog ref={sendDialogRef} className="receive-link-dialog wallet-send-dialog" aria-modal="true" aria-labelledby="wallet-send-title" onCancel={(event)=>{event.preventDefault();closeSendDialog();}} onClick={(event)=>{if(event.target===event.currentTarget)closeSendDialog();}}><div className="receive-link-dialog-heading"><div><span>Agentic Wallet</span><h2 id="wallet-send-title">Prepare a transfer</h2></div></div><PaymentWorkflow onClose={closeSendDialog}/></dialog>}{action==="receive"&&<section className="wallet-section receive-addresses"><div className="section-heading"><h2>Receive</h2><button onClick={()=>setAction("")}>Close</button></div><p className="panel-note">Choose the correct network before sharing an address. Sending on the wrong network may permanently lose funds.</p><div className="data-list">{overview.addresses.map(address=><div className="data-row" key={address.binanceChainId}><div><strong>{address.chainName}</strong><small className="mono-value">{address.address}</small></div><button className="secondary-button" onClick={()=>void navigator.clipboard.writeText(address.address)}>Copy</button></div>)}</div></section>}
+    {action==="send"&&<dialog ref={sendDialogRef} className="receive-link-dialog wallet-send-dialog" aria-modal="true" aria-labelledby="wallet-send-title" onCancel={(event)=>{event.preventDefault();closeWalletDialog();}} onClick={(event)=>{if(event.target===event.currentTarget)closeWalletDialog();}}><div className="receive-link-dialog-heading"><div><span>Agentic Wallet</span><h2 id="wallet-send-title">Prepare a transfer</h2></div></div><PaymentWorkflow onClose={closeWalletDialog}/></dialog>}{action==="receive"&&<dialog ref={receiveDialogRef} className="receive-link-dialog wallet-receive-dialog" aria-modal="true" aria-labelledby="wallet-receive-title" onCancel={(event)=>{event.preventDefault();closeWalletDialog();}} onClick={(event)=>{if(event.target===event.currentTarget)closeWalletDialog();}}><div className="receive-link-dialog-heading"><div><span>Agentic Wallet</span><h2 id="wallet-receive-title">Receive assets</h2></div></div><div className="wallet-receive-content"><div className="wallet-receive-warning"><strong>Choose the correct network</strong><span>EVM networks may share an address format, but assets must still be sent on a supported network.</span></div>{receiveFamilies.length?<div className="wallet-receive-families">{receiveFamilies.map(family=><section className="wallet-receive-family" key={family.id}><div className="wallet-receive-family-heading"><span className={`wallet-family-badge ${family.id}`}>{family.label}</span><p>{family.description}</p></div><div className="wallet-receive-addresses">{family.groups.map(group=><div className="wallet-receive-address" key={`${family.id}:${group.address}`}><div className="wallet-network-chips">{group.networks.map(network=><span key={network}>{network}</span>)}</div><code>{group.address}</code><button type="button" className="primary-button" onClick={()=>void copyReceiveAddress(group.address)}>{copiedReceiveAddress===group.address?"Copied":"Copy address"}</button></div>)}</div></section>)}</div>:<div className="inline-empty">No receive addresses were returned by Agentic Wallet.</div>}</div><div className="receive-link-dialog-actions"><button type="button" className="secondary-button" onClick={closeWalletDialog}>Close</button></div></dialog>}
     <div className="wallet-data-grid"><section className="wallet-section"><div className="section-heading wallet-section-heading"><div><h2>Balances</h2><span>{overview.balances.length} assets</span></div><select aria-label="Sort wallet balances" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="high">Highest to lowest</option><option value="low">Lowest to highest</option></select></div>{balances.length ? <div className="data-list">{balances.map((balance) => <div className="data-row" key={`${balance.binanceChainId}:${balance.address}`}><div><strong>{balance.symbol}</strong><small>Chain {balance.binanceChainId} · {balance.address}</small></div><div className="amount"><strong>{balance.balance}</strong><small>${Number(balance.value || 0).toFixed(2)}</small></div></div>)}</div> : <p className="inline-empty">No balances above the wallet’s display threshold.</p>}</section>
     <section className="wallet-section"><div className="section-heading"><h2>Recent transactions</h2><span>Last {Math.min(5,overview.transactions.length)}</span></div>{overview.transactions.length ? <div className="data-list">{overview.transactions.slice(0,5).map((transaction) => <div className="data-row" key={transaction.txHash}><div><strong>{transaction.txType || "Transaction"}</strong><small className="mono-value">{transaction.txHash}</small></div><div className="amount"><strong className={`tx-status ${transaction.status}`}>{transaction.status}</strong><small>{transaction.txTime}</small></div></div>)}</div> : <p className="inline-empty">No recent transactions returned.</p>}</section></div>
   </div>;
+}
+
+function groupWalletReceiveAddresses(overview: WalletOverview) {
+  const makeGroups=(solana:boolean)=>{
+    const grouped=new Map<string,{address:string;networks:string[]}>();
+    for(const item of overview.addresses){
+      if(isSolanaChain(item.binanceChainId)!==solana)continue;
+      const key=solana?item.address:item.address.toLowerCase();
+      const chain=overview.chains.find(candidate=>candidate.binanceChainId===item.binanceChainId);
+      const network=item.chainName||chain?.simpleName||chain?.name||item.binanceChainId;
+      const existing=grouped.get(key);
+      if(existing){if(!existing.networks.includes(network))existing.networks.push(network);}
+      else grouped.set(key,{address:item.address,networks:[network]});
+    }
+    return [...grouped.values()].map(group=>({...group,networks:group.networks.sort()}));
+  };
+  return [
+    {id:"evm",label:"EVM",description:"Use this address only on one of the supported EVM networks shown below.",groups:makeGroups(false)},
+    {id:"solana",label:"Solana",description:"Use this address only for transfers sent through the Solana network.",groups:makeGroups(true)},
+  ].filter(family=>family.groups.length>0);
 }
 
 
