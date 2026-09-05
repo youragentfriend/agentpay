@@ -11,26 +11,143 @@ const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "development";
 type View = "overview" | "binance" | "binance-pay" | "wallet" | "x402" | "activity" | "settings";
 const labels: Record<View,string>={overview:"Overview",binance:"Binance", "binance-pay":"Binance Pay",wallet:"Agentic Wallet",x402:"x402",activity:"Activity",settings:"Settings"};
 
-export default function Home(){
- const [view,setView]=useState<View>("overview"); const [walletStatus,setWalletStatus]=useState<WalletConnectionStatus>("UNCONNECTED"); const [binanceOpen,setBinanceOpen]=useState(true); const [walletOpen,setWalletOpen]=useState(true);
- useEffect(()=>{void fetch("/api/wallet/overview",{cache:"no-store"}).then(async response=>{if(!response.ok)return;const data=await response.json() as WalletOverview;setWalletStatus(data.status)}).catch(()=>undefined)},[]);
- return <main className="app-shell"><aside className="sidebar"><div className="brand"><img className="brand-mark" src="/brand/agentpay-mark.png" alt=""/><div><strong>AgentPay</strong><span>Payment intelligence</span></div></div><div className="connection-pill"><span className={`status-dot ${walletStatus==="CONNECTED"?"active-dot":"muted"}`}/><span>{walletStatus==="CONNECTED"?"Wallet connected":"Approval mode · funds protected"}</span></div><nav className="nav-list" aria-label="Main navigation"><span className="nav-label">WORKSPACE</span><NavButton active={view==="overview"} icon="⌂" label="Overview" onClick={()=>setView("overview")}/><NavParent label="Binance" icon="B" active={view==="binance"||view==="binance-pay"} open={binanceOpen} onNavigate={()=>setView("binance")} onToggle={()=>setBinanceOpen(v=>!v)}/>{binanceOpen&&<div className="nav-submenu"><NavButton active={view==="binance-pay"} icon="▦" label="Binance Pay" onClick={()=>setView("binance-pay")}/></div>}<NavParent label="Agentic Wallet" icon="◈" active={view==="wallet"||view==="x402"} open={walletOpen} onNavigate={()=>setView("wallet")} onToggle={()=>setWalletOpen(v=>!v)}/>{walletOpen&&<div className="nav-submenu"><NavButton active={view==="x402"} icon="402" label="x402" onClick={()=>setView("x402")}/></div>}<NavButton active={view==="activity"} icon="◷" label="Activity" onClick={()=>setView("activity")}/><span className="nav-label manage-label">MANAGE</span><NavButton active={view==="settings"} icon="⚙" label="Settings" onClick={()=>setView("settings")}/></nav><div className="sidebar-footer"><div className="security-note"><span>◆</span><div><strong>Approval-first</strong><small>Every payment is reviewable</small></div></div><span className="version">v{appVersion}</span></div></aside><section className="content-area"><header className="topbar"><div className="breadcrumbs"><span>AgentPay</span><b>/</b><strong>{labels[view]}</strong></div><div className="topbar-actions"><button className="avatar" aria-label="Account">M</button></div></header><div className="page-content">{view==="overview"&&<OverviewView onNavigate={setView} walletStatus={walletStatus}/>} {view==="binance"&&<BinanceView/>}{view==="binance-pay"&&<BinancePayView/>}{view==="wallet"&&<WalletView onStatusChange={setWalletStatus}/>} {view==="x402"&&<X402View/>}{view==="activity"&&<ActivityView/>}{view==="settings"&&<SettingsView/>}</div></section></main>;
+export default function Home() {
+  const [view, setView] = useState<View>("overview");
+  const [walletStatus, setWalletStatus] = useState<WalletConnectionStatus>("UNCONNECTED");
+  const [binanceOpen, setBinanceOpen] = useState(true);
+  const [walletOpen, setWalletOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    void fetch("/api/wallet/overview", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json() as WalletOverview;
+        setWalletStatus(data.status);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const navigate = (nextView: View) => {
+    setView(nextView);
+    setMenuOpen(false);
+  };
+
+  return <main className="app-shell">
+    <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
+      <div className="brand-row">
+        <div className="brand"><span className="brand-symbol" aria-hidden="true"><i/><i/></span><div><strong>AgentPay</strong><span>Payment intelligence</span></div></div>
+        <button className="mobile-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}>×</button>
+      </div>
+      <div className="safe-state"><span className={`status-dot ${walletStatus === "CONNECTED" ? "active-dot" : ""}`}/><div><strong>{walletStatus === "CONNECTED" ? "Wallet connected" : "Approval mode"}</strong><small>Funds move only after review</small></div></div>
+      <nav className="nav-list" aria-label="Main navigation">
+        <span className="nav-label">Workspace</span>
+        <NavButton active={view === "overview"} icon="⌂" label="Overview" onClick={() => navigate("overview")}/>
+        <NavParent label="Binance" icon="B" active={view === "binance" || view === "binance-pay"} open={binanceOpen} onNavigate={() => navigate("binance")} onToggle={() => setBinanceOpen((value) => !value)}/>
+        {binanceOpen && <div className="nav-submenu"><NavButton active={view === "binance-pay"} icon="" label="Binance Pay" onClick={() => navigate("binance-pay")}/></div>}
+        <NavParent label="Agentic Wallet" icon="◇" active={view === "wallet" || view === "x402"} open={walletOpen} onNavigate={() => navigate("wallet")} onToggle={() => setWalletOpen((value) => !value)}/>
+        {walletOpen && <div className="nav-submenu"><NavButton active={view === "x402"} icon="" label="x402 services" onClick={() => navigate("x402")}/></div>}
+        <NavButton active={view === "activity"} icon="◷" label="Activity" onClick={() => navigate("activity")}/>
+        <span className="nav-label manage-label">Manage</span>
+        <NavButton active={view === "settings"} icon="⚙" label="Settings" onClick={() => navigate("settings")}/>
+      </nav>
+      <div className="sidebar-footer">
+        <div className="profile"><span className="profile-avatar">M</span><div><strong>Mark</strong><small>Approval-first account</small></div></div>
+        <span className="version">AgentPay · v{appVersion}</span>
+      </div>
+    </aside>
+    <section className="content-area">
+      <header className="topbar">
+        <button className="menu-button" aria-label="Open menu" onClick={() => setMenuOpen(true)}>☰</button>
+        <div className="breadcrumbs"><span>AgentPay</span><b>/</b><strong>{labels[view]}</strong></div>
+        <button className="avatar" aria-label="Mark account">M</button>
+      </header>
+      <div className="page-content">
+        {view === "overview" && <OverviewView onNavigate={navigate} walletStatus={walletStatus}/>}
+        {view === "binance" && <BinanceView/>}
+        {view === "binance-pay" && <BinancePayView/>}
+        {view === "wallet" && <WalletView onStatusChange={setWalletStatus}/>}
+        {view === "x402" && <X402View/>}
+        {view === "activity" && <ActivityView/>}
+        {view === "settings" && <SettingsView/>}
+      </div>
+    </section>
+  </main>;
 }
 function NavButton({active,icon,label,onClick}:{active:boolean;icon:string;label:string;onClick:()=>void}){return <button className={`nav-item ${active?"active":""}`} onClick={onClick}><span className="nav-icon">{icon}</span><span>{label}</span></button>}
 function NavParent({label,icon,active,open,onNavigate,onToggle}:{label:string;icon:string;active:boolean;open:boolean;onNavigate:()=>void;onToggle:()=>void}){return <div className={`nav-parent ${active?"active":""}`}><button className="nav-parent-main" onClick={onNavigate}><span className="nav-icon">{icon}</span><span>{label}</span></button><button className="nav-chevron" aria-label={`${open?"Collapse":"Expand"} ${label}`} onClick={onToggle}>{open?"⌄":"›"}</button></div>}
 
 type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: "payment" | "binance-pay" | "payment-link" | "binance-balance" | "qr" | "activity" | "balance" | "x402"; file?: File };
 
-function OverviewView({onNavigate,walletStatus}:{onNavigate:(view:View)=>void;walletStatus:WalletConnectionStatus}){
- const [message,setMessage]=useState(""); const [turns,setTurns]=useState<ChatTurn[]>([]); const [nextId,setNextId]=useState(1); const [welcome,setWelcome]=useState({greeting:"Welcome back.",date:""});
- useEffect(()=>{const now=new Date();const hour=now.getHours();setWelcome({greeting:hour<12?"Good morning.":hour<18?"Good afternoon.":"Good evening.",date:new Intl.DateTimeFormat(undefined,{weekday:"long",month:"long",day:"numeric"}).format(now)});},[]);
- function addTurn(text:string, action?:ChatTurn["action"], file?:File){const id=nextId;setNextId(value=>value+1);setTurns(value=>[...value,{id,role:"user",text,action,file},{id:id+0.5,role:"assistant",text:action==="payment"?"I’ll prepare an approval-first Agentic Wallet transfer. Review the exact intent before approving.":action==="binance-pay"?"I’ll open the Binance Pay inspector here so you can paste a link or attach a QR without leaving this conversation.":action==="payment-link"?"I’ll open the live Binance Pay receive-link workflow here. You choose the amount and review the link before sharing it.":action==="binance-balance"?"A separate read-only Binance account connection is required before I can show Spot, Funding, Futures, Earn, or Margin balances.":action==="qr"?"I’ll inspect this QR through the shared Binance Pay validation pipeline.":action==="activity"?"Here’s the latest activity, normalized across every payment rail.":action==="balance"?"Here’s the current Agentic Wallet overview, including balances and connection status.":action==="x402"?"I’ll inspect the x402 service here. If your message includes a URL, it is prefilled below.":"I can prepare wallet payments, inspect Binance Pay QR codes, check wallet balances, review activity, or inspect x402 services. Tell me what you’d like to do."}]);}
- function submit(){const value=message.trim();if(!value)return;const lower=value.toLowerCase();const action:ChatTurn["action"]=lower.includes("activity")||lower.includes("history")?"activity":lower.includes("x402")||lower.includes("service")?"x402":lower.includes("binance")&&(lower.includes("balance")||lower.includes("portfolio")||lower.includes("funding")||lower.includes("spot")||lower.includes("futures"))?"binance-balance":(lower.includes("create")||lower.includes("generate"))&&lower.includes("payment link")?"payment-link":lower.includes("binance pay")||lower.includes("payment link")?"binance-pay":lower.includes("balance")||lower.includes("wallet")||lower.includes("holdings")?"balance":"payment";addTurn(value,action);setMessage("")}
- function attach(file:File|undefined){if(file)addTurn("Attached QR: "+file.name,"qr",file)}
- const actions:Array<{label:string;description:string;icon:string;action:ChatTurn["action"]}>=[{label:"Prepare a transfer",description:"Send crypto with approval",icon:"↗",action:"payment"},{label:"Explore an x402 service",description:"Inspect before purchase",icon:"402",action:"x402"},{label:"Check wallet",description:"Balances and connection",icon:"◇",action:"balance"},{label:"Create a payment link",description:"Generate a receive link",icon:"＋",action:"payment-link"}];
- return <div className="overview-page"><div className="overview-heading"><div className="eyebrow"><span className="spark">✦</span>{welcome.date}</div><h1>{welcome.greeting}</h1><p className="lead">What would you like AgentPay to take care of?</p></div><div className="overview-grid"><section className="assistant-panel"><div className="assistant-status"><div className="assistant-identity"><span className="assistant-badge">✦</span><div><strong>AgentPay Assistant</strong><small><span className="status-dot active-dot"/> Ready for an instruction</small></div></div></div><div className="quick-actions">{actions.map(action=><button key={action.label} onClick={()=>addTurn(action.label,action.action)}><span className="quick-action-icon">{action.icon}</span><span><strong>{action.label}</strong><small>{action.description}</small></span><b>→</b></button>)}</div><div className="conversation" aria-live="polite">{turns.map(turn=>turn.role==="user"?<div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div>:<div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action==="payment"&&<PaymentWorkflow initialInstruction={turns.find(item=>item.id===turn.id-0.5)?.text}/>} {turn.action==="binance-pay"&&<BinancePayWorkflow embedded/>}{turn.action==="payment-link"&&<BinancePayWorkflow embedded initialMode="receive"/>}{turn.action==="binance-balance"&&<div className="inline-state"><strong>Connect Binance portfolio</strong><span>Use the Binance page to configure a protected read-only connection. AgentPay will never request API credentials in chat.</span></div>} {turn.action==="qr"&&<QrResult file={turns.find(item=>item.id===turn.id-0.5)?.file} fileName={turns.find(item=>item.id===turn.id-0.5)?.text.replace("Attached QR: ","")||"attached QR"}/>} {turn.action==="activity"&&<InlineActivity/>}{turn.action==="balance"&&<InlineBalance/>}{turn.action==="x402"&&<X402Workflow initialUrl={extractUrl(turns.find(item=>item.id===turn.id-0.5)?.text||"")}/>}</div>)}</div><div className="composer"><textarea className="composer-input" value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit()}}} placeholder="Ask AgentPay to prepare, inspect, check, or review…"/><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR" onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();event.currentTarget.querySelector("input")?.click()}}}><span>＋</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>attach(e.target.files?.[0])}/></label><button className="send-button" onClick={submit} aria-label="Send instruction">↑</button></div><div className="composer-footer"><span>Enter to send · Shift + Enter for a new line</span><span className="approval-note">◆ No funds move without approval</span></div></section><RecentActivity onViewAll={()=>onNavigate("activity")}/></div><PaymentRails walletStatus={walletStatus} onNavigate={onNavigate}/></div>
-}
+function OverviewView({ onNavigate, walletStatus }: { onNavigate: (view: View) => void; walletStatus: WalletConnectionStatus }) {
+  const [message, setMessage] = useState("");
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [nextId, setNextId] = useState(1);
+  const [welcome, setWelcome] = useState({ greeting: "Welcome back, Mark.", date: "" });
 
+  useEffect(() => {
+    const now = new Date();
+    const hour = now.getHours();
+    setWelcome({
+      greeting: `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, Mark.`,
+      date: new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(now),
+    });
+  }, []);
+
+  function addTurn(text: string, action?: ChatTurn["action"], file?: File) {
+    const id = nextId;
+    setNextId((value) => value + 1);
+    const responses: Partial<Record<NonNullable<ChatTurn["action"]>, string>> = {
+      payment: "I’ll prepare an approval-first Agentic Wallet transfer. Review the exact intent before approving.",
+      "binance-pay": "I’ll open the Binance Pay inspector here so you can paste a link or attach a QR without leaving this conversation.",
+      "payment-link": "I’ll open the live Binance Pay receive-link workflow here. You choose the amount and review the link before sharing it.",
+      "binance-balance": "A separate read-only Binance account connection is required before I can show Spot, Funding, Futures, Earn, or Margin balances.",
+      qr: "I’ll inspect this QR through the shared Binance Pay validation pipeline.",
+      activity: "Here’s the latest activity, normalized across every payment rail.",
+      balance: "Here’s the current Agentic Wallet overview, including balances and connection status.",
+      x402: "I’ll inspect the x402 service here. If your message includes a URL, it is prefilled below.",
+    };
+    setTurns((value) => [...value, { id, role: "user", text, action, file }, { id: id + 0.5, role: "assistant", text: action ? responses[action] ?? "Tell me what you’d like to do." : "Tell me what you’d like to do." }]);
+  }
+
+  function submit() {
+    const value = message.trim();
+    if (!value) return;
+    const lower = value.toLowerCase();
+    const action: ChatTurn["action"] = lower.includes("activity") || lower.includes("history") ? "activity" : lower.includes("x402") || lower.includes("service") ? "x402" : lower.includes("binance") && ["balance", "portfolio", "funding", "spot", "futures"].some((term) => lower.includes(term)) ? "binance-balance" : (lower.includes("create") || lower.includes("generate")) && lower.includes("payment link") ? "payment-link" : lower.includes("binance pay") || lower.includes("payment link") ? "binance-pay" : lower.includes("balance") || lower.includes("wallet") || lower.includes("holdings") ? "balance" : "payment";
+    addTurn(value, action);
+    setMessage("");
+  }
+
+  function attach(file: File | undefined) {
+    if (file) addTurn(`Attached QR: ${file.name}`, "qr", file);
+  }
+
+  const actions: Array<{ label: string; description: string; icon: string; action: ChatTurn["action"] }> = [
+    { label: "Prepare a transfer", description: "Send USDT with approval", icon: "↗", action: "payment" },
+    { label: "Explore an x402 service", description: "Review a service before purchase", icon: "↗", action: "x402" },
+    { label: "Check wallet", description: "Balances and connection status", icon: "◇", action: "balance" },
+    { label: "Create a payment link", description: "Request money with a shareable link", icon: "↗", action: "payment-link" },
+  ];
+
+  return <div className="overview-page">
+    <section className="welcome">
+      <p className="eyebrow"><span className="spark">✦</span>{welcome.date}</p>
+      <h1>{welcome.greeting}</h1>
+      <p className="lead">What would you like AgentPay to take care of?</p>
+    </section>
+    <section className="overview-grid">
+      <section className="assistant-panel">
+        <div className="assistant-status"><div className="assistant-identity"><span className="assistant-badge">✦</span><div><strong>AgentPay Assistant</strong><small><span className="status-dot active-dot"/> Ready for an instruction</small></div></div></div>
+        <div className="quick-actions">{actions.map((action) => <button key={action.label} onClick={() => addTurn(action.label, action.action)}><span className="quick-action-icon">{action.icon}</span><span><strong>{action.label}</strong><small>{action.description}</small></span><b>→</b></button>)}</div>
+        {turns.length > 0 && <div className="conversation" aria-live="polite">{turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow initialInstruction={turns.find((item) => item.id === turn.id - 0.5)?.text}/>} {turn.action === "binance-pay" && <BinancePayWorkflow embedded/>}{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive"/>}{turn.action === "binance-balance" && <div className="inline-state"><strong>Connect Binance portfolio</strong><span>Use the Binance page to configure a protected read-only connection. AgentPay will never request API credentials in chat.</span></div>} {turn.action === "qr" && <QrResult file={turns.find((item) => item.id === turn.id - 0.5)?.file} fileName={turns.find((item) => item.id === turn.id - 0.5)?.text.replace("Attached QR: ", "") || "attached QR"}/>} {turn.action === "activity" && <InlineActivity/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={extractUrl(turns.find((item) => item.id === turn.id - 0.5)?.text || "")}/>}</div>)}</div>}
+        <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submit(); } }} placeholder="Ask AgentPay to prepare, inspect, check, or review…"/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => attach(event.target.files?.[0])}/></label><div><span>Enter to send</span><button className="send-button" onClick={submit} aria-label="Send instruction">↑</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay prepares actions for review. Nothing executes without your explicit approval.</p></div>
+      </section>
+      <RecentActivity onViewAll={() => onNavigate("activity")}/>
+    </section>
+    <PaymentRails walletStatus={walletStatus} onNavigate={onNavigate}/>
+  </div>;
+}
 function extractUrl(text:string){return text.match(/https:\/\/[^\s]+/)?.[0]?.replace(/[),.;]+$/,"")||""}
 
 function QrResult({fileName,file}:{fileName:string;file?:File}){return <div className="qr-result"><div className="inline-empty"><strong>{fileName}</strong><span>QR attached. The shared Binance Pay decoder will validate it when available.</span></div><BinancePayWorkflow initialFile={file} embedded/></div>}
@@ -135,7 +252,7 @@ function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; on
 function BinancePayView(){return <PageFrame eyebrow="Binance Pay" title="Pay or receive with Binance" description="Inspect a supported Binance QR or payment link, review every detail, or generate an official receive link."><BinancePayWorkflow/></PageFrame>}
 function X402View(){return <PageFrame eyebrow="Agentic Wallet / x402" title="Discover and purchase agent services" description="Browse BNB-compatible services or inspect a trusted HTTP 402 resource directly."><X402Workflow/></PageFrame>}
 function ActivityView(){return <PageFrame eyebrow="Activity" title="All activity" description="Filter approvals, transfers, Binance Pay payments, x402 purchases, successes, pending actions, and failures."><ActivityWorkflow/></PageFrame>}
-function SettingsView(){const [tab,setTab]=useState('Rules & approvals');return <PageFrame eyebrow="Settings" title="Control how AgentPay works" description="Manage approval rules, connections, diagnostics, and product preferences without exposing credentials."><div className="settings-tabs">{['Rules & approvals','Connections','Diagnostics','General'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==='Rules & approvals'&&<div className="rule-list"><RuleRow title="Require approval for every payment" description="Enabled and recommended" enabled/><RuleRow title="Per-payment spending limit" description="Configure after redesign validation"/><RuleRow title="Daily spending limit" description="Configure after redesign validation"/><RuleRow title="Trusted destinations and services" description="Server-side allowlists remain enforced"/></div>}{tab==='Connections'&&<div className="connection-list"><ConnectionRow title="Agentic Wallet" detail="Balances, transfers, and x402 signing"/><ConnectionRow title="Binance Pay" detail="QR, payment links, and receive links"/><ConnectionRow title="Binance Account" detail="Future read-only portfolio connection"/></div>}{tab==='Diagnostics'&&<div className="diagnostic-grid"><Diagnostic title="Database" value="SQLite connected" tone="success"/><Diagnostic title="Payment execution" value="Disabled by default" tone="awaiting"/><Diagnostic title="Environment" value="Local development"/><Diagnostic title="Version" value={`v${appVersion}`}/></div>}{tab==='General'&&<div className="settings-card"><label className="field"><span>Display currency</span><select defaultValue="USD"><option>USD</option></select></label><div className="setting-row"><div><strong>Appearance</strong><small>AgentPay light theme</small></div><span className="theme-chip">Light</span></div></div>}</PageFrame>}
+function SettingsView(){const [tab,setTab]=useState('Rules & approvals');return <PageFrame eyebrow="Settings" title="Control how AgentPay works" description="Manage approval rules, connections, diagnostics, and product preferences without exposing credentials."><div className="settings-tabs">{['Rules & approvals','Connections','Diagnostics','General'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==='Rules & approvals'&&<div className="rule-list"><RuleRow title="Require approval for every payment" description="Enabled and recommended" enabled/><RuleRow title="Per-payment spending limit" description="Configure after redesign validation"/><RuleRow title="Daily spending limit" description="Configure after redesign validation"/><RuleRow title="Trusted destinations and services" description="Server-side allowlists remain enforced"/></div>}{tab==='Connections'&&<div className="connection-list"><ConnectionRow title="Agentic Wallet" detail="Balances, transfers, and x402 signing"/><ConnectionRow title="Binance Pay" detail="QR, payment links, and receive links"/><ConnectionRow title="Binance Account" detail="Future read-only portfolio connection"/></div>}{tab==='Diagnostics'&&<div className="diagnostic-grid"><Diagnostic title="Database" value="SQLite connected" tone="success"/><Diagnostic title="Payment execution" value="Disabled by default" tone="awaiting"/><Diagnostic title="Environment" value="Server workspace"/><Diagnostic title="Version" value={`v${appVersion}`}/></div>}{tab==='General'&&<div className="settings-card"><label className="field"><span>Display currency</span><select defaultValue="USD"><option>USD</option></select></label><div className="setting-row"><div><strong>Appearance</strong><small>AgentPay light theme</small></div><span className="theme-chip">Light</span></div></div>}</PageFrame>}
 function RuleRow({title,description,enabled=false}:{title:string;description:string;enabled?:boolean}){return <div className="rule-row"><div><strong>{title}</strong><span>{description}</span></div><span className={`toggle ${enabled?'on':''}`}><span/></span></div>}
 function ConnectionRow({title,detail}:{title:string;detail:string}){return <div className="connection-row"><div className="connection-logo">{title==='Agentic Wallet'?'W':title==='Binance Pay'?'B':'A'}</div><div className="connection-copy"><strong>{title}</strong><span>{detail}</span></div><span className="not-connected">Review connection</span><button className="secondary-button">Manage</button></div>}
 function Diagnostic({title,value,tone=''}:{title:string;value:string;tone?:string}){return <div className="diagnostic-card"><span>{title}</span><strong className={tone}>{value}</strong></div>}
