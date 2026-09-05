@@ -59,7 +59,6 @@ export default function Home() {
         <div className="brand"><img className="brand-symbol" src="/brand/agentpay-logo.png" alt="AgentPay"/><div><strong>AgentPay</strong></div></div>
         <button className="mobile-close" aria-label="Close menu" onClick={() => setMenuOpen(false)}>×</button>
       </div>
-      <div className="safe-state"><span className={`status-dot ${walletStatus === "CONNECTED" ? "active-dot" : ""}`}/><div><strong>{walletStatus === "CONNECTED" ? "Wallet connected" : "Approval mode"}</strong><small>Funds move only after review</small></div></div>
       <nav className="nav-list" aria-label="Main navigation">
         <span className="nav-label">Workspace</span>
         <NavButton active={view === "overview"} icon="⌂" label="Overview" onClick={() => navigate("overview")}/>
@@ -71,6 +70,7 @@ export default function Home() {
         <span className="nav-label manage-label">Manage</span>
         <NavButton active={view === "settings"} icon="⚙" label="Settings" onClick={() => { setSettingsTab("Rules & approvals"); navigate("settings"); }}/>
       </nav>
+      <div className="safe-state"><span className={`status-dot ${walletStatus === "CONNECTED" ? "active-dot" : ""}`}/><div><strong>{walletStatus === "CONNECTED" ? "Wallet connected" : "Approval mode"}</strong><small>Funds move only after review</small></div></div>
       <div className="sidebar-footer">
         <button className="profile" onClick={() => { setSettingsTab("General"); navigate("settings"); }}><span className="profile-avatar">{settings.profileImageDataUrl ? <img src={settings.profileImageDataUrl} alt=""/> : avatarInitials}</span><span><strong>{settings.displayName}</strong><small>Approval-first account</small></span></button>
         <span className="version">AgentPay · v{appVersion}</span>
