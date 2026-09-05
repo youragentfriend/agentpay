@@ -79,15 +79,11 @@ Completion evidence: display name and IANA time zone persist in SQLite and updat
 
 ## Priority 5 — Activity completion
 
-Status: **complete — shipped September 5, 2026**
+Status: deferred by Mark for a later frontend review
 
-- Search, status, source, activity-type, asset, date-range, and sort filters with pagination.
-- Bounded filtered CSV export using normalized stored events, safe escaping, and spreadsheet-formula neutralization.
-- Accessible event detail dialog containing normalized safe fields only.
-- Durable manual Agentic Wallet and Binance Account balance snapshots with source-isolated failures and no wallet addresses or credentials.
-- First-class idempotent policy-rejection events across Agentic Wallet, Binance Pay, and x402 route boundaries.
+Already working: search, status filter, source filter, sort, and pagination.
 
-Completion evidence: users can filter, inspect, snapshot, and export normalized stored events without executing payments. Automated tests cover filter mapping, CSV safety, snapshot persistence/source isolation, policy-event idempotency/redaction, and existing Activity status semantics.
+The additional filters, CSV export, event details, balance snapshots, and policy-rejection Activity projection were removed from the current product scope at Mark's request. Revisit only when requested.
 
 ## Priority 6 — x402 readiness
 

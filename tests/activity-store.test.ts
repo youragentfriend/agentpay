@@ -50,8 +50,6 @@ test("filters by source, activity type, and search", () => {
   assert.equal(queryActivityEvents({ source: "binance-pay", limit: 100 }).pagination.total, 2);
   assert.equal(queryActivityEvents({ activityType: "x402-intent", limit: 100 }).pagination.total, 1);
   assert.equal(queryActivityEvents({ search: "api.example.com", limit: 100 }).events[0]?.source, "x402");
-  assert.equal(queryActivityEvents({ asset: "usdt", limit: 100 }).pagination.total, 4);
-  assert.equal(queryActivityEvents({ from: "2026-09-04T02:30:00Z", to: "2026-09-04", limit: 100 }).pagination.total, 2);
 });
 
 test("paginates with a bounded, deterministic sort", () => {

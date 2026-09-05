@@ -1,21 +1,17 @@
 import { PaymentIntentError } from "@/lib/server/payment-intents";
 import { approvePaymentIntent, getPaymentIntent } from "@/lib/server/payment-store";
 import { enforcePaymentPolicy, PaymentPolicyError } from "@/lib/server/payment-policy";
-import { policyAuditFingerprint, recordPolicyRejectionFromError } from "@/lib/server/activity-policy-audit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let fingerprint = policyAuditFingerprint("invalid-request");
   try {
     const body = await request.json() as { id?: unknown };
-    fingerprint = policyAuditFingerprint(body);
     if (typeof body.id !== "string") throw new PaymentIntentError("Payment intent ID is required.", "INVALID_PAYMENT_INTENT_ID");
     const intent = getPaymentIntent(body.id);
     enforcePaymentPolicy({ rail: "agentic-wallet", amountUsd: intent.amountUsd, destination: intent.recipient });
     return Response.json(approvePaymentIntent(body.id));
   } catch (error) {
-    recordPolicyRejectionFromError(error, { source: "agentic-wallet", operation: "approve", fingerprint });
     const paymentError = error instanceof PaymentIntentError || error instanceof PaymentPolicyError
       ? error
       : new PaymentIntentError("Unable to approve this transfer.", "APPROVE_TRANSFER_FAILED");
