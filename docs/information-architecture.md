@@ -1,8 +1,8 @@
 # AgentPay Information Architecture — Redesign Specification
 
-**Status:** Proposed for Mark's approval; not yet implemented  
-**Prepared:** 2026-09-04  
-**Target release:** AgentPay v0.4.0  
+**Status:** Implemented in Concept 07 production; pending Mark's final visual approval
+**Prepared:** 2026-09-04; production direction updated 2026-09-05
+**Target release:** AgentPay v0.4.0
 
 ## Product principle
 
@@ -36,31 +36,26 @@ Behavior:
 
 ### Row 1 layout
 
-Desktop grid: approximately **68% assistant / 32% Recent Activity**.
+Desktop grid: **70% assistant / 30% Recent Activity**.
 
 Tablet and mobile: stack the assistant first, then Recent Activity.
 
 ### Universal AgentPay assistant
 
-Recommended heading:
+The production header uses a time-aware welcome and the supporting prompt:
 
-> **What can AgentPay do for you?**
+> **What would you like AgentPay to take care of?**
 
-Recommended supporting copy:
+The composer placeholder is:
 
-> Ask AgentPay to check balances, prepare payments, scan QR codes, buy x402 services, or review activity. It chooses the right rail, validates every detail, and asks before funds move.
+> Ask AgentPay to prepare, inspect, check, or review…
 
-Recommended input placeholder:
+Approved quick actions:
 
-> Ask AgentPay to pay, receive, scan a QR, check balances, or find a service…
-
-Alternative headings:
-
-- Move money, check balances, and pay—just ask.
-- What would you like AgentPay to handle?
-- Your payments, wallets, and activity in one command center.
-
-The first option is recommended because it is broad, direct, and does not imply that every request must be a payment.
+- **Prepare a transfer** — Send USDT with approval.
+- **Explore an x402 service** — Review a service before purchase.
+- **Check wallet** — Balances and connection status.
+- **Create a payment link** — Request money with a shareable link.
 
 ### Assistant capabilities
 
@@ -81,13 +76,13 @@ The Overview assistant must eventually support:
 
 ### Attach QR
 
-Place **Attach QR** at the lower-left of the composer. It must be a real file input with drag-and-drop support.
+Place **Attach QR** at the lower-left of the composer as a real, keyboard-accessible file input.
 
 Flow:
 
 1. Upload and validate image type/size locally.
 2. Decode using the existing Binance Pay QR pipeline.
-3. Display an inline review drawer on desktop and a bottom sheet on mobile.
+3. Display the shared inline review workflow within the conversation on desktop and mobile.
 4. Show payee/merchant information, payment type, currency, amount, compatible link, and warnings.
 5. If the QR locks the amount, show a read-only amount.
 6. If the QR requires an amount, show an amount textbox with currency validation.
@@ -103,23 +98,13 @@ This reuses the Binance Pay workflow; it must not become a second independent im
 - Title: **Recent Activity**, never “Payment History.”
 - Show the latest ten normalized records.
 - Use a fixed-height compact list aligned with the assistant card; allow internal scrolling if necessary.
-- Each row shows icon/source, short action, amount when relevant, normalized status, and relative time.
-- Clicking a row opens its detail drawer.
-- **View all** navigates to Activity while preserving an optional source/status filter.
+- Each row shows a source/status marker, short action, source, timestamp, and normalized text status.
+- **View all** navigates to Activity.
 - Never show full addresses, order IDs, or transaction hashes in the compact panel.
 
-### Row 2 — reserved for later
+### Row 2 — payment rails
 
-Potential modules:
-
-- Combined estimated balance.
-- Binance vs Agentic Wallet allocation.
-- Send and Receive quick actions.
-- Seven-day spending graph.
-- Pending approvals.
-- Connection health.
-
-Do not build Row 2 until Row 1 is stable and the portfolio APIs exist.
+Show compact connection rows for Agentic Wallet, Binance Pay, and the future read-only Binance Account connection. Each row includes a plain-language status and routes to the existing focused page. Analytics and portfolio charts remain later work.
 
 ## 2. Binance
 
@@ -311,7 +296,7 @@ Settings should use internal tabs or anchored sections rather than adding more s
 ### General
 
 - Display currency — USD initially.
-- Appearance — dark default, light optional.
+- Appearance — approved light warm workspace with dark sidebar.
 - Language and timezone later.
 - Version and environment summary.
 
@@ -352,32 +337,13 @@ Move the current Connections content here.
 - Clear local drafts/history with explicit destructive confirmation.
 - Backup/restore after the schema stabilizes.
 
-## Version plan
+## Version
 
-The code currently declares `0.1.0`, which no longer reflects the product.
+The implemented Concept 07 release is **v0.4.0**. The interface reads its displayed build version from `NEXT_PUBLIC_APP_VERSION`, with a development fallback, rather than hardcoding a JSX version string.
 
-Recommended history:
+## Implemented release shape
 
-- `0.1.0` — initial AgentPay prototype and basic wallet flow.
-- `0.2.0` — Binance Pay integration and persisted receipts.
-- `0.3.0` — x402/Bazaar, three real payment proofs, brand foundation.
-- `0.4.0` — this navigation, Overview command center, portfolio dashboards, normalized Activity, and redesigned interface.
-
-Update the current application to **v0.3.0** before redesign. Make the completed redesign release **v0.4.0**. Render the version from package/build metadata rather than a hardcoded JSX string.
-
-## Implementation order after approval
-
-1. Update version to v0.3.0 and centralize build/version metadata.
-2. Add the normalized Activity schema and migration before redesigning Activity or Recent Activity.
-3. Extract shared Binance Pay QR and payment-review components for reuse in Overview.
-4. Replace navigation and page routing/state with the approved hierarchy.
-5. Build Overview Row 1 with the universal assistant shell, Attach QR, and Recent Activity.
-6. Build Binance portfolio UI with connection-required placeholders until read-only APIs are configured.
-7. Restructure Agentic Wallet and move x402 beneath it.
-8. Rebuild Activity filters, pagination, detail drawer, and export-ready API.
-9. Consolidate Rules, Connections, and Diagnostics under Settings.
-10. Apply the approved AgentPay brand tokens and responsive design.
-11. Run payment regression, accessibility, mobile, empty/error/loading, privacy, test, and production-build gates.
+The branch now contains the approved navigation hierarchy, 70/30 Overview command center, shared Binance Pay and transfer workflows, x402 under Agentic Wallet, normalized Activity filtering/pagination, Settings consolidation, Concept 07 visual tokens, and responsive layouts. Future portfolio APIs, exports, detail drawers, and reporting remain follow-on work rather than blockers for Mark's visual review.
 
 ## Explicitly out of scope for this redesign increment
 

@@ -1,8 +1,8 @@
 # AgentPay Brand Kit
 
-**Status:** Foundation only — not yet applied to screens  
-**Prepared:** 2026-09-04  
-**Visual reference:** Binance Web3  
+**Status:** Applied in Concept 07 production; pending Mark's final visual approval
+**Prepared:** 2026-09-04; production direction updated 2026-09-05
+**Visual reference:** Approved AgentPay Concept 07
 
 ## Evidence and limitations
 
@@ -24,7 +24,7 @@ References:
 
 1. **Financial clarity:** amount, asset, network, recipient, approval state, and finality must be visually dominant.
 2. **Black/yellow identity:** yellow identifies primary action and selection; it must not decorate every surface.
-3. **Neutral-first UI:** most content uses near-black, graphite, white, and cool gray so semantic colors remain meaningful.
+3. **Warm neutral-first UI:** the workspace uses warm off-white surfaces with a near-black sidebar; restrained yellow is reserved for primary action and selection so semantic colors remain meaningful.
 4. **Explicit safety:** approval, warning, disabled, pending, failure, and success states must never rely on color alone.
 5. **Dense but calm:** compact controls and data tables, generous page spacing, low-noise borders, minimal shadows.
 
@@ -47,35 +47,22 @@ For future variants, prefer a true path-based SVG with outlined shapes and a tra
 
 | Token | Hex | Usage | Classification |
 |---|---:|---|---|
-| Brand yellow | `#FCD535` | Primary buttons, selected indicators, focused brand accents | Observed/adopted |
-| Brand yellow hover | `#F0B90B` | Primary hover and emphasized links | Observed ecosystem value |
-| Brand yellow active | `#D9A400` | Pressed state | AgentPay recommendation |
-| On yellow | `#181A20` | Text/icons on yellow | Observed/adopted |
-| Focus ring | `rgba(252, 213, 53, 0.28)` | Keyboard focus halo | AgentPay recommendation |
+| Brand yellow | `#F5CD45` | Restrained primary buttons, selected indicators, focused brand accents | Concept 07 adopted |
+| Brand yellow hover | `#E6BE36` | Primary hover | Concept 07 adopted |
+| On yellow | `#171815` | Text/icons on yellow | Concept 07 adopted |
+| Focus ring | `rgba(245, 205, 69, 0.34)` | Keyboard focus halo | Concept 07 adopted |
 
-### Dark surfaces — default AgentPay theme
-
-| Token | Hex | Usage |
-|---|---:|---|
-| Canvas | `#0B0E11` | App background |
-| Sidebar | `#0E1116` | Main navigation |
-| Surface 1 | `#181A20` | Cards and primary panels |
-| Surface 2 | `#1E2329` | Elevated/interactive panels |
-| Surface 3 | `#2B3139` | Hovered rows and controls |
-| Border subtle | `#2B3139` | Dividers and default borders |
-| Border strong | `#474D57` | Focused/important boundaries |
-| Overlay | `rgba(11, 14, 17, 0.76)` | Modal backdrop |
-
-### Light surfaces — supported secondary theme
+### Production surfaces — light warm workspace with dark sidebar
 
 | Token | Hex | Usage |
 |---|---:|---|
-| Canvas | `#F5F5F5` | Page background |
-| Surface 1 | `#FFFFFF` | Cards |
-| Surface 2 | `#FAFAFA` | Inputs/secondary panels |
-| Surface 3 | `#F0F1F2` | Hover state |
-| Border subtle | `#EAECEF` | Dividers/default borders |
-| Border strong | `#B7BDC6` | Focused/important boundaries |
+| Canvas | `#F6F4ED` | Warm application workspace |
+| Sidebar | `#171815` | Persistent desktop navigation and dark summaries |
+| Surface 1 | `#FFFEF9` | Cards and primary panels |
+| Surface 2 | `#F0EEE6` | Nested/secondary panels |
+| Surface 3 | `#E9E6DC` | Hovered rows and controls |
+| Border subtle | `#DEDDD5` | Dividers and default borders |
+| Border strong | `#BBB9AF` | Focused/important boundaries |
 
 ### Text and icons
 
@@ -108,22 +95,15 @@ Always pair state color with an icon and label such as **Confirmed**, **Failed**
 
 “Binance Nova” appears to be a custom Binance brand typeface. Unofficial copies exist online, but no official public webfont redistribution license was confirmed during this review. AgentPay must not bundle or hotlink it without written licensing evidence.
 
-### Adopted alternative
+### Adopted typeface
 
-**Inter Variable** is the recommended primary typeface. It is open source under the SIL Open Font License, optimized for interfaces, supports tabular numerals, and has similar neutral grotesk proportions.
+**Manrope** is the approved Concept 07 typeface throughout the application, including controls and machine-readable values, with weights 400, 500, 600, and 700. Controls use semibold 600 labels.
 
 ```css
-font-family: Inter, "Helvetica Neue", Arial, sans-serif;
-font-variant-numeric: tabular-nums;
+font-family: Manrope, sans-serif;
 ```
 
-Alternative ranking:
-
-1. **Inter Variable** — recommended for all product UI.
-2. **Geist Sans** — slightly sharper/technical; suitable if a more developer-oriented character is desired.
-3. **DM Sans** — softer and friendlier, but less similar to Binance’s dense financial UI.
-
-Use a system monospace stack only for hashes, addresses, IDs, and machine-readable payloads.
+Do not mix Inter, system monospace, or other product fonts into production screens without a new visual decision.
 
 ### Type scale
 
@@ -231,7 +211,7 @@ Danger:
 - Dark persistent sidebar on desktop; compact drawer/bottom navigation on mobile.
 - Active item: Surface 3 background, primary text, narrow yellow indicator.
 - Submenus are indented 12–16px and use smaller labels—not separate oversized cards.
-- Keep payment methods grouped under one **Payments** parent in the redesign.
+- Keep the approved hierarchy: **Binance → Binance Pay** and **Agentic Wallet → x402**, with Activity and Settings as peers.
 
 ### Status and prices
 
@@ -265,12 +245,6 @@ Danger:
 - Honor `prefers-reduced-motion`.
 - Loading states must retain button width and announce progress text.
 
-## Application sequence
+## Production application
 
-1. Receive and store final logo/favicon variants.
-2. Review Mark’s menu, submenu, tab-content, add/remove requirements.
-3. Approve page information architecture before visual implementation.
-4. Import `app/brand-tokens.css` and replace legacy blue/light tokens.
-5. Rebuild shared primitives: buttons, fields, cards, badges, notices, navigation.
-6. Redesign screens one workflow at a time without changing proven payment behavior.
-7. Run responsive, accessibility, error-state, test, and production-build gates.
+Concept 07 is implemented on `design/concept-07-integration`: warm light workspace, dark persistent/sidebar drawer navigation, Manrope throughout, restrained yellow primary actions, semibold controls, semantic status labels, and shared API-backed payment workflows. Keep the design lab until Mark gives final visual approval, and do not merge this branch before that review.
