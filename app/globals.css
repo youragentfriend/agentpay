@@ -88,9 +88,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .welcome h1, .standard-page h1 { margin: 0; font-size: clamp(35px, 4vw, 53px); font-weight: 600; line-height: 1.1; letter-spacing: -.045em; }
 .welcome .lead { margin-top: 10px; font-size: 16px; }
 .lead { max-width: 700px; margin: 12px 0 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
-.overview-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr); align-items: start; gap: 18px; }
+.overview-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr); align-items: stretch; gap: 18px; }
 .assistant-panel, .recent-panel, .payment-rails, .wallet-section, .payment-workflow, .binance-pay-workflow, .integration-setup, .settings-card { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.assistant-panel, .recent-panel { overflow: hidden; }
+.assistant-panel, .recent-panel { min-height: 0; overflow: hidden; }
+.recent-panel { display: flex; height: 100%; flex-direction: column; align-self: stretch; }
 .assistant-status { display: flex; min-height: 80px; align-items: center; padding: 23px 24px; border-bottom: 1px solid var(--line); }
 .assistant-identity { display: flex; align-items: center; gap: 11px; }
 .assistant-badge { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: var(--ink); color: var(--yellow); }
@@ -113,9 +114,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .chat-bubble span { display: block; margin-bottom: 4px; color: var(--yellow); font-size: 10px; font-weight: 700; }
 .chat-bubble p { margin: 0; font-size: 13px; }
 .chat-result { display: grid; gap: 10px; }
-.assistant-message { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 16px 16px 16px 4px; background: var(--soft); }
+.assistant-message { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid #d5d4cc; border-radius: 16px 16px 16px 4px; background: #e5e4de; }
 .assistant-message strong { color: #8a6800; font-size: 11px; }
-.assistant-message span { color: var(--muted); font-size: 12px; }
+.assistant-message span { color: #30322d; font-size: 13px; line-height: 1.55; }
 .composer-wrap { padding: 0 24px 30px; }
 .composer { padding: 14px 15px 11px; border: 1px solid #cdcec6; border-radius: 13px; background: #fff; box-shadow: 0 6px 20px rgba(25, 25, 20, .04); }
 .composer:focus-within { border-color: #a9a99f; box-shadow: 0 0 0 3px rgba(243, 211, 50, .16); }
@@ -136,7 +137,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .panel-heading { min-height: 80px; padding: 23px; border-bottom: 1px solid var(--line); }
 .panel-heading h2, .rails-heading h2, .section-heading h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
 .panel-heading button, .rails-heading button, .section-heading button { background: transparent; color: #555850; font-size: 12px; font-weight: 500; }
-.recent-list { max-height: 500px; overflow: auto; }
+.recent-list { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: auto; }
 .recent-item { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
 .recent-item strong, .recent-item small { display: block; }
 .recent-item strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -148,7 +149,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .success { color: var(--green) !important; }
 .failed { color: var(--red) !important; }
 .awaiting { color: #8a6800 !important; }
-.recent-empty { display: flex; min-height: 207px; align-items: center; justify-content: center; flex-direction: column; padding: 20px; background: #fafaf7; text-align: center; }
+.recent-empty { display: flex; min-height: 207px; flex: 1; align-items: center; justify-content: center; flex-direction: column; padding: 20px; background: #fafaf7; text-align: center; }
 .recent-empty > span { color: #b3b5ac; font-size: 21px; }
 .recent-empty strong { margin-top: 10px; font-size: 13px; }
 .recent-empty p { max-width: 220px; margin: 5px 0 0; color: #62665e; font-size: 11px; line-height: 1.5; }
