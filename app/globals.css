@@ -149,7 +149,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .recent-chat-list, .recent-list { min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .recent-chat-list { flex: 1; }
 .recent-chat-item { display: grid; width: 100%; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 18px; border-bottom: 1px solid var(--line); text-align: left; }
-.recent-chat-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--ink); color: var(--yellow); }
+.recent-chat-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; background: var(--ink); color: var(--yellow); }
 .recent-chat-item strong, .recent-chat-item small { display: block; }
 .recent-chat-item strong { display: -webkit-box; overflow: hidden; font-size: 14px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .recent-chat-item small { margin-top: 4px; color: #4f534b; font-size: 13px; }
