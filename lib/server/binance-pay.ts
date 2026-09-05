@@ -15,7 +15,14 @@ const STATE = path.join(SKILL_DIR, ".payment_state.json");
 const VENV_PYTHON = process.env.AGENTPAY_PAYMENT_PYTHON
   || path.join(os.homedir(), ".local", "share", "agentpay", "payment-venv", "bin", "python");
 const MAX_OUTPUT = 2 * 1024 * 1024;
-const RECEIVE_CURRENCIES = ["USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB", "BRL"];
+// Curated from Binance's current market-cap list; stablecoins are intentionally
+// grouped first for faster receive-link selection. The server whitelist remains
+// the authority for symbols accepted by this workflow.
+const RECEIVE_CURRENCIES = [
+  "USDT", "USDC", "DAI", "USDE", "USD1",
+  "BTC", "ETH", "BNB", "XRP", "SOL", "TRX", "ZEC", "DOGE", "LINK", "LEO",
+  "ADA", "XLM", "BCH", "LTC", "UNI",
+];
 let queue = Promise.resolve();
 
 export class BinancePayError extends Error {

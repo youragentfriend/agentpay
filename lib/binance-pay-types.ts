@@ -59,8 +59,3 @@ export interface BinancePayCurrencies {
   currencies: string[];
   source: "agent-payout-supported-set";
 }
-
-export interface BinancePayCurrencies {
-  currencies: string[];
-  source: "agent-payout-supported-set";
-}
