@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { GasLevel, PaymentApiError, PreparedTransfer } from "@/lib/payment-workflow";
-import { amountValidationError, isSolanaChain, recipientValidationError } from "@/lib/payment-validation";
+import { addDecimalStrings, isSolanaChain, recipientValidationError, transferAmountValidationError } from "@/lib/payment-validation";
 import type { WalletOverview } from "@/lib/wallet-types";
 
 const AMOUNT_ERROR_CODES = new Set([
@@ -15,7 +15,12 @@ const AMOUNT_ERROR_CODES = new Set([
 ]);
 const RECIPIENT_ERROR_CODES = new Set(["INVALID_RECIPIENT", "POLICY_DESTINATION_NOT_TRUSTED"]);
 
-export function PaymentWorkflow() {
+type WalletPolicySnapshot = {
+  limits: { perPaymentUsdLimit: string | null; dailyUsdLimit: string | null };
+  dailySpendUsd: string | null;
+};
+
+export function PaymentWorkflow({ onClose }: { onClose?: () => void } = {}) {
   const [wallet, setWallet] = useState<WalletOverview | null>(null);
   const [asset, setAsset] = useState("");
   const [networkKey, setNetworkKey] = useState("");
@@ -24,6 +29,7 @@ export function PaymentWorkflow() {
   const [gasLevel, setGasLevel] = useState<GasLevel>("MEDIUM");
   const [prepared, setPrepared] = useState<PreparedTransfer | null>(null);
   const [executionEnabled, setExecutionEnabled] = useState(false);
+  const [policy, setPolicy] = useState<WalletPolicySnapshot | null>(null);
   const [error, setError] = useState("");
   const [amountServerError, setAmountServerError] = useState("");
   const [recipientServerError, setRecipientServerError] = useState("");
@@ -52,6 +58,13 @@ export function PaymentWorkflow() {
       .catch(() => setExecutionEnabled(false));
   }, []);
 
+  useEffect(() => {
+    void fetch("/api/payments/policy", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => setPolicy(data as WalletPolicySnapshot))
+      .catch(() => setPolicy(null));
+  }, []);
+
   const assets = useMemo(() => {
     return [...new Set(wallet?.balances.map((balance) => balance.symbol.toUpperCase()) ?? [])].sort();
   }, [wallet]);
@@ -78,9 +91,23 @@ export function PaymentWorkflow() {
   const selectedOption = networkOptions.find((option) => option.key === networkKey);
   const selectedBalance = selectedOption?.balance;
   const selectedChainId = selectedOption?.chainId ?? "";
+  const assetBalance = useMemo(() => {
+    if (!wallet || !asset) return "";
+    return wallet.balances
+      .filter((balance) => balance.symbol.toUpperCase() === asset)
+      .reduce((total, balance) => addDecimalStrings(total, balance.balance), "0");
+  }, [asset, wallet]);
   const assetError = attempted && !asset ? "Select an asset." : "";
   const networkError = attempted && !selectedBalance ? "Select a network for this asset." : "";
-  const amountError = amountServerError || ((attempted || amountTouched) ? amountValidationError(amount) : "");
+  const liveAmountError = transferAmountValidationError(amount, {
+    asset,
+    availableBalance: selectedBalance?.balance,
+    priceUsd: selectedBalance?.price,
+    perPaymentUsdLimit: policy?.limits.perPaymentUsdLimit,
+    dailyUsdLimit: policy?.limits.dailyUsdLimit,
+    dailySpendUsd: policy?.dailySpendUsd ?? undefined,
+  });
+  const amountError = amountServerError || ((amount || attempted || amountTouched) ? liveAmountError : "");
   const recipientError = recipientServerError || ((attempted || recipientTouched) ? recipientValidationError(recipient, selectedChainId) : "");
 
   function resetPrepared() {
@@ -106,7 +133,14 @@ export function PaymentWorkflow() {
     setAmountServerError("");
     setRecipientServerError("");
     setError("");
-    const localAmountError = amountValidationError(amount);
+    const localAmountError = transferAmountValidationError(amount, {
+      asset,
+      availableBalance: selectedBalance?.balance,
+      priceUsd: selectedBalance?.price,
+      perPaymentUsdLimit: policy?.limits.perPaymentUsdLimit,
+      dailyUsdLimit: policy?.limits.dailyUsdLimit,
+      dailySpendUsd: policy?.dailySpendUsd ?? undefined,
+    });
     const localRecipientError = recipientValidationError(recipient, selectedChainId);
     if (!asset || !selectedBalance || localAmountError || localRecipientError) return;
 
@@ -183,15 +217,15 @@ export function PaymentWorkflow() {
 
   return <div className="payment-workflow">
     <div className="payment-fields">
-      <label className="field"><span>Asset</span><select aria-invalid={Boolean(assetError)} value={asset} onChange={(event) => handleAssetChange(event.target.value)} title={assetError || "Choose an asset held in the connected wallet."}><option value="">Select asset</option>{assets.map((symbol) => <option key={symbol} value={symbol}>{symbol}</option>)}</select>{assetError && <small className="field-error">{assetError}</small>}</label>
-      <label className="field"><span>Network</span><select aria-invalid={Boolean(networkError)} value={networkKey} disabled={!asset} onChange={(event) => handleNetworkChange(event.target.value)} title={networkError || (asset ? "Choose a network where this asset has a balance." : "Select an asset first.")}><option value="">Select network</option>{networkOptions.map((option) => <option key={option.key} value={option.key}>{option.label} · available {option.balance.balance}</option>)}</select>{networkError && <small className="field-error">{networkError}</small>}</label>
-      <label className="field"><span>Amount</span><input type="number" inputMode="decimal" min="0" max={selectedBalance?.balance} step="any" aria-invalid={Boolean(amountError)} aria-describedby="wallet-amount-help" value={amount} onBlur={() => setAmountTouched(true)} onKeyDown={(event) => { if (["e", "E", "+", "-"].includes(event.key)) event.preventDefault(); }} onChange={(event) => { setAmount(event.target.value); setAmountServerError(""); resetPrepared(); }} placeholder="0.00" title={amountError || "Enter numbers only. The amount must be positive and within your balance and spending limits."}/>{amountError ? <small id="wallet-amount-help" className="field-error">{amountError}</small> : <small id="wallet-amount-help" className="field-help">{selectedBalance ? `Available: ${selectedBalance.balance} ${selectedBalance.symbol}.` : "Select an asset and network first."}</small>}</label>
-      <label className="field"><span>Gas priority</span><select value={gasLevel} onChange={(event) => { setGasLevel(event.target.value as GasLevel); resetPrepared(); }}><option value="LOW">LOW</option><option value="MEDIUM">MEDIUM (Recommended)</option><option value="HIGH">HIGH</option></select><small className="field-help">LOW may be slower. BSC token transfers require BNB for gas.</small></label>
+      <label className="field transfer-field"><span>Asset</span><select aria-invalid={Boolean(assetError)} value={asset} onChange={(event) => handleAssetChange(event.target.value)} title={assetError || "Choose an asset held in the connected wallet."}><option value="">Select asset</option>{assets.map((symbol) => <option key={symbol} value={symbol}>{symbol}</option>)}</select>{assetError ? <small className="field-error">{assetError}</small> : <small className="field-help balance-tooltip">{asset ? `Your ${asset} balance is ${assetBalance}.` : "Choose the asset you want to send."}</small>}</label>
+      <label className="field transfer-field"><span>Network</span><select aria-invalid={Boolean(networkError)} value={networkKey} disabled={!asset} onChange={(event) => handleNetworkChange(event.target.value)} title={networkError || (asset ? "Choose a network where this asset has a balance." : "Select an asset first.")}><option value="">Select network</option>{networkOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select>{networkError ? <small className="field-error">{networkError}</small> : <small className="field-help">{asset ? "Choose the network to send this asset on." : "Select an asset first."}</small>}</label>
+      <label className="field transfer-field"><span>Amount</span><input type="number" inputMode="decimal" min="0" max={selectedBalance?.balance} step="any" aria-invalid={Boolean(amountError)} aria-describedby="wallet-amount-help" value={amount} onBlur={() => setAmountTouched(true)} onKeyDown={(event) => { if (["e", "E", "+", "-"].includes(event.key)) event.preventDefault(); }} onChange={(event) => { setAmount(event.target.value); setAmountServerError(""); resetPrepared(); }} placeholder="0.00" title={amountError || "Enter numbers only. The amount must be positive and within your balance and spending limits."}/>{amountError ? <small id="wallet-amount-help" className="field-error">{amountError}</small> : <small id="wallet-amount-help" className="field-help">{selectedBalance ? `Available on ${selectedOption?.label}: ${selectedBalance.balance} ${selectedBalance.symbol}.` : "Select an asset and network first."}</small>}</label>
+      <label className="field transfer-field"><span>Gas priority</span><select value={gasLevel} onChange={(event) => { setGasLevel(event.target.value as GasLevel); resetPrepared(); }}><option value="LOW">LOW</option><option value="MEDIUM">MEDIUM (Recommended)</option><option value="HIGH">HIGH</option></select><small className="field-help">LOW may be slower. BSC token transfers require BNB for gas.</small></label>
       <label className="field full"><span>Recipient from Binance address book</span><input aria-invalid={Boolean(recipientError)} aria-describedby="wallet-recipient-help" value={recipient} onBlur={() => setRecipientTouched(true)} onChange={(event) => { setRecipient(event.target.value); setRecipientServerError(""); resetPrepared(); }} placeholder={isSolanaChain(selectedChainId) ? "Solana address" : "0x…"} title={recipientError || recipientHelp}/>{recipientError ? <small id="wallet-recipient-help" className="field-error">{recipientError}</small> : <small id="wallet-recipient-help" className="field-help">{recipientHelp}</small>}</label>
     </div>
     {wallet.balances.length === 0 && <div className="notice"><span>i</span><div><strong>No spendable balances returned</strong><p>Fund the Agentic Wallet before a transfer can be prepared. AgentPay will not invent token data.</p></div></div>}
     {error && <div className="workflow-error">{error}</div>}
-    <button type="button" className="primary-button workflow-submit" disabled={submitting || wallet.balances.length === 0} onClick={() => void prepare()}>{submitting ? "Checking…" : "Prepare transfer"} <span>→</span></button>
+    <div className="payment-workflow-actions">{onClose && <button type="button" className="secondary-button" onClick={onClose}>Close</button>}<button type="button" className="primary-button" disabled={submitting || wallet.balances.length === 0} onClick={() => void prepare()}>{submitting ? "Checking…" : "Prepare transfer"} <span>→</span></button></div>
     {prepared && <div className="review-card"><div className="review-heading"><div><span>Payment intent</span><h2>{prepared.status === "approved" ? "Approved for execution" : prepared.status === "submitted" ? "Submitted — awaiting confirmation" : "Review before approval"}</h2></div><span className={`review-status ${prepared.status}`}>{prepared.status.replace("-", " ")}</span></div><dl><div><dt>Amount</dt><dd>{prepared.amount} {prepared.asset}</dd></div><div><dt>Network</dt><dd>{prepared.chainName}</dd></div><div><dt>Recipient</dt><dd className="review-address"><span>{prepared.recipient}</span><button type="button" onClick={() => void copyRecipient()}>{copied ? "Copied" : "Copy"}</button></dd></div><div><dt>Token contract</dt><dd className="review-address"><span>{prepared.tokenAddress}</span></dd></div><div><dt>Gas priority</dt><dd>{prepared.gasLevel}</dd></div><div><dt>Available</dt><dd>{prepared.availableBalance} {prepared.asset}</dd></div>{prepared.txHash && <div><dt>Transaction</dt><dd className="review-address"><span>{prepared.txHash}</span></dd></div>}</dl><ul>{prepared.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>{prepared.status === "awaiting-approval" ? <button type="button" className="primary-button" disabled={submitting} onClick={() => void approve()}>Approve this exact intent</button> : prepared.status === "approved" && executionEnabled ? <button type="button" className="primary-button" disabled={submitting} onClick={() => void execute()}>{submitting ? "Submitting…" : "Send approved transfer"}</button> : prepared.status === "approved" ? <div className="approved-note">✓ Approval persisted. Wallet execution remains disabled until you explicitly ask to enable real sends.</div> : <div className="approved-note">Transaction broadcast recorded. Check Activity for confirmation before treating it as complete.</div>}</div>}
   </div>;
 }
