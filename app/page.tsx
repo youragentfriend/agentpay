@@ -6,10 +6,14 @@ import { PaymentWorkflow } from "@/app/components/payment-workflow";
 import { ActivityWorkflow } from "@/app/components/activity-workflow";
 import { BinancePayWorkflow } from "@/app/components/binance-pay-workflow";
 import { BinanceAccountConnectionRow, BinancePortfolioView } from "@/app/components/binance-portfolio";
+import { ProfileSettings } from "@/app/components/profile-settings";
 import { X402Workflow } from "@/app/components/x402-workflow";
+import type { AgentPaySettings } from "@/lib/settings-types";
+import { DEFAULT_AGENTPAY_SETTINGS } from "@/lib/settings-types";
 const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "development";
 
 type View = "overview" | "binance" | "binance-pay" | "wallet" | "x402" | "activity" | "settings";
+type SettingsTab = "Rules & approvals" | "Connections" | "Diagnostics" | "General";
 const labels: Record<View,string>={overview:"Overview",binance:"Binance", "binance-pay":"Binance Pay",wallet:"Agentic Wallet",x402:"x402",activity:"Activity",settings:"Settings"};
 
 export default function Home() {
@@ -18,6 +22,17 @@ export default function Home() {
   const [binanceOpen, setBinanceOpen] = useState(true);
   const [walletOpen, setWalletOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("Rules & approvals");
+  const [settings, setSettings] = useState<AgentPaySettings>({ ...DEFAULT_AGENTPAY_SETTINGS, updatedAt: new Date(0).toISOString() });
+
+  useEffect(() => {
+    void fetch("/api/settings", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        setSettings(await response.json() as AgentPaySettings);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void fetch("/api/wallet/overview", { cache: "no-store" })
@@ -33,6 +48,7 @@ export default function Home() {
     setView(nextView);
     setMenuOpen(false);
   };
+  const avatarInitials = settings.displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "A";
 
   return <main className="app-shell">
     <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
@@ -50,10 +66,10 @@ export default function Home() {
         {walletOpen && <div className="nav-submenu"><NavButton active={view === "x402"} icon="" label="x402 services" onClick={() => navigate("x402")}/></div>}
         <NavButton active={view === "activity"} icon="◷" label="Activity" onClick={() => navigate("activity")}/>
         <span className="nav-label manage-label">Manage</span>
-        <NavButton active={view === "settings"} icon="⚙" label="Settings" onClick={() => navigate("settings")}/>
+        <NavButton active={view === "settings"} icon="⚙" label="Settings" onClick={() => { setSettingsTab("Rules & approvals"); navigate("settings"); }}/>
       </nav>
       <div className="sidebar-footer">
-        <div className="profile"><span className="profile-avatar">M</span><div><strong>Mark</strong><small>Approval-first account</small></div></div>
+        <button className="profile" onClick={() => { setSettingsTab("General"); navigate("settings"); }}><span className="profile-avatar">{avatarInitials}</span><span><strong>{settings.displayName}</strong><small>Approval-first account</small></span></button>
         <span className="version">AgentPay · v{appVersion}</span>
       </div>
     </aside>
@@ -61,16 +77,16 @@ export default function Home() {
       <header className="topbar">
         <button className="menu-button" aria-label="Open menu" onClick={() => setMenuOpen(true)}>☰</button>
         <div className="breadcrumbs"><span>AgentPay</span><b>/</b><strong>{labels[view]}</strong></div>
-        <button className="avatar" aria-label="Mark account">M</button>
+        <button className="avatar" aria-label={`${settings.displayName} account settings`} onClick={() => { setSettingsTab("General"); navigate("settings"); }}>{avatarInitials}</button>
       </header>
       <div className="page-content">
-        {view === "overview" && <OverviewView onNavigate={navigate} walletStatus={walletStatus}/>}
+        {view === "overview" && <OverviewView onNavigate={navigate} walletStatus={walletStatus} displayName={settings.displayName} timeZone={settings.timeZone}/>}
         {view === "binance" && <BinanceView/>}
         {view === "binance-pay" && <BinancePayView/>}
         {view === "wallet" && <WalletView onStatusChange={setWalletStatus}/>}
         {view === "x402" && <X402View/>}
         {view === "activity" && <ActivityView/>}
-        {view === "settings" && <SettingsView/>}
+        {view === "settings" && <SettingsView tab={settingsTab} onTabChange={setSettingsTab} settings={settings} onSettingsChange={setSettings} onNavigate={navigate}/>}
       </div>
     </section>
   </main>;
@@ -81,21 +97,22 @@ function NavParent({label,icon,active,open,onNavigate,onToggle}:{label:string;ic
 type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: "payment" | "binance-pay" | "payment-link" | "binance-balance" | "qr" | "activity" | "balance" | "x402"; file?: File };
 type StoredConversation = { id: string; title: string; savedAt: string; turns: Array<Omit<ChatTurn, "file">> };
 
-function OverviewView({ onNavigate, walletStatus }: { onNavigate: (view: View) => void; walletStatus: WalletConnectionStatus }) {
+function OverviewView({ onNavigate, walletStatus, displayName, timeZone }: { onNavigate: (view: View) => void; walletStatus: WalletConnectionStatus; displayName: string; timeZone: string }) {
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [nextId, setNextId] = useState(1);
   const [recentConversations, setRecentConversations] = useState<StoredConversation[]>([]);
-  const [welcome, setWelcome] = useState({ greeting: "Welcome back, Mark." });
+  const [welcome, setWelcome] = useState({ greeting: `Welcome back, ${displayName}.` });
   const conversationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const now = new Date();
-    const hour = now.getHours();
+    let hour = now.getHours();
+    try { hour = Number(new Intl.DateTimeFormat("en-US", { hour: "2-digit", hourCycle: "h23", timeZone }).format(now)); } catch { /* use browser-local hour */ }
     setWelcome({
-      greeting: `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, Mark.`,
+      greeting: `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${displayName}.`,
     });
-  }, []);
+  }, [displayName, timeZone]);
 
   useEffect(() => {
     const conversation = conversationRef.current;
@@ -290,8 +307,8 @@ function ConnectedWallet({ overview, onRefresh }: { overview: WalletOverview; on
 function BinancePayView(){return <PageFrame eyebrow="Binance Pay" title="Pay or receive with Binance" description="Inspect a supported Binance QR or payment link, review every detail, or generate an official receive link."><BinancePayWorkflow/></PageFrame>}
 function X402View(){return <PageFrame eyebrow="Agentic Wallet / x402" title="Discover and purchase agent services" description="Browse BNB-compatible services or inspect a trusted HTTP 402 resource directly."><X402Workflow/></PageFrame>}
 function ActivityView(){return <PageFrame eyebrow="Activity" title="All activity" description="Filter approvals, transfers, Binance Pay payments, x402 purchases, successes, pending actions, and failures."><ActivityWorkflow/></PageFrame>}
-function SettingsView(){const [tab,setTab]=useState('Rules & approvals');return <PageFrame eyebrow="Settings" title="Control how AgentPay works" description="Manage approval rules, connections, diagnostics, and product preferences without exposing credentials."><div className="settings-tabs">{['Rules & approvals','Connections','Diagnostics','General'].map(x=><button key={x} className={tab===x?'active':''} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==='Rules & approvals'&&<div className="rule-list"><RuleRow title="Require approval for every payment" description="Enabled and recommended" enabled/><RuleRow title="Per-payment spending limit" description="Configure after redesign validation"/><RuleRow title="Daily spending limit" description="Configure after redesign validation"/><RuleRow title="Trusted destinations and services" description="Server-side allowlists remain enforced"/></div>}{tab==='Connections'&&<div className="connection-list"><ConnectionRow title="Agentic Wallet" detail="Balances, transfers, and x402 signing"/><ConnectionRow title="Binance Pay" detail="QR, payment links, and receive links"/><BinanceAccountConnectionRow/></div>}{tab==='Diagnostics'&&<div className="diagnostic-grid"><Diagnostic title="Database" value="SQLite connected" tone="success"/><Diagnostic title="Payment execution" value="Disabled by default" tone="awaiting"/><Diagnostic title="Environment" value="Server workspace"/><Diagnostic title="Version" value={`v${appVersion}`}/></div>}{tab==='General'&&<div className="settings-card"><label className="field"><span>Display currency</span><select defaultValue="USD"><option>USD</option></select></label><div className="setting-row"><div><strong>Appearance</strong><small>AgentPay light theme</small></div><span className="theme-chip">Light</span></div></div>}</PageFrame>}
-function RuleRow({title,description,enabled=false}:{title:string;description:string;enabled?:boolean}){return <div className="rule-row"><div><strong>{title}</strong><span>{description}</span></div><span className={`toggle ${enabled?'on':''}`}><span/></span></div>}
-function ConnectionRow({title,detail}:{title:string;detail:string}){return <div className="connection-row"><div className="connection-logo">{title==='Agentic Wallet'?'W':title==='Binance Pay'?'B':'A'}</div><div className="connection-copy"><strong>{title}</strong><span>{detail}</span></div><span className="not-connected">Review connection</span><button className="secondary-button">Manage</button></div>}
+function SettingsView({tab,onTabChange,settings,onSettingsChange,onNavigate}:{tab:SettingsTab;onTabChange:(tab:SettingsTab)=>void;settings:AgentPaySettings;onSettingsChange:(settings:AgentPaySettings)=>void;onNavigate:(view:View)=>void}){const tabs:SettingsTab[]=['Rules & approvals','Connections','Diagnostics','General'];return <PageFrame eyebrow="Settings" title="Control how AgentPay works" description="Manage approval rules, connections, diagnostics, and product preferences without exposing credentials."><div className="settings-tabs">{tabs.map(x=><button key={x} className={tab===x?'active':''} onClick={()=>onTabChange(x)}>{x}</button>)}</div>{tab==='Rules & approvals'&&<div className="rule-list"><RuleRow title="Require approval for every payment" description="Mandatory and enforced across AgentPay" state="Locked on" tone="success"/><RuleRow title="Per-payment spending limit" description="Server-side enforcement is next in the functional roadmap" state="Not configured"/><RuleRow title="Daily spending limit" description="Server-side enforcement is next in the functional roadmap" state="Not configured"/><RuleRow title="Trusted destinations and services" description="Management and enforcement are scheduled in Priority 2" state="Coming next"/></div>}{tab==='Connections'&&<div className="connection-list"><ConnectionRow title="Agentic Wallet" detail="Balances, transfers, and x402 signing" onClick={()=>onNavigate('wallet')}/><ConnectionRow title="Binance Pay" detail="QR, payment links, and receive links" onClick={()=>onNavigate('binance-pay')}/><BinanceAccountConnectionRow/></div>}{tab==='Diagnostics'&&<div className="diagnostic-grid"><Diagnostic title="Database" value="SQLite connected" tone="success"/><Diagnostic title="Payment execution" value="Disabled by default" tone="awaiting"/><Diagnostic title="Environment" value="Server workspace"/><Diagnostic title="Version" value={`v${appVersion}`}/></div>}{tab==='General'&&<ProfileSettings settings={settings} onSaved={onSettingsChange}/>}</PageFrame>}
+function RuleRow({title,description,state,tone=''}:{title:string;description:string;state:string;tone?:string}){return <div className="rule-row"><div><strong>{title}</strong><span>{description}</span></div><span className={`rule-state ${tone}`}>{state}</span></div>}
+function ConnectionRow({title,detail,onClick}:{title:string;detail:string;onClick:()=>void}){return <div className="connection-row"><div className="connection-logo">{title==='Agentic Wallet'?'W':title==='Binance Pay'?'B':'A'}</div><div className="connection-copy"><strong>{title}</strong><span>{detail}</span></div><button className="secondary-button" onClick={onClick}>Manage</button></div>}
 function Diagnostic({title,value,tone=''}:{title:string;value:string;tone?:string}){return <div className="diagnostic-card"><span>{title}</span><strong className={tone}>{value}</strong></div>}
 function PageFrame({eyebrow,title,description,children}:{eyebrow:string;title:string;description:string;children:React.ReactNode}){return <div className="standard-page"><div className="eyebrow"><span className="spark">✦</span>{eyebrow}</div><h1>{title}</h1><p className="lead">{description}</p>{children}</div>}

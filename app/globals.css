@@ -62,9 +62,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .nav-submenu .nav-icon { position: relative; width: 12px; }
 .nav-submenu .nav-icon::before { position: absolute; top: -13px; left: 0; width: 11px; height: 15px; border-bottom: 1px solid #43443d; border-left: 1px solid #43443d; border-radius: 0 0 0 5px; content: ''; }
 .sidebar-footer { margin-top: auto; }
-.profile { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 10px; margin-bottom: 14px; padding: 15px 5px; border-top: 1px solid #2f3029; border-bottom: 1px solid #2f3029; }
+.profile { display: grid; width: 100%; grid-template-columns: 34px 1fr; align-items: center; gap: 10px; margin-bottom: 14px; padding: 15px 5px; border: 0; border-top: 1px solid #2f3029; border-bottom: 1px solid #2f3029; background: transparent; color: inherit; text-align: left; }
+.profile:hover { background: #22231d; }
 .profile-avatar, .avatar { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #31322b; color: var(--yellow); font-weight: 700; }
-.profile div { display: flex; flex-direction: column; }
+.profile > span:last-child { display: flex; min-width: 0; flex-direction: column; }
 .profile strong { font-size: 13px; }
 .profile small, .version { color: #81837a; font-size: 13px; }
 .profile small { margin-top: 2px; }
@@ -385,6 +386,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .rule-row strong, .rule-row span, .connection-copy strong, .connection-copy span { display: block; }
 .rule-row strong, .connection-copy strong { font-size: 13px; }
 .rule-row div > span, .connection-copy span { margin-top: 5px; color: var(--muted); font-size: 13px; }
+.rule-state { flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; background: #f0f0eb; color: var(--muted); font-size: 12px; font-weight: 700; }
+.rule-state.success { background: #eaf5f0; }
 .toggle { width: 35px; height: 20px; padding: 3px; border-radius: 20px; background: #d9dad3; }
 .toggle span { display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
 .toggle.on { background: var(--ink); }
@@ -399,6 +402,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .diagnostic-card span { color: var(--muted-2); font-size: 13px; }
 .diagnostic-card strong { margin-top: 9px; }
 .settings-card { padding: 22px; }
+.profile-settings-card { display: grid; gap: 22px; }
+.settings-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.settings-section-heading strong, .settings-section-heading span { display: block; }
+.settings-section-heading strong { font-size: 16px; }
+.settings-section-heading div > span { margin-top: 5px; color: var(--muted); font-size: 13px; }
+.settings-saved-at { color: var(--muted-2); font-size: 12px; white-space: nowrap; }
+.settings-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px; }
+.timezone-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.timezone-control input { width: 100%; }
+.settings-actions { display: flex; justify-content: flex-end; padding-top: 2px; }
+.settings-success { padding: 12px 14px; border: 1px solid rgba(36, 116, 90, .3); border-radius: 11px; background: #eaf5f0; color: var(--green); font-size: 13px; }
 .setting-row { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
 .setting-row small { display: block; margin-top: 4px; color: var(--muted-2); }
 .theme-chip { color: #765a00; }
@@ -452,6 +466,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .binance-source-grid { grid-template-columns: 1fr; }
   .binance-summary .summary-actions { align-items: stretch; }
   .binance-summary .primary-button { width: 100%; }
+  .settings-section-heading { display: grid; }
+  .settings-saved-at { white-space: normal; }
+  .settings-fields, .timezone-control { grid-template-columns: 1fr; }
+  .settings-actions .primary-button { width: 100%; }
 }
 
 @media (max-width: 480px) {
