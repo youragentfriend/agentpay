@@ -24,6 +24,7 @@ export function spendingLimitError(rail: PaymentRail, field: keyof SpendingLimit
 
 export type AgentPaySettings = {
   displayName: string;
+  profileImageDataUrl: string | null;
   displayCurrency: DisplayCurrency;
   timeZone: string;
   requireApproval: true;
@@ -35,6 +36,7 @@ export type AgentPaySettings = {
 
 export type UpdateAgentPaySettings = {
   displayName: string;
+  profileImageDataUrl: string | null;
   displayCurrency: DisplayCurrency;
   timeZone: string;
   spendingLimits: SpendingLimits;
@@ -44,6 +46,7 @@ export type UpdateAgentPaySettings = {
 
 export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
   displayName: "Mark",
+  profileImageDataUrl: null,
   displayCurrency: "USD",
   timeZone: "UTC",
   spendingLimits: {

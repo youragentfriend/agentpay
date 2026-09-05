@@ -13,7 +13,10 @@ import {
   validateSettingsUpdate,
 } from "../lib/server/settings-store";
 
+const profileImageDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
 const policyFields = {
+  profileImageDataUrl: null as string | null,
   spendingLimits: { "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" } },
   trustedWalletDestinations: [] as string[],
   trustedX402Hosts: [] as string[],
@@ -37,6 +40,7 @@ function withDatabase(run: (filename: string) => void) {
 test("creates persistent default AgentPay settings with mandatory approval", () => withDatabase(() => {
   const settings = getAgentPaySettings();
   assert.equal(settings.displayName, "Mark");
+  assert.equal(settings.profileImageDataUrl, null);
   assert.equal(settings.displayCurrency, "USD");
   assert.equal(settings.timeZone, "UTC");
   assert.equal(settings.requireApproval, true);
@@ -50,15 +54,17 @@ test("creates persistent default AgentPay settings with mandatory approval", () 
 test("updates rules and persists them in SQLite", () => withDatabase(() => {
   const address = "0x1111111111111111111111111111111111111111";
   const saved = updateAgentPaySettings({
-    displayName: "Mark Agent", displayCurrency: "USD", timeZone: "Asia/Manila",
+    displayName: "Mark Agent", profileImageDataUrl, displayCurrency: "USD", timeZone: "Asia/Manila",
     spendingLimits: { "binance-pay": { perPaymentUsdLimit: "25.50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "5", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "30" } }, trustedWalletDestinations: [address.toUpperCase().replace("0X", "0x")], trustedX402Hosts: ["API.Example.com"],
   });
   assert.equal(saved.displayName, "Mark Agent");
+  assert.equal(saved.profileImageDataUrl, profileImageDataUrl);
   assert.equal(saved.spendingLimits["binance-pay"].perPaymentUsdLimit, "25.50");
   assert.deepEqual(saved.trustedWalletDestinations, [address]);
   assert.deepEqual(saved.trustedX402Hosts, ["api.example.com"]);
   resetSettingsStoreForTests();
   assert.equal(getAgentPaySettings().spendingLimits["binance-pay"].dailyUsdLimit, "100");
+  assert.equal(getAgentPaySettings().profileImageDataUrl, profileImageDataUrl);
 }));
 
 test("migrates a Priority 1 settings database without losing profile values", () => withDatabase((filename) => {
@@ -69,6 +75,7 @@ test("migrates a Priority 1 settings database without losing profile values", ()
   const settings = getAgentPaySettings();
   assert.equal(settings.displayName, "Existing Mark");
   assert.equal(settings.timeZone, "Europe/London");
+  assert.equal(settings.profileImageDataUrl, null);
   assert.equal(settings.requireApproval, true);
   assert.deepEqual(settings.trustedX402Hosts, []);
 }));
@@ -86,6 +93,7 @@ test("normalizes fields and validates unsupported values", () => {
     displayName: "Mark Agent", displayCurrency: "USD", timeZone: "UTC", ...policyFields,
   });
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "EUR", timeZone: "UTC", ...policyFields }), SettingsValidationError);
+  assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, profileImageDataUrl: "data:image/png;base64,bm90LWEtcG5n" }), /does not match/i);
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, "binance-pay": { perPaymentUsdLimit: "0.00001", dailyUsdLimit: "100" } } }), /between \$0.0001 and \$50/);
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, "binance-pay": { perPaymentUsdLimit: "50.0001", dailyUsdLimit: "100" } } }), /between \$0.0001 and \$50/);
   assert.throws(() => validateSettingsUpdate({ displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", ...policyFields, spendingLimits: { ...policyFields.spendingLimits, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20.0001" } } }), /between \$0.0001 and \$20/);

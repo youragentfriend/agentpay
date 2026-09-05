@@ -20,7 +20,7 @@ import { enforceX402OptionPolicy, X402Error } from "../lib/server/x402";
 const trusted = "0x1111111111111111111111111111111111111111";
 const other = "0x2222222222222222222222222222222222222222";
 const settings: AgentPaySettings = {
-  displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", updatedAt: new Date().toISOString(), requireApproval: true,
+  displayName: "Mark", profileImageDataUrl: null, displayCurrency: "USD", timeZone: "UTC", updatedAt: new Date().toISOString(), requireApproval: true,
   spendingLimits: { "binance-pay": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, x402: { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" } }, trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
 };
 
@@ -86,7 +86,7 @@ test("all execution-rail guards re-read persisted rules before execution", () =>
   resetPaymentPolicyStoreForTests();
   try {
     updateAgentPaySettings({
-      displayName: "Mark", displayCurrency: "USD", timeZone: "UTC", spendingLimits: { "binance-pay": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "1", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" } },
+      displayName: "Mark", profileImageDataUrl: null, displayCurrency: "USD", timeZone: "UTC", spendingLimits: { "binance-pay": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "1", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" } },
       trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
     });
     assert.throws(() => enforcePaymentPolicy({ rail: "agentic-wallet", amountUsd: "2", destination: trusted }), (error) => error instanceof PaymentPolicyError && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");

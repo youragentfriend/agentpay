@@ -26,6 +26,7 @@ function db() {
     CREATE TABLE IF NOT EXISTS app_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       display_name TEXT NOT NULL,
+      profile_image_data_url TEXT,
       display_currency TEXT NOT NULL,
       time_zone TEXT NOT NULL,
       per_payment_usd_limit TEXT,
@@ -42,6 +43,7 @@ function db() {
     )
   `);
   const columns = new Set((database.prepare("PRAGMA table_info(app_settings)").all() as unknown as Array<{ name: string }>).map((column) => column.name));
+  if (!columns.has("profile_image_data_url")) database.exec("ALTER TABLE app_settings ADD COLUMN profile_image_data_url TEXT");
   if (!columns.has("per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN per_payment_usd_limit TEXT");
   if (!columns.has("daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN daily_usd_limit TEXT");
   if (!columns.has("binance_pay_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN binance_pay_per_payment_usd_limit TEXT");
@@ -84,6 +86,23 @@ function validateDisplayName(value: unknown) {
   if (displayName.length < 1 || displayName.length > 50) throw new SettingsValidationError("Display name must contain 1 to 50 characters.");
   if (/\p{Cc}/u.test(displayName)) throw new SettingsValidationError("Display name contains unsupported control characters.");
   return displayName;
+}
+
+function validateProfileImage(value: unknown): string | null {
+  if (value === null || value === "") return null;
+  if (typeof value !== "string") throw new SettingsValidationError("Profile image must be an uploaded PNG, JPEG, or WebP image.");
+  if (value.length > 700_000) throw new SettingsValidationError("Profile image is too large. Choose an image under 512 KB after resizing.");
+  const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match) throw new SettingsValidationError("Profile image must be a PNG, JPEG, or WebP image.");
+  const bytes = Buffer.from(match[2], "base64");
+  if (!bytes.length || bytes.length > 512 * 1024) throw new SettingsValidationError("Profile image must be under 512 KB after resizing.");
+  const isPng = bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const isJpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  const isWebp = bytes.length >= 12 && bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+  if ((match[1] === "png" && !isPng) || (match[1] === "jpeg" && !isJpeg) || (match[1] === "webp" && !isWebp)) {
+    throw new SettingsValidationError("Profile image data does not match its file type.");
+  }
+  return value;
 }
 
 function validateDisplayCurrency(value: unknown): "USD" {
@@ -170,6 +189,7 @@ export function validateSettingsUpdate(value: unknown): UpdateAgentPaySettings {
   const input = value as Record<string, unknown>;
   return {
     displayName: validateDisplayName(input.displayName),
+    profileImageDataUrl: validateProfileImage(input.profileImageDataUrl),
     displayCurrency: validateDisplayCurrency(input.displayCurrency),
     timeZone: validateTimeZone(input.timeZone),
     spendingLimits: validateSpendingLimits(input.spendingLimits),
@@ -188,6 +208,7 @@ function parseStoredList(value: unknown): string[] {
 function mapSettings(row: Record<string, unknown>): AgentPaySettings {
   return {
     displayName: String(row.display_name),
+    profileImageDataUrl: row.profile_image_data_url === null || row.profile_image_data_url === undefined ? null : String(row.profile_image_data_url),
     displayCurrency: "USD",
     timeZone: String(row.time_zone),
     requireApproval: true,
@@ -217,11 +238,11 @@ export function updateAgentPaySettings(value: unknown): AgentPaySettings {
   const updatedAt = new Date().toISOString();
   db().prepare(`
     UPDATE app_settings
-    SET display_name = ?, display_currency = ?, time_zone = ?,
+    SET display_name = ?, profile_image_data_url = ?, display_currency = ?, time_zone = ?,
         binance_pay_per_payment_usd_limit=?, binance_pay_daily_usd_limit=?, x402_per_payment_usd_limit=?, x402_daily_usd_limit=?, wallet_per_payment_usd_limit=?, wallet_daily_usd_limit=?,
         trusted_wallet_destinations = ?, trusted_x402_hosts = ?, updated_at = ?
     WHERE id = 1
-  `).run(settings.displayName, settings.displayCurrency, settings.timeZone,
+  `).run(settings.displayName, settings.profileImageDataUrl, settings.displayCurrency, settings.timeZone,
     settings.spendingLimits["binance-pay"].perPaymentUsdLimit, settings.spendingLimits["binance-pay"].dailyUsdLimit,
     settings.spendingLimits.x402.perPaymentUsdLimit, settings.spendingLimits.x402.dailyUsdLimit,
     settings.spendingLimits["agentic-wallet"].perPaymentUsdLimit, settings.spendingLimits["agentic-wallet"].dailyUsdLimit,

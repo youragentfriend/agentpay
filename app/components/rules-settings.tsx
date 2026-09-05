@@ -46,7 +46,7 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
       const response = await fetch("/api/settings", {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          displayName: settings.displayName, displayCurrency: settings.displayCurrency, timeZone: settings.timeZone,
+          displayName: settings.displayName, profileImageDataUrl: settings.profileImageDataUrl, displayCurrency: settings.displayCurrency, timeZone: settings.timeZone,
           spendingLimits: normalizedLimits,
           trustedWalletDestinations: walletDestinations.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
           trustedX402Hosts: x402Hosts.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
