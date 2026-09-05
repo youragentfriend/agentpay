@@ -3,9 +3,9 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-export const ACTIVITY_SOURCES = ["agentic-wallet", "binance-pay", "x402"] as const;
+export const ACTIVITY_SOURCES = ["agentic-wallet", "binance-pay", "binance-account", "x402"] as const;
 export type ActivitySource = (typeof ACTIVITY_SOURCES)[number];
-export const ACTIVITY_TYPES = ["transfer", "binance-pay", "x402"] as const;
+export const ACTIVITY_TYPES = ["transfer", "binance-pay", "x402", "balance-snapshot", "policy-rejection"] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 export type ActivityStatusGroup = "awaiting-approval" | "in-progress" | "successful" | "failed";
 export type ActivityStatusCategory = "yellow" | "blue" | "green" | "red";
@@ -129,6 +129,14 @@ function getDatabase(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS activity_events_source ON activity_events(source);
     CREATE INDEX IF NOT EXISTS activity_events_activity_type ON activity_events(activity_type);
     CREATE INDEX IF NOT EXISTS activity_events_asset ON activity_events(asset);
+    CREATE TABLE IF NOT EXISTS activity_policy_rejections (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      operation TEXT NOT NULL,
+      code TEXT NOT NULL,
+      message TEXT NOT NULL,
+      occurred_at TEXT NOT NULL
+    );
   `);
   return database;
 }
@@ -210,6 +218,27 @@ function x402Projection(row: Record<string, unknown>): Projection {
   return makeProjection({ source: "x402", sourceId: String(row.id), activityType: "x402", status, statusGroup: mapped.group, statusCategory: mapped.category, title: `x402 · ${host}`, summary: "x402 payment", occurredAt: updatedAt, createdAt, updatedAt, searchText: [host, status, "x402"].join(" ") });
 }
 
+function snapshotProjection(row: Record<string, unknown>): Projection {
+  const source: ActivitySource = row.source === "binance-account" ? "binance-account" : "agentic-wallet";
+  const status = stringValue(row.status) || "unavailable";
+  const createdAt = stringValue(row.captured_at) || new Date(0).toISOString();
+  const mapped = status === "captured" ? statusMapping("completed") : statusMapping("failed");
+  const totalUsd = stringValue(row.total_usd);
+  const title = source === "binance-account" ? "Binance Account balance snapshot" : "Agentic Wallet balance snapshot";
+  const summary = status === "captured" ? `${String(row.asset_count || 0)} assets${totalUsd ? ` · $${totalUsd}` : ""}` : "Balance source unavailable";
+  return makeProjection({ source, sourceId: `snapshot:${String(row.id)}`, activityType: "balance-snapshot", status, statusGroup: mapped.group, statusCategory: mapped.category, title, summary, occurredAt: createdAt, createdAt, updatedAt: createdAt, searchText: [title, summary, status].join(" ") });
+}
+
+function policyProjection(row: Record<string, unknown>): Projection {
+  const source: ActivitySource = row.source === "binance-pay" || row.source === "x402" ? row.source : "agentic-wallet";
+  const occurredAt = stringValue(row.occurred_at) || new Date(0).toISOString();
+  const operation = stringValue(row.operation) || "payment";
+  const code = stringValue(row.code) || "POLICY_REJECTED";
+  const message = stringValue(row.message) || "Payment rejected by policy.";
+  const mapped = statusMapping("rejected");
+  return makeProjection({ source, sourceId: `policy:${String(row.id)}`, activityType: "policy-rejection", status: "rejected", statusGroup: mapped.group, statusCategory: mapped.category, title: "Payment blocked by policy", summary: `${operation} · ${message}`, occurredAt, createdAt: occurredAt, updatedAt: occurredAt, searchText: ["policy rejection", source, operation, code, message].join(" ") });
+}
+
 function sourceProjections(): Projection[] {
   const result: Projection[] = [];
   if (tableExists("payment_intents")) {
@@ -221,7 +250,23 @@ function sourceProjections(): Projection[] {
   if (tableExists("x402_intents")) {
     for (const row of getDatabase().prepare("SELECT * FROM x402_intents").all() as unknown as Record<string, unknown>[]) result.push(x402Projection(row));
   }
+  if (tableExists("balance_snapshots")) {
+    for (const row of getDatabase().prepare("SELECT * FROM balance_snapshots").all() as unknown as Record<string, unknown>[]) result.push(snapshotProjection(row));
+  }
+  if (tableExists("activity_policy_rejections")) {
+    for (const row of getDatabase().prepare("SELECT * FROM activity_policy_rejections").all() as unknown as Record<string, unknown>[]) result.push(policyProjection(row));
+  }
   return result;
+}
+
+export function recordPolicyRejection(input: { source: "agentic-wallet" | "binance-pay" | "x402"; operation: string; code: string; message: string; idempotencyKey: string; occurredAt?: string }): string {
+  if (!input.code.startsWith("POLICY_")) throw new Error("Only payment-policy rejections may be recorded.");
+  const id = createHash("sha256").update(`${input.source}:${input.operation}:${input.idempotencyKey}:${input.code}`).digest("hex").slice(0, 32);
+  const message = input.message.replace(/0x[a-fA-F0-9]{8,}/g, "[redacted]").slice(0, 240);
+  getDatabase().prepare("INSERT OR IGNORE INTO activity_policy_rejections (id,source,operation,code,message,occurred_at) VALUES (?,?,?,?,?,?)")
+    .run(id, input.source, input.operation.slice(0, 80), input.code.slice(0, 80), message, input.occurredAt || new Date().toISOString());
+  syncActivityEvents();
+  return projectionId(input.source, `policy:${id}`);
 }
 
 /** Upsert the projection. Re-running this is safe and does not duplicate events. */
@@ -255,8 +300,8 @@ function toEvent(row: ActivityRow): ActivityEvent {
   return { id: row.id, source: row.source, activityType: row.activity_type, status: row.raw_status, statusGroup: row.status_group, statusCategory: row.status_category, amount: row.amount ?? undefined, asset: row.asset ?? undefined, title: row.title, summary: row.summary, occurredAt: row.occurred_at, createdAt: row.created_at, updatedAt: row.updated_at, reference: row.safe_reference ?? undefined };
 }
 
-const sourceAliases: Record<string, ActivitySource> = { "agentic-wallet": "agentic-wallet", "agentic_wallet": "agentic-wallet", wallet: "agentic-wallet", payment: "agentic-wallet", "payment-intent": "agentic-wallet", "payment-intents": "agentic-wallet", payment_intents: "agentic-wallet", "binance-pay": "binance-pay", binance: "binance-pay", "binance_pay": "binance-pay", binance_pay_orders: "binance-pay", x402: "x402", x402_intents: "x402" };
-const typeAliases: Record<string, ActivityType> = { transfer: "transfer", payment: "transfer", "payment-intent": "transfer", "payment_intent": "transfer", "binance-pay": "binance-pay", "binance-pay-order": "binance-pay", "binance_pay_order": "binance-pay", x402: "x402", "x402-intent": "x402", "x402_intent": "x402" };
+const sourceAliases: Record<string, ActivitySource> = { "agentic-wallet": "agentic-wallet", "agentic_wallet": "agentic-wallet", wallet: "agentic-wallet", payment: "agentic-wallet", "payment-intent": "agentic-wallet", "payment-intents": "agentic-wallet", payment_intents: "agentic-wallet", "binance-pay": "binance-pay", binance: "binance-pay", "binance_pay": "binance-pay", binance_pay_orders: "binance-pay", "binance-account": "binance-account", "binance_account": "binance-account", x402: "x402", x402_intents: "x402" };
+const typeAliases: Record<string, ActivityType> = { transfer: "transfer", payment: "transfer", "payment-intent": "transfer", "payment_intent": "transfer", "binance-pay": "binance-pay", "binance-pay-order": "binance-pay", "binance_pay_order": "binance-pay", x402: "x402", "x402-intent": "x402", "x402_intent": "x402", "balance-snapshot": "balance-snapshot", snapshot: "balance-snapshot", "policy-rejection": "policy-rejection", rejection: "policy-rejection" };
 
 function oneOf<T extends string>(value: string, aliases: Record<string, T>, label: string): T {
   const normalized = value.trim().toLowerCase();
@@ -326,6 +371,17 @@ export function queryActivityEvents(input: ActivityQuery = {}): ActivityPage {
   const rows = db.prepare(`SELECT * FROM activity_events${where} ORDER BY occurred_at ${order}, id ${order} LIMIT ? OFFSET ?`).all(...args, query.limit, offset) as unknown as ActivityRow[];
   const totalPages = total ? Math.ceil(total / query.limit) : 0;
   return { events: rows.map(toEvent), pagination: { page: query.page, limit: query.limit, total, totalPages, hasNextPage: query.page < totalPages, hasPreviousPage: query.page > 1 && totalPages > 0 } };
+}
+
+export function queryActivityEventsForExport(input: ActivityQuery = {}, maximum = 1_000): ActivityEvent[] {
+  const requested = Math.min(Math.max(1, maximum), 1_000);
+  const pageSize = Math.min(100, requested);
+  const first = queryActivityEvents({ ...input, page: 1, limit: pageSize });
+  const events = [...first.events];
+  for (let page = 2; events.length < requested && page <= first.pagination.totalPages; page += 1) {
+    events.push(...queryActivityEvents({ ...input, page, limit: Math.min(100, requested - events.length) }).events);
+  }
+  return events.slice(0, requested);
 }
 
 export const listActivityEvents = queryActivityEvents;

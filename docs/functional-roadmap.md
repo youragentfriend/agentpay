@@ -69,28 +69,25 @@ Implemented evidence:
 
 ## Priority 4 — General settings
 
-Status: pending after Priority 1 foundation
+Status: **complete — shipped with Priority 1**
 
 - Persist the currently supported currency and time zone.
 - Add only options that affect actual formatting/behavior.
 - Defer theme switching until a second tested theme exists.
 
-Completion: every visible General control changes real behavior and survives reload.
+Completion evidence: display name and IANA time zone persist in SQLite and update the live identity/greeting; USD is presented honestly as the only supported valuation currency; no unsupported theme or currency control is interactive.
 
 ## Priority 5 — Activity completion
 
-Status: partially working
+Status: **complete — shipped September 5, 2026**
 
-Already working: search, status filter, source filter, sort, pagination.
+- Search, status, source, activity-type, asset, date-range, and sort filters with pagination.
+- Bounded filtered CSV export using normalized stored events, safe escaping, and spreadsheet-formula neutralization.
+- Accessible event detail dialog containing normalized safe fields only.
+- Durable manual Agentic Wallet and Binance Account balance snapshots with source-isolated failures and no wallet addresses or credentials.
+- First-class idempotent policy-rejection events across Agentic Wallet, Binance Pay, and x402 route boundaries.
 
-Remaining:
-
-- Expose activity-type, asset, and date-range filters already supported by the backend.
-- Add CSV export of the filtered result set.
-- Add event detail view.
-- Add durable balance snapshots for later portfolio history/reporting.
-
-Completion: users can filter, inspect, and export normalized events without querying providers again.
+Completion evidence: users can filter, inspect, snapshot, and export normalized stored events without executing payments. Automated tests cover filter mapping, CSV safety, snapshot persistence/source isolation, policy-event idempotency/redaction, and existing Activity status semantics.
 
 ## Priority 6 — x402 readiness
 

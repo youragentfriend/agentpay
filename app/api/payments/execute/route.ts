@@ -2,15 +2,18 @@ import { AgenticWalletError, getWalletLockStatus, getWalletOverview, sendWalletT
 import { PaymentIntentError, prepareTransfer } from "@/lib/server/payment-intents";
 import { getPaymentIntent, markPaymentFailed, markPaymentSubmitted, markPaymentSubmitting, walletSendEnabled } from "@/lib/server/payment-store";
 import { enforcePaymentPolicy, PaymentPolicyError } from "@/lib/server/payment-policy";
+import { policyAuditFingerprint, recordPolicyRejectionFromError } from "@/lib/server/activity-policy-audit";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
 export async function POST(request: Request) {
   let processingId: string | undefined;
+  let fingerprint = policyAuditFingerprint("invalid-request");
   try {
     if (!walletSendEnabled()) throw new PaymentIntentError("Wallet execution is disabled on this server.", "EXECUTION_DISABLED");
     const body = await request.json() as { id?: unknown };
+    fingerprint = policyAuditFingerprint(body);
     if (typeof body.id !== "string") throw new PaymentIntentError("Payment intent ID is required.", "INVALID_PAYMENT_INTENT_ID");
     const intent = getPaymentIntent(body.id);
     if (intent.status !== "approved") throw new PaymentIntentError("This payment intent is not approved.", "INVALID_PAYMENT_STATUS");
@@ -29,6 +32,7 @@ export async function POST(request: Request) {
     const txHash = await sendWalletTransfer(intent);
     return Response.json(markPaymentSubmitted(intent.id, txHash));
   } catch (error) {
+    recordPolicyRejectionFromError(error, { source: "agentic-wallet", operation: "execute", fingerprint });
     const paymentError = error instanceof PaymentIntentError || error instanceof PaymentPolicyError
       ? error
       : error instanceof AgenticWalletError
