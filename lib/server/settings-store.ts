@@ -153,6 +153,11 @@ export function getAgentPaySettings(): AgentPaySettings {
   return mapSettings(row);
 }
 
+export function checkSettingsDatabaseHealth(): boolean {
+  const result = db().prepare("PRAGMA quick_check").get() as Record<string, unknown> | undefined;
+  return result !== undefined && Object.values(result).some((value) => value === "ok");
+}
+
 export function updateAgentPaySettings(value: unknown): AgentPaySettings {
   const settings = validateSettingsUpdate(value);
   const updatedAt = new Date().toISOString();

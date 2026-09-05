@@ -50,7 +50,7 @@ Concrete remaining subtask: add first-class normalized Activity events for polic
 
 ## Priority 3 — Connections and diagnostics
 
-Status: pending
+Status: **complete — live diagnostics shipped September 5, 2026**
 
 - Replace static Agentic Wallet and Binance Pay connection rows with real status data.
 - Make Manage actions navigate to the correct workspace.
@@ -58,6 +58,14 @@ Status: pending
 - Add a real diagnostics API for SQLite, Agentic Wallet, Binance Pay/QR decoder, Binance Account, x402, execution flags, build version, and uptime.
 
 Completion: no connection or diagnostic label is hardcoded as healthy/unhealthy.
+
+Implemented evidence:
+
+- `GET /api/diagnostics` returns a typed, secret-safe aggregate of process metadata, SQLite health, Agentic Wallet connection, Binance Pay and QR capability, read-only Binance Account source health, x402 allowlist count, and each execution flag.
+- Every external source check is isolated; failures produce partial `unavailable` or `degraded` states without suppressing healthy source results or returning raw provider errors.
+- Settings Connections and Diagnostics use the aggregate endpoint with refresh, loading/error handling, a generated-at timestamp, distinct configured/connected/ready/execution-disabled states, and working navigation actions.
+- Disabled payment execution remains an intentional safe state rather than a health failure.
+- Focused tests cover aggregate mapping, partial-source isolation, response redaction/shape, and status semantics.
 
 ## Priority 4 — General settings
 
