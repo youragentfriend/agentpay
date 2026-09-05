@@ -364,11 +364,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .receive-link-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid var(--line); background: #f5f4ee; }
 .receive-link-dialog-heading span { color: var(--muted-2); font-size: 13px; text-transform: uppercase; }
 .receive-link-dialog-heading h2 { margin: 5px 0 0; font-size: 18px; }
-.receive-link-close { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: 9px; background: #171815; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
-.receive-link-close:hover { background: #2b2d29; }
-.receive-link-close:focus-visible { outline: 3px solid rgba(245,205,69,.55); outline-offset: 2px; }
 .receive-link-dialog > code { display: block; margin: 20px; padding: 14px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 9px; background: #fafaf7; color: var(--ink); font-size: 13px; }
-.receive-link-share-error { margin: -6px 20px 18px; padding: 11px 12px; border-radius: 9px; background: rgba(179,38,61,.09); color: var(--red); font-size: 13px; }
 .receive-link-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 20px; }
 .compatible-link-card { margin: 16px 18px; }
 .compatible-link-card button { justify-self: end; }
