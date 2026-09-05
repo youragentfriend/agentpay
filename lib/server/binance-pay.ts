@@ -113,7 +113,7 @@ export function validateBinancePayInput(rawQr: string): string {
     const url = new URL(value);
     if (url.protocol === "https:" && url.hostname === "app.binance.com" && (url.pathname.startsWith("/uni-qr/") || url.pathname.startsWith("/qr/"))) return value;
   } catch { /* handled below */ }
-  throw new BinancePayError("Only official app.binance.com payment links and PIX QR payloads are supported.", "UNSUPPORTED_QR_FORMAT");
+  throw new BinancePayError("Enter a valid Binance Pay URL beginning with https://app.binance.com/ or a PIX QR payload. Plain text and numbers are not supported.", "UNSUPPORTED_QR_FORMAT");
 }
 
 export function getCompatibleBinancePayLink(rawQr: string): string | undefined {

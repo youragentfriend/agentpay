@@ -51,6 +51,18 @@ export function BinancePayWorkflow({ initialFile = null, embedded = false, initi
 
   async function prepareLink() {
     try {
+      const value = rawQr.trim();
+      let supported = value.includes("br.gov.bcb.pix");
+      if (!supported) {
+        try {
+          const url = new URL(value);
+          supported = url.protocol === "https:" && url.hostname === "app.binance.com" && (url.pathname.startsWith("/uni-qr/") || url.pathname.startsWith("/qr/"));
+        } catch { supported = false; }
+      }
+      if (!supported) {
+        setError("Enter a valid Binance Pay URL beginning with https://app.binance.com/ or a PIX QR payload. Plain text and numbers are not supported.");
+        return;
+      }
       setSource("payment link");
       setCompatibleLink("");
       setOrder(await call("/api/binance-pay/prepare", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rawQr }) }) as unknown as BinancePayOrder);

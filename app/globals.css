@@ -292,7 +292,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .field.full { grid-column: 1 / -1; }
 .field > span { color: var(--muted-2); font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .field input, .field select, .field textarea { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 11px; outline: none; background: #fafaf7; color: var(--ink); }
-.field textarea { min-height: 82px; resize: vertical; }
+.field textarea { height: 82px; min-height: 82px; max-height: 82px; resize: none; }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: #d5ab00; box-shadow: 0 0 0 3px rgba(245, 205, 69, .22); }
 .field-help { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .workflow-submit { margin-top: 18px; }

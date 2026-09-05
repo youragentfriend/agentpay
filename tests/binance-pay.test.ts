@@ -21,6 +21,13 @@ test("rejects lookalike hosts and insecure links", () => {
   }
 });
 
+test("explains that plain text and numbers are not payment inputs", () => {
+  assert.throws(
+    () => validateBinancePayInput("123456789"),
+    (error) => error instanceof BinancePayError && /plain text and numbers are not supported/i.test(error.message),
+  );
+});
+
 test("adds a specific hint for a rejected Request-to-Pay share link", () => {
   const result = addBinancePayInputHint(
     "https://app.binance.com/uni-qr/request-to-pay?billOrderId=redacted&billType=PAY_REQUEST",
