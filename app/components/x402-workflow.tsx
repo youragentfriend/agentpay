@@ -82,7 +82,7 @@ export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) 
       </div>
 
       {error && <div className="workflow-error">{error}</div>}
-      {!status?.ai.configured && <div className="inline-state"><strong>Live-search agent requires configuration</strong><span>Connect the protected OpenAI API key to let AgentPay search the live web for x402 services. Pasted endpoints can still be validated directly.</span></div>}
+      {!status?.ai.configured && <div className="inline-state"><strong>Live-search agent requires configuration</strong><span>Connect a protected Gemini or OpenAI API key to let AgentPay search the live web for x402 services. Pasted endpoints can still be validated directly.</span></div>}
       <label className="field full">
         <span>Message AgentPay</span>
         <textarea
