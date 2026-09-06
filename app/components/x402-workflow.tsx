@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { X402CatalogResource, X402ChatSession, X402Intent } from "@/lib/x402-types";
+import type { X402ChatSession, X402Intent } from "@/lib/x402-types";
 
 type Status = {
   executionEnabled: boolean;
@@ -12,7 +12,6 @@ type Status = {
 export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [chat, setChat] = useState<X402ChatSession | null>(null);
-  const [candidates, setCandidates] = useState<X402CatalogResource[]>([]);
   const [intent, setIntent] = useState<X402Intent | null>(null);
   const [message, setMessage] = useState(initialUrl ? `Pay for this x402 endpoint: ${initialUrl}` : "");
   const [error, setError] = useState("");
@@ -31,22 +30,21 @@ export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) 
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
-  }, [chat?.messages.length, candidates.length, intent?.status]);
+  }, [chat?.messages.length, intent?.status]);
 
-  async function send(nextMessage = message.trim(), candidate?: X402CatalogResource) {
-    if (!nextMessage && !candidate) return;
+  async function send(nextMessage = message.trim()) {
+    if (!nextMessage) return;
     setWorking(true);
     setError("");
     try {
       const response = await fetch("/api/x402/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: chat?.id, message: nextMessage, candidateId: candidate?.id }),
+        body: JSON.stringify({ sessionId: chat?.id, message: nextMessage }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to continue the x402 conversation.");
       setChat(data.session);
-      setCandidates(Array.isArray(data.candidates) ? data.candidates : Array.isArray(data.discovery?.candidates) ? data.discovery.candidates : []);
       if (data.intent) setIntent(data.intent);
       setMessage("");
     } catch (sendError) {
@@ -78,25 +76,13 @@ export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) 
           <span>Ask for pay-per-call market data, premium API access, digital services, or paste an x402 endpoint.</span>
         </div>}
 
-        {candidates.length > 0 && <div className="x402-chat-candidates">
-          {candidates.map(candidate => <article className="x402-chat-candidate" key={candidate.id}>
-            <div className="x402-network-row">
-              <span className="x402-category-badge">{candidate.category || "Service"}</span>
-              {candidate.networks.map(network => <span className={networkClass(network)} key={network}>{networkName(network)}</span>)}
-            </div>
-            <strong>{candidate.description}</strong>
-            <small>{candidate.method} · {candidate.resourceHost}</small>
-            <button className="secondary-button" disabled={working} onClick={() => void send(`Use ${candidate.description}`, candidate)}>Review this service</button>
-          </article>)}
-        </div>}
-
         {intent && ["reviewed", "approved"].includes(intent.status) && <PaymentReview intent={intent} />}
         {intent?.status === "completed" && <Result intent={intent} />}
         {intent?.status === "failed" && <div className="workflow-error"><strong>Purchase not delivered</strong><br />{intent.errorMessage}</div>}
       </div>
 
       {error && <div className="workflow-error">{error}</div>}
-      {!status?.ai.configured && <div className="inline-state"><strong>Deterministic search active</strong><span>AgentPay can still search supported discovery sources. Connecting the protected AI provider improves conversational ranking.</span></div>}
+      {!status?.ai.configured && <div className="inline-state"><strong>Live-search agent requires configuration</strong><span>Connect the protected OpenAI API key to let AgentPay search the live web for x402 services. Pasted endpoints can still be validated directly.</span></div>}
       <label className="field full">
         <span>Message AgentPay</span>
         <textarea
@@ -120,16 +106,6 @@ export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) 
   </div>;
 }
 
-function networkName(network: string) {
-  if (network === "eip155:56") return "BSC";
-  if (network === "eip155:8453") return "Base";
-  if (network.startsWith("solana:")) return "Solana";
-  return network;
-}
-function networkClass(network: string) {
-  const name = networkName(network);
-  return name === "BSC" ? "network-bsc" : name === "Base" ? "network-base" : name === "Solana" ? "network-solana" : "network-other";
-}
 function optionNetwork(intent: X402Intent) {
   const option = intent.selectedOption;
   return option?.network || String(option?.originalAccept?.network || option?.binanceChainId || "Network not reported");

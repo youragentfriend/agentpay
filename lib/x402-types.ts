@@ -41,8 +41,7 @@ export interface X402Intent {
   resourceHost: string;
   requestMethod: X402RequestMethod;
   requestBody?: string;
-  source: "ai" | "catalog" | "direct";
-  catalogResourceId?: string;
+  source: "agent" | "direct";
   userRequest?: string;
   status: X402IntentStatus;
   paymentId: string;
@@ -71,21 +70,3 @@ export interface X402Intent {
 export type X402ChatRole = "user" | "assistant";
 export interface X402ChatMessage { id: string; role: X402ChatRole; content: string; createdAt: string; }
 export interface X402ChatSession { id: string; status: "active" | "awaiting_confirmation" | "completed" | "cancelled" | "failed"; messages: X402ChatMessage[]; intentId?: string; updatedAt: string; }
-
-export interface X402CatalogPaymentOption { scheme?: string; network: string; asset?: string; amount?: string; payTo?: string; }
-export interface X402CatalogResource {
-  id: string;
-  source: string;
-  resourceUrl: string;
-  resourceHost: string;
-  description: string;
-  category?: string;
-  method: X402RequestMethod;
-  requestBody?: unknown;
-  networks: string[];
-  paymentOptions: X402CatalogPaymentOption[];
-  trusted: boolean;
-  allowlisted: boolean;
-}
-export interface X402LlmStatus { configured: boolean; provider: string | null; model: string | null; }
-export interface X402AiDiscovery { configured: boolean; message: string; candidateIds: string[]; candidates: X402CatalogResource[]; }

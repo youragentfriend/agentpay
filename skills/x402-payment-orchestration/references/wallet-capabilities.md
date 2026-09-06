@@ -14,6 +14,7 @@ AgentPay reuses one shared Agentic Wallet adapter, but keeps workflows separate.
 ## Separate workflows
 
 - Wallet operations handle balances, send, receive, and direct transfer policy.
-- x402 orchestration handles catalog discovery, service inputs, HTTP 402, payment options, endpoint trust, replay, result delivery, and Activity.
+- The LLM agent handles conversational intent, live web search, and service selection.
+- Deterministic x402 orchestration handles proposed-endpoint validation, service inputs, HTTP 402, payment options, endpoint trust, replay, result delivery, persistence, and Activity.
 - A wallet send must never be used as a substitute for an x402 purchase.
 - Binance read-only account credentials are for portfolio visibility only and cannot sign wallet or x402 operations.
