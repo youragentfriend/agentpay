@@ -98,7 +98,8 @@ export default function Home() {
 function NavButton({active,icon,label,onClick}:{active:boolean;icon:string;label:string;onClick:()=>void}){return <button className={`nav-item ${active?"active":""}`} onClick={onClick}><span className="nav-icon">{icon}</span><span>{label}</span></button>}
 function NavParent({label,icon,active,open,onNavigate,onToggle}:{label:string;icon:string;active:boolean;open:boolean;onNavigate:()=>void;onToggle:()=>void}){return <div className={`nav-parent ${active?"active":""}`}><button className="nav-parent-main" onClick={onNavigate}><span className="nav-icon">{icon}</span><span>{label}</span></button><button className="nav-chevron" aria-label={`${open?"Collapse":"Expand"} ${label}`} onClick={onToggle}>{open?"⌄":"›"}</button></div>}
 
-type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: "payment" | "binance-pay" | "payment-link" | "binance-balance" | "qr" | "activity" | "balance" | "x402"; file?: File };
+type ChatWorkflow = { input: Record<string, string> };
+type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: "payment" | "binance-pay" | "payment-link" | "binance-balance" | "qr" | "activity" | "balance" | "x402"; workflow?: ChatWorkflow; file?: File };
 type StoredConversation = { id: string; title: string; savedAt: string; turns: Array<Omit<ChatTurn, "file">> };
 
 function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataUrl, timeZone }: { onNavigate: (view: View) => void; walletStatus: WalletConnectionStatus; displayName: string; profileImageDataUrl: string | null; timeZone: string }) {
@@ -109,6 +110,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
   const [welcome, setWelcome] = useState({ greeting: `Welcome back, ${displayName}.` });
   const [assistantBusy, setAssistantBusy] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
+  const runtimeConversationId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const now = new Date();
@@ -151,16 +153,16 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     const value = message.trim();
     if (!value || assistantBusy) return;
     const id = nextId;
-    const priorTurns = turns;
     setNextId((current) => current + 1);
     setTurns((current) => [...current, { id, role: "user", text: value }]);
     setMessage("");
     setAssistantBusy(true);
     try {
-      const response = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, history: priorTurns.slice(-8).map((turn) => ({ role: turn.role, content: turn.text })) }) });
-      const result = await response.json() as { action?: ChatTurn["action"]; message?: string; error?: string };
-      if (!response.ok || !result.action || !result.message) throw new Error(result.error || "AgentPay could not select a skill.");
-      setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: result.message!, action: result.action }]);
+      const response = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, conversationId: runtimeConversationId.current }) });
+      const result = await response.json() as { conversationId?: string; action?: ChatTurn["action"]; workflow?: ChatWorkflow; message?: string; error?: string };
+      if (!response.ok || !result.message) throw new Error(result.error || "AgentPay could not run the selected skill.");
+      if (result.conversationId) runtimeConversationId.current = result.conversationId;
+      setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: result.message!, action: result.action, workflow: result.workflow }]);
     } catch (error) {
       setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: error instanceof Error ? error.message : "The AgentPay assistant is unavailable." }]);
     } finally {
@@ -181,12 +183,14 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     setRecentConversations(next);
     localStorage.setItem("agentpay-conversations", JSON.stringify(next));
     setTurns([]);
+    runtimeConversationId.current = undefined;
     setNextId(1);
     setMessage("");
   }
 
   function openConversation(conversation: StoredConversation) {
     setTurns(conversation.turns);
+    runtimeConversationId.current = undefined;
     setNextId(Math.max(...conversation.turns.map((turn) => turn.id), 0) + 1);
   }
 
@@ -207,7 +211,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
       <section className={`assistant-panel${turns.length ? " has-messages" : " empty"}`}>
         <div className="assistant-status"><div className="assistant-identity"><img className="assistant-badge" src="/brand/assistant-badge.svg" alt=""/><div><strong>AgentPay Assistant</strong><small><span className="status-dot active-dot"/> Ready for an instruction</small></div></div></div>
         <div className="quick-actions">{actions.map((action) => <button key={action.label} onClick={() => addTurn(action.label, action.action)}><span className="quick-action-icon">{action.icon}</span><span><strong>{action.label}</strong><small>{action.description}</small></span><b>→</b></button>)}</div>
-        <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow/>} {turn.action === "binance-pay" && <BinancePayWorkflow embedded/>}{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive"/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>} {turn.action === "qr" && <QrResult file={turns.find((item) => item.id === turn.id - 0.5)?.file} fileName={turns.find((item) => item.id === turn.id - 0.5)?.text.replace("Attached QR: ", "") || "attached QR"}/>} {turn.action === "activity" && <InlineActivity/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={extractUrl(turns.find((item) => item.id === turn.id - 0.5)?.text || "")}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
+        <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow initialInput={turn.workflow?.input}/>} {turn.action === "binance-pay" && <BinancePayWorkflow embedded initialInput={turn.workflow?.input}/>}{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive" initialInput={turn.workflow?.input}/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>} {turn.action === "qr" && <QrResult file={turns.find((item) => item.id === turn.id - 0.5)?.file} fileName={turns.find((item) => item.id === turn.id - 0.5)?.text.replace("Attached QR: ", "") || "attached QR"}/>} {turn.action === "activity" && <InlineActivity input={turn.workflow?.input}/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={turn.workflow?.input.url || extractUrl(turns.find((item) => item.id === turn.id - 0.5)?.text || "")} initialMessage={turn.workflow?.input.request}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
         <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} disabled={assistantBusy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={assistantBusy ? "AgentPay is selecting the right skill…" : "Ask AgentPay to prepare, inspect, check, or review…"}/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={assistantBusy} onChange={(event) => attach(event.target.files?.[0])}/></label><div><button className="new-conversation-button" onClick={newConversation} disabled={!turns.length || assistantBusy}>New conversation</button><button className="send-button" onClick={() => void submit()} disabled={assistantBusy || !message.trim()} aria-label="Send instruction">{assistantBusy ? "…" : "↑"}</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay prepares actions for review. Nothing executes without your explicit approval.</p></div>
       </section>
       <RecentChats conversations={recentConversations} onSelect={openConversation} displayName={displayName} profileImageDataUrl={profileImageDataUrl}/>
@@ -223,7 +227,7 @@ function extractUrl(text:string){return text.match(/https:\/\/[^\s]+/)?.[0]?.rep
 
 function QrResult({fileName,file}:{fileName:string;file?:File}){return <div className="qr-result"><div className="inline-empty"><strong>{fileName}</strong><span>QR attached. The shared Binance Pay decoder will validate it when available.</span></div><BinancePayWorkflow initialFile={file} embedded/></div>}
 
-function InlineActivity(){const [events,setEvents]=useState<any[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState("");useEffect(()=>{void fetch("/api/payments/activity?page=1&limit=6&sort=newest",{cache:"no-store"}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to load activity.");setEvents(Array.isArray(data.events)?data.events:[])}).catch(e=>setError(e instanceof Error?e.message:"Unable to load activity.")).finally(()=>setLoading(false))},[]);if(loading)return <div className="inline-state">Loading your activity…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!events.length)return <div className="inline-state"><strong>No activity yet</strong><span>Approved transfers and payment requests will appear here.</span></div>;return <div className="inline-events">{events.map(event=><div className="inline-event" key={event.id}><span className={"activity-dot "+statusClass(event.statusGroup||event.status)}/><div><strong>{event.title||event.description||event.activityType||"Payment activity"}</strong><small>{event.source||"AgentPay"} · {event.summary||"Activity recorded"}</small></div><span className={"status-text "+statusClass(event.statusGroup||event.status)}>{friendlyStatus(event.statusGroup||event.status)}</span></div>)}</div>}
+function InlineActivity({input={}}:{input?:Record<string,string>}){const [events,setEvents]=useState<any[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState("");const inputKey=JSON.stringify(input);useEffect(()=>{const params=new URLSearchParams({page:"1",limit:"6",sort:"newest",...JSON.parse(inputKey) as Record<string,string>});void fetch(`/api/payments/activity?${params}`,{cache:"no-store"}).then(async response=>{const data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to load activity.");setEvents(Array.isArray(data.events)?data.events:[])}).catch(e=>setError(e instanceof Error?e.message:"Unable to load activity.")).finally(()=>setLoading(false))},[inputKey]);if(loading)return <div className="inline-state">Loading your activity…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!events.length)return <div className="inline-state"><strong>No activity yet</strong><span>Approved transfers and payment requests will appear here.</span></div>;return <div className="inline-events">{events.map(event=><div className="inline-event" key={event.id}><span className={"activity-dot "+statusClass(event.statusGroup||event.status)}/><div><strong>{event.title||event.description||event.activityType||"Payment activity"}</strong><small>{event.source||"AgentPay"} · {event.summary||"Activity recorded"}</small></div><span className={"status-text "+statusClass(event.statusGroup||event.status)}>{friendlyStatus(event.statusGroup||event.status)}</span></div>)}</div>}
 
 function InlineBalance(){const [data,setData]=useState<WalletOverview|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");useEffect(()=>{void fetch("/api/wallet/overview",{cache:"no-store"}).then(async response=>{const value=await response.json();if(!response.ok)throw new Error(value.error||"Unable to load wallet.");setData(value as WalletOverview)}).catch(e=>setError(e instanceof Error?e.message:"Unable to load wallet.")).finally(()=>setLoading(false))},[]);if(loading)return <div className="inline-state">Loading your Agentic Wallet overview…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!data)return <div className="inline-state">No wallet overview returned.</div>;const total=data.balances.reduce((sum,item)=>sum+(Number(item.value)||0),0);return <div className="inline-balance"><div><span className="metric-label">Agentic Wallet value</span><strong>{data.status==="CONNECTED"?"$"+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"Not connected"}</strong><small>{data.status==="CONNECTED"?data.balances.length+" visible on-chain assets · Live wallet data":"Connect in Agentic Wallet to load on-chain balances."}</small></div>{data.balances.length>0&&<div className="balance-pills">{data.balances.slice(0,5).map(balance=><span key={balance.binanceChainId+":"+balance.address}><b>{balance.symbol}</b> {balance.balance}</span>)}</div>}</div>}
 

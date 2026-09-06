@@ -13,16 +13,16 @@ function getPaymentInputError(value: string): string {
   return "Enter a valid Binance Pay URL beginning with https://app.binance.com/ or a PIX QR payload. Plain text and numbers are not supported.";
 }
 
-export function BinancePayWorkflow({ initialFile = null, embedded = false, initialMode = "pay" }: { initialFile?: File | null; embedded?: boolean; initialMode?: "pay" | "receive" }) {
+export function BinancePayWorkflow({ initialFile = null, embedded = false, initialMode = "pay", initialInput = {} }: { initialFile?: File | null; embedded?: boolean; initialMode?: "pay" | "receive"; initialInput?: Record<string, string> }) {
   const [capability, setCapability] = useState<BinancePayCapability | null>(null);
-  const [rawQr, setRawQr] = useState("");
+  const [rawQr, setRawQr] = useState(initialInput.rawQr || "");
   const [amount, setAmount] = useState("");
   const [order, setOrder] = useState<BinancePayOrder | null>(null);
   const [source, setSource] = useState("");
-  const [receiveCurrency, setReceiveCurrency] = useState("USDT");
+  const [receiveCurrency, setReceiveCurrency] = useState(initialInput.currency?.toUpperCase() || "USDT");
   const [receiveCurrencies, setReceiveCurrencies] = useState<string[]>(["USDT"]);
-  const [receiveAmount, setReceiveAmount] = useState("");
-  const [receiveNote, setReceiveNote] = useState("");
+  const [receiveAmount, setReceiveAmount] = useState(initialInput.amount || "");
+  const [receiveNote, setReceiveNote] = useState(initialInput.note || "");
   const [receiveLink, setReceiveLink] = useState<BinancePayReceiveLink | null>(null);
   const [receiveCooldown, setReceiveCooldown] = useState(0);
   const [rawQrError, setRawQrError] = useState("");

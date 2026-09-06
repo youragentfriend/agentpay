@@ -9,11 +9,11 @@ type Status = {
   ai: { configured: boolean; provider: string | null; model: string | null };
 };
 
-export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) {
+export function X402Workflow({ initialUrl = "", initialMessage = "" }: { initialUrl?: string; initialMessage?: string } = {}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [chat, setChat] = useState<X402ChatSession | null>(null);
   const [intent, setIntent] = useState<X402Intent | null>(null);
-  const [message, setMessage] = useState(initialUrl ? `Pay for this x402 endpoint: ${initialUrl}` : "");
+  const [message, setMessage] = useState(initialUrl ? `Pay for this x402 endpoint: ${initialUrl}` : initialMessage);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);

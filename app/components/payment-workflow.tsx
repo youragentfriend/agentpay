@@ -20,13 +20,13 @@ type WalletPolicySnapshot = {
   dailySpendUsd: string | null;
 };
 
-export function PaymentWorkflow({ onClose }: { onClose?: () => void } = {}) {
+export function PaymentWorkflow({ onClose, initialInput = {} }: { onClose?: () => void; initialInput?: Record<string, string> } = {}) {
   const [wallet, setWallet] = useState<WalletOverview | null>(null);
-  const [asset, setAsset] = useState("");
+  const [asset, setAsset] = useState(initialInput.asset?.toUpperCase() || "");
   const [networkKey, setNetworkKey] = useState("");
-  const [amount, setAmount] = useState("");
-  const [recipient, setRecipient] = useState("");
-  const [gasLevel, setGasLevel] = useState<GasLevel>("MEDIUM");
+  const [amount, setAmount] = useState(initialInput.amount || "");
+  const [recipient, setRecipient] = useState(initialInput.recipient || "");
+  const [gasLevel, setGasLevel] = useState<GasLevel>(["LOW", "MEDIUM", "HIGH"].includes(initialInput.gasPriority?.toUpperCase()) ? initialInput.gasPriority.toUpperCase() as GasLevel : "MEDIUM");
   const [prepared, setPrepared] = useState<PreparedTransfer | null>(null);
   const [executionEnabled, setExecutionEnabled] = useState(false);
   const [policy, setPolicy] = useState<WalletPolicySnapshot | null>(null);
@@ -109,6 +109,13 @@ export function PaymentWorkflow({ onClose }: { onClose?: () => void } = {}) {
   });
   const amountError = amountServerError || ((amount || attempted || amountTouched) ? liveAmountError : "");
   const recipientError = recipientServerError || ((attempted || recipientTouched) ? recipientValidationError(recipient, selectedChainId) : "");
+
+  useEffect(() => {
+    if (networkKey || !initialInput.network || !networkOptions.length) return;
+    const wanted = initialInput.network.toLowerCase();
+    const option = networkOptions.find((candidate) => candidate.label.toLowerCase() === wanted || candidate.chainId.toLowerCase() === wanted || candidate.label.toLowerCase().includes(wanted));
+    if (option) setNetworkKey(option.key);
+  }, [initialInput.network, networkKey, networkOptions]);
 
   function resetPrepared() {
     setPrepared(null);
