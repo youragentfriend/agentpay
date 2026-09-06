@@ -1,34 +1,156 @@
 "use client";
-import { useEffect,useMemo,useRef,useState } from "react";
-import type { X402AiDiscovery,X402CatalogResource,X402ChatSession,X402Intent,X402RequestMethod } from "@/lib/x402-types";
 
-type Tab="ai"|"browse"|"direct";
-type Status={executionEnabled:boolean;allowedHosts:string[];supportedNetworks:string[];ai:{configured:boolean;provider:string|null;model:string|null}};
-export function X402Workflow({initialUrl=""}:{initialUrl?:string}={}){
- const[tab,setTab]=useState<Tab>(initialUrl?"direct":"ai"),[status,setStatus]=useState<Status|null>(null),[resources,setResources]=useState<X402CatalogResource[]>([]),[failures,setFailures]=useState(0),[query,setQuery]=useState(""),[aiResult,setAiResult]=useState<X402AiDiscovery|null>(null),[chat,setChat]=useState<X402ChatSession|null>(null),[url,setUrl]=useState(initialUrl),[method,setMethod]=useState<X402RequestMethod>("GET"),[body,setBody]=useState("{}"),[selected,setSelected]=useState<X402CatalogResource|null>(null),[intent,setIntent]=useState<X402Intent|null>(null),[error,setError]=useState(""),[working,setWorking]=useState("");
- useEffect(()=>{void Promise.all([fetch('/api/x402/status',{cache:'no-store'}).then(r=>r.json()),fetch('/api/x402/bazaar',{cache:'no-store'}).then(r=>r.json())]).then(([nextStatus,catalog])=>{setStatus(nextStatus);setResources(catalog.resources||[]);setFailures((catalog.failures||[]).length);}).catch(()=>setError("Unable to load x402 service capabilities."));},[]);
- const candidates=tab==="ai"?(aiResult?.candidates||[]):resources;
- async function aiDiscover(){setWorking('ai');setError('');setIntent(null);try{const response=await fetch('/api/x402/ai/discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to discover services.");setAiResult(data);}catch(e){setError(e instanceof Error?e.message:"Unable to discover services.");}finally{setWorking('');}}
- async function sendChat(){const message=query.trim();if(!message)return;setWorking('chat');setError('');try{const response=await fetch('/api/x402/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:chat?.id,message,intentId:intent?.id})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to continue the x402 conversation.");setChat(data.session);if(data.discovery)setAiResult(data.discovery);if(data.intent)setIntent(data.intent);setQuery('');}catch(e){setError(e instanceof Error?e.message:"Unable to continue the x402 conversation.");}finally{setWorking('');}}
- function choose(resource:X402CatalogResource){setSelected(resource);setUrl(resource.resourceUrl);setMethod(resource.method);setBody(JSON.stringify(resource.requestBody??{},null,2));setIntent(null);setError('');}
- async function prepare(resource=selected){setWorking('prepare');setError('');setIntent(null);try{const target=resource?resource.resourceUrl:url,httpMethod=resource?resource.method:method,rawBody=body;let requestBody:unknown=undefined;if(httpMethod==='POST'){try{requestBody=JSON.parse(rawBody||'{}');}catch{throw new Error("Request body must be valid JSON.");}}const response=await fetch('/api/x402/prepare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:target,method:httpMethod,requestBody,source:tab==='ai'?'ai':tab==='browse'?'catalog':'direct',catalogResourceId:resource?.id,userRequest:tab==='ai'?query:undefined})}),data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to prepare x402 payment.");setIntent(data);setUrl(target);setMethod(httpMethod);setSelected(resource||null);}catch(e){setError(e instanceof Error?e.message:"Unable to prepare x402 payment.");}finally{setWorking('');}}
- async function transition(path:string,payload:Record<string,unknown>,name:string){setWorking(name);setError('');try{const response=await fetch(`/api/x402/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),data=await response.json();if(!response.ok)throw new Error(data.error||`Unable to ${name} payment.`);setIntent(data);}catch(e){setError(e instanceof Error?e.message:`Unable to ${name} payment.`);}finally{setWorking('');}}
- const selectedOption=intent?.selectedOption||intent?.options.find(option=>option.index===intent.selectedIndex);
- return <div className="binance-pay-workflow x402-workflow">
-  <div className="workflow-tabs" role="tablist" aria-label="x402 service finder modes"><button className={tab==='ai'?'active':''} onClick={()=>setTab('ai')}>Discover</button><button className={tab==='browse'?'active':''} onClick={()=>setTab('browse')}>Browse Services</button><button className={tab==='direct'?'active':''} onClick={()=>setTab('direct')}>Direct Endpoint</button></div>
-  {tab==='ai'&&<section className="x402-finder-panel"><div className="x402-agent-heading"><img src="/brand/assistant-badge.svg" alt="AgentPay Assistant"/><div><strong>Discover with AgentPay AI</strong><p>Describe the result you need. AgentPay will find validated services, prepare the exact purchase, and return the delivered result.</p></div><span className={`rail-status ${status?.ai.configured?'success':'neutral'}`}>{status?.ai.configured?'AI ready':'AI not configured'}</span></div><div className="x402-chat-log" aria-live="polite">{chat?.messages.length?chat.messages.map(item=><div className={`x402-chat-message ${item.role}`} key={item.id}><strong>{item.role==='assistant'?'AgentPay AI':'You'}</strong><p>{item.content}</p></div>):<div className="x402-chat-empty">Tell AgentPay what you want to purchase, such as “Find current market data for Bitcoin.”</div>}</div><label className="field full"><span>Message AgentPay</span><textarea rows={3} value={query} onChange={e=>setQuery(e.target.value)} placeholder="Find a validated x402 service…" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendChat();}}}/></label><button className="primary-button workflow-submit" disabled={!query.trim()||Boolean(working)} onClick={()=>void sendChat()}>{working==='chat'?'Thinking…':'Send message'}</button>{status&&!status.ai.configured&&<div className="inline-state"><strong>AI discovery is not configured</strong><span>Connect the protected LLM provider before using this chat. Browse Services and Direct Endpoint remain available without AI.</span></div>}{aiResult&&<p className="x402-agent-message">{aiResult.message}</p>}</section>}
-  {tab==='browse'&&failures>0&&<div className="workflow-error">Some catalog sources could not be loaded; available entries were still validated.</div>}
-  {(tab==='browse'||(tab==='ai'&&aiResult?.configured))&&<ServiceList resources={candidates} selectedId={selected?.id} onChoose={choose}/>}
-  {tab==='direct'&&<div className="x402-direct-panel"><div className="x402-direct-grid"><label className="field"><span>HTTP method</span><select value={method} onChange={e=>setMethod(e.target.value as X402RequestMethod)}><option>GET</option><option>POST</option></select></label><label className="field"><span>Exact x402 endpoint</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://trusted-service.example/api/resource"/></label></div>{method==='POST'&&<label className="field full"><span>JSON request body</span><textarea className="code-input" rows={6} value={body} onChange={e=>setBody(e.target.value)}/></label>}<button className="primary-button workflow-submit" disabled={!url||Boolean(working)} onClick={()=>void prepare(null)}>{working==='prepare'?'Fetching fresh 402…':'Prepare from live 402'}</button></div>}
-  {selected&&tab!=="direct"&&<section className="x402-input-card"><div><span className="eyebrow">SELECTED SERVICE</span><h3>{selected.description}</h3><code>{selected.method} {selected.resourceUrl}</code></div>{selected.method==='POST'&&<label className="field full"><span>Service input (JSON)</span><textarea className="code-input" rows={6} value={body} onChange={e=>setBody(e.target.value)}/></label>}<button className="primary-button" disabled={!selected.trusted||!selected.allowlisted||Boolean(working)} onClick={()=>void prepare(selected)}>{working==='prepare'?'Fetching fresh 402…':selected.trusted&&selected.allowlisted?'Prepare from live 402':'Trust exact endpoint in Settings'}</button></section>}
-  {error&&<div className="workflow-error">{error}</div>}
-  {intent&&<Lifecycle intent={intent} selectedOption={selectedOption} enabled={Boolean(status?.executionEnabled)} working={working} onReview={(index)=>transition('review',{id:intent.id,selectedIndex:index},'review')} onApprove={()=>transition('approve',{id:intent.id},'approve')} onPay={()=>transition('pay',{id:intent.id},'pay')}/>}
- </div>;
+import { useEffect, useRef, useState } from "react";
+import type { X402CatalogResource, X402ChatSession, X402Intent } from "@/lib/x402-types";
+
+type Status = {
+  executionEnabled: boolean;
+  supportedNetworks: string[];
+  ai: { configured: boolean; provider: string | null; model: string | null };
+};
+
+export function X402Workflow({ initialUrl = "" }: { initialUrl?: string } = {}) {
+  const [status, setStatus] = useState<Status | null>(null);
+  const [chat, setChat] = useState<X402ChatSession | null>(null);
+  const [candidates, setCandidates] = useState<X402CatalogResource[]>([]);
+  const [intent, setIntent] = useState<X402Intent | null>(null);
+  const [message, setMessage] = useState(initialUrl ? `Pay for this x402 endpoint: ${initialUrl}` : "");
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void fetch("/api/x402/status", { cache: "no-store" })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Unable to load x402 capabilities.");
+        setStatus(data);
+      })
+      .catch(loadError => setError(loadError instanceof Error ? loadError.message : "Unable to load x402 capabilities."));
+  }, []);
+
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
+  }, [chat?.messages.length, candidates.length, intent?.status]);
+
+  async function send(nextMessage = message.trim(), candidate?: X402CatalogResource) {
+    if (!nextMessage && !candidate) return;
+    setWorking(true);
+    setError("");
+    try {
+      const response = await fetch("/api/x402/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: chat?.id, message: nextMessage, candidateId: candidate?.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to continue the x402 conversation.");
+      setChat(data.session);
+      setCandidates(Array.isArray(data.candidates) ? data.candidates : Array.isArray(data.discovery?.candidates) ? data.discovery.candidates : []);
+      if (data.intent) setIntent(data.intent);
+      setMessage("");
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "Unable to continue the x402 conversation.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return <div className="binance-pay-workflow x402-workflow x402-chat-only">
+    <section className="x402-finder-panel">
+      <div className="x402-agent-heading">
+        <img src="/brand/assistant-badge.svg" alt="AgentPay Assistant" />
+        <div>
+          <strong>Ask AgentPay</strong>
+          <p>Find and pay for supported x402 services through one conversation.</p>
+        </div>
+        <span className={`rail-status ${status?.executionEnabled ? "success" : "neutral"}`}>
+          {status?.executionEnabled ? "Payments ready" : "Payment disabled"}
+        </span>
+      </div>
+
+      <div className="x402-chat-log" ref={logRef} aria-live="polite">
+        {chat?.messages.length ? chat.messages.map(item => <div className={`x402-chat-message ${item.role}`} key={item.id}>
+          <strong>{item.role === "assistant" ? "AgentPay" : "You"}</strong>
+          <p>{item.content}</p>
+        </div>) : <div className="x402-chat-empty">
+          <strong>What x402 service do you need?</strong>
+          <span>Ask for pay-per-call market data, premium API access, digital services, or paste an x402 endpoint.</span>
+        </div>}
+
+        {candidates.length > 0 && <div className="x402-chat-candidates">
+          {candidates.map(candidate => <article className="x402-chat-candidate" key={candidate.id}>
+            <div className="x402-network-row">
+              <span className="x402-category-badge">{candidate.category || "Service"}</span>
+              {candidate.networks.map(network => <span className={networkClass(network)} key={network}>{networkName(network)}</span>)}
+            </div>
+            <strong>{candidate.description}</strong>
+            <small>{candidate.method} · {candidate.resourceHost}</small>
+            <button className="secondary-button" disabled={working} onClick={() => void send(`Use ${candidate.description}`, candidate)}>Review this service</button>
+          </article>)}
+        </div>}
+
+        {intent && ["reviewed", "approved"].includes(intent.status) && <PaymentReview intent={intent} />}
+        {intent?.status === "completed" && <Result intent={intent} />}
+        {intent?.status === "failed" && <div className="workflow-error"><strong>Purchase not delivered</strong><br />{intent.errorMessage}</div>}
+      </div>
+
+      {error && <div className="workflow-error">{error}</div>}
+      {!status?.ai.configured && <div className="inline-state"><strong>Deterministic search active</strong><span>AgentPay can still search supported discovery sources. Connecting the protected AI provider improves conversational ranking.</span></div>}
+      <label className="field full">
+        <span>Message AgentPay</span>
+        <textarea
+          rows={3}
+          value={message}
+          onChange={event => setMessage(event.target.value)}
+          placeholder="Find pay-per-call Bitcoin market data, explain x402, or paste an endpoint…"
+          onKeyDown={event => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void send();
+            }
+          }}
+        />
+      </label>
+      <button className="primary-button workflow-submit" disabled={!message.trim() || working} onClick={() => void send()}>
+        {working ? "AgentPay is working…" : "Send message"}
+      </button>
+      <small className="x402-chat-note">AgentPay supports x402 v2 on BSC, Base, and supported Solana networks. It will not sign until you confirm an exact payment review.</small>
+    </section>
+  </div>;
 }
-const SERVICES_PER_PAGE=10;
-function networkName(network:string){if(network==='eip155:56')return'BSC';if(network==='eip155:8453')return'Base';if(network.startsWith('solana:'))return'Solana';return network;}
-function networkClass(network:string){const name=networkName(network);return name==='BSC'?'network-bsc':name==='Base'?'network-base':name==='Solana'?'network-solana':'network-other';}
-function ServiceList({resources,selectedId,onChoose}:{resources:X402CatalogResource[];selectedId?:string;onChoose:(resource:X402CatalogResource)=>void}){const[search,setSearch]=useState(''),[category,setCategory]=useState(''),[network,setNetwork]=useState(''),[page,setPage]=useState(1);const gridRef=useRef<HTMLDivElement>(null);const categories=useMemo(()=>[...new Set(resources.map(resource=>resource.category||'Other'))].sort(),[resources]);const filtered=useMemo(()=>{const term=search.trim().toLowerCase();return resources.filter(resource=>(!term||[resource.description,resource.category||'Other',resource.method,resource.resourceHost,resource.resourceUrl,...resource.networks.map(networkName)].join(' ').toLowerCase().includes(term))&&(!category||(resource.category||'Other')===category)&&(!network||resource.networks.some(value=>networkName(value)===network)));},[resources,search,category,network]);const pages=Math.max(1,Math.ceil(filtered.length/SERVICES_PER_PAGE));useEffect(()=>setPage(1),[search,category,network,resources]);const visible=filtered.slice((page-1)*SERVICES_PER_PAGE,page*SERVICES_PER_PAGE);function changePage(nextPage:number){setPage(nextPage);window.requestAnimationFrame(()=>gridRef.current?.scrollIntoView({behavior:'smooth',block:'start'}));}return <div className="x402-service-browser"><div className="x402-service-toolbar"><label className="x402-service-search"><span>Search</span><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search services"/></label><label><span>Category</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="">All categories</option>{categories.map(value=><option value={value} key={value}>{value}</option>)}</select></label><label><span>Network</span><select value={network} onChange={event=>setNetwork(event.target.value)}><option value="">All networks</option><option value="BSC">BSC</option><option value="Base">Base</option><option value="Solana">Solana</option></select></label></div>{!visible.length?<div className="empty-state"><div className="empty-icon">402</div><h2>No matching services</h2><p>Change the search, category, or network filter to see other validated x402 v2 services.</p></div>:<div className="x402-service-grid" ref={gridRef}>{visible.map(resource=><article className={`x402-service-card ${selectedId===resource.id?'selected':''}`} key={resource.id}><div className="x402-network-row"><span className="x402-category-badge">{resource.category||'Other'}</span>{resource.networks.map(value=><span className={networkClass(value)} title={value} key={value}>{networkName(value)}</span>)}</div><h3 title={resource.description}>{resource.description}</h3><small>{resource.method} · {resource.resourceHost}</small><code>{resource.resourceUrl}</code><div className="x402-card-footer">{resource.trusted&&resource.allowlisted&&<span className="rail-status success">Trusted endpoint</span>}<button className="primary-button" onClick={()=>onChoose(resource)}>Choose</button></div></article>)}</div>}<div className="x402-pagination"><span>Page {Math.min(page,pages)} of {pages} · <span className="x402-service-count">{filtered.length} service{filtered.length===1?'':'s'} found</span></span><div><button className="secondary-button" disabled={page<=1} onClick={()=>changePage(Math.max(1,page-1))}>Previous</button><button className="secondary-button" disabled={page>=pages} onClick={()=>changePage(Math.min(pages,page+1))}>Next</button></div></div></div>}
-function Lifecycle({intent,selectedOption,enabled,working,onReview,onApprove,onPay}:{intent:X402Intent;selectedOption?:X402Intent['selectedOption'];enabled:boolean;working:string;onReview:(index:number)=>void;onApprove:()=>void;onPay:()=>void}){const stages=['prepared','reviewed','approved','completed'];const current=intent.status==='failed'?3:Math.max(0,stages.indexOf(intent.status));const conversational=intent.source==='ai';return <section className="x402-lifecycle"><div className="x402-stepper">{['Prepare','Review','Approve','Pay'].map((label,index)=><div className={index<=current?'complete':''} key={label}><span>{index+1}</span><strong>{label}</strong></div>)}</div><div className="x402-review-header"><div><span className={`review-status ${intent.status}`}>{intent.status.replaceAll('_',' ')}</span><h2>Live payment preview</h2></div><code>{intent.requestMethod} {intent.resourceUrl}</code></div>{intent.requestBody&&<details><summary>Request input</summary><pre>{intent.requestBody}</pre></details>}{intent.status==='prepared'&&<div className="x402-options">{intent.options.map(option=><article className="x402-option" key={option.index}><div><span className={`review-status ${option.status.toLowerCase()}`}>{option.status.replaceAll('_',' ')}</span><strong>{option.amount??'—'} {option.tokenSymbol??'Token not reported'}</strong><small>{optionNetwork(option)} · {option.assetTransferMethod??'method not reported'} · {option.amountUsd?`$${option.amountUsd}`:'USD value unavailable'}</small><code>{option.payTo??'Recipient not reported'}</code>{option.reasons.length>0&&<p>{option.reasons.join(', ')}</p>}</div>{option.status==='READY_TO_SIGN'&&<button className="secondary-button" disabled={Boolean(working)} onClick={()=>onReview(option.index)}>Review this option</button>}</article>)}</div>}{selectedOption&&['reviewed','approved'].includes(intent.status)&&<div className="x402-exact-review"><div><span>Amount</span><strong>{selectedOption.amount} {selectedOption.tokenSymbol}</strong><small>{selectedOption.amountUsd?`$${selectedOption.amountUsd} USD valuation`:'No reliable USD valuation'}</small></div><div><span>Network</span><strong>{optionNetwork(selectedOption)}</strong><small>{selectedOption.assetTransferMethod}</small></div><div><span>Recipient</span><code>{selectedOption.payTo}</code></div><div><span>Exact request</span><code>{intent.requestMethod} {intent.resourceUrl}</code></div></div>}{intent.status==='reviewed'&&<div className="x402-action-box"><p>{conversational?'Would you like AgentPay to proceed with this exact payment? Reply in the Discover chat to confirm or cancel.':'Approval records consent to this exact option. It does not sign or send payment.'}</p>{!conversational&&<button className="primary-button" disabled={Boolean(working)} onClick={onApprove}>{working==='approve'?'Approving…':'Approve exact payment'}</button>}</div>}{intent.status==='approved'&&<div className="x402-action-box"><p>{conversational?'This purchase is approved and will be completed through the Discover chat.':'Approved. Pay is a separate action that asks Agentic Wallet to sign once and replays this exact request once. Failures are never retried silently.'}</p>{!conversational&&<button className="primary-button" disabled={!enabled||Boolean(working)} onClick={onPay}>{working==='pay'?'Signing and replaying…':enabled?'Pay with Agentic Wallet':'Payment execution disabled'}</button>}</div>}{intent.status==='completed'&&<Result intent={intent}/>} {intent.status==='failed'&&<div className="workflow-error"><strong>Payment failed</strong><br/>{intent.errorMessage}</div>}</section>}
-function optionNetwork(option:NonNullable<X402Intent['selectedOption']>){return option.network||String(option.originalAccept?.network||option.binanceChainId||'Network not reported');}
-function Result({intent}:{intent:X402Intent}){let body:unknown=intent.responseBody;try{if(intent.responseKind==='json'&&intent.responseBody)body=JSON.parse(intent.responseBody);}catch{}return <div className="x402-result"><div className="settings-success"><strong>Service delivered</strong> · HTTP {intent.responseStatus}</div><div className="x402-provenance"><span>Source</span><code>{intent.requestMethod} {intent.resourceUrl}</code>{intent.settlementTxHash&&<><span>Settlement</span><code>{intent.settlementTxHash}</code></>}</div><pre>{typeof body==='string'?body:JSON.stringify(body,null,2)}</pre>{intent.resultTruncated&&<small>Stored result was truncated to the safe display limit.</small>}{intent.receipt&&<details><summary>Settlement receipt</summary><pre>{JSON.stringify(intent.receipt,null,2)}</pre></details>}</div>}
+
+function networkName(network: string) {
+  if (network === "eip155:56") return "BSC";
+  if (network === "eip155:8453") return "Base";
+  if (network.startsWith("solana:")) return "Solana";
+  return network;
+}
+function networkClass(network: string) {
+  const name = networkName(network);
+  return name === "BSC" ? "network-bsc" : name === "Base" ? "network-base" : name === "Solana" ? "network-solana" : "network-other";
+}
+function optionNetwork(intent: X402Intent) {
+  const option = intent.selectedOption;
+  return option?.network || String(option?.originalAccept?.network || option?.binanceChainId || "Network not reported");
+}
+function PaymentReview({ intent }: { intent: X402Intent }) {
+  const option = intent.selectedOption;
+  return <div className="x402-inline-review">
+    <span className="review-status reviewed">Awaiting confirmation</span>
+    <strong>{option?.amount || "—"} {option?.tokenSymbol || "Token"}{option?.amountUsd ? ` · $${option.amountUsd}` : ""}</strong>
+    <small>{optionNetwork(intent)} · {intent.requestMethod} {intent.resourceUrl}</small>
+    <code>{option?.payTo || "Recipient not reported"}</code>
+    <p>Reply clearly to confirm this exact purchase, or cancel it. Questions and ambiguous replies will not authorize payment.</p>
+  </div>;
+}
+function Result({ intent }: { intent: X402Intent }) {
+  let body: unknown = intent.responseBody;
+  try { if (intent.responseKind === "json" && intent.responseBody) body = JSON.parse(intent.responseBody); } catch { /* keep safe raw text */ }
+  return <div className="x402-result">
+    <div className="settings-success"><strong>Service delivered</strong> · HTTP {intent.responseStatus}</div>
+    <div className="x402-provenance"><span>Source</span><code>{intent.requestMethod} {intent.resourceUrl}</code>{intent.settlementTxHash && <><span>Settlement</span><code>{intent.settlementTxHash}</code></>}</div>
+    <pre>{typeof body === "string" ? body : JSON.stringify(body, null, 2)}</pre>
+    {intent.resultTruncated && <small>Stored result was truncated to the safe display limit.</small>}
+  </div>;
+}

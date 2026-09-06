@@ -130,7 +130,11 @@ export function getDailySpendUsd(rail: PaymentPolicyInput["rail"], now = new Dat
     }
   }
   if (rail === "x402" && tableExists("x402_intents")) {
-    for (const row of db().prepare("SELECT options_json, selected_index FROM x402_intents WHERE status IN ('signing','approving','replaying','completed','failed') AND updated_at >= ?").all(since) as unknown as Array<{ options_json: string; selected_index: number | null }>) {
+    const columns = new Set((db().prepare("PRAGMA table_info(x402_intents)").all() as unknown as Array<{ name: string }>).map(column => column.name));
+    const query = columns.has("paid_at") && columns.has("delivery_status")
+      ? "SELECT options_json, selected_index FROM x402_intents WHERE paid_at IS NOT NULL AND paid_at >= ? AND (status IN ('approving','replaying','completed') OR delivery_status IN ('paid_but_invalid','paid_but_failed'))"
+      : "SELECT options_json, selected_index FROM x402_intents WHERE status IN ('approving','replaying','completed') AND updated_at >= ?";
+    for (const row of db().prepare(query).all(since) as unknown as Array<{ options_json: string; selected_index: number | null }>) {
       try {
         const options = JSON.parse(row.options_json) as Array<{ index?: number; amountUsd?: string }>;
         amounts.push(options.find((option) => option.index === row.selected_index)?.amountUsd);

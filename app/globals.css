@@ -409,6 +409,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .x402-chat-message strong { display: block; font-size: 12px; color: var(--muted); }
 .x402-chat-message p { margin: 4px 0 0; color: var(--ink); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .x402-chat-empty { padding: 28px 16px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); font-size: 14px; text-align: center; }
+.x402-chat-empty { display: grid; gap: 6px; }
+.x402-chat-candidates { display: grid; gap: 10px; }
+.x402-chat-candidate { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.x402-chat-candidate > small { color: var(--muted); }
+.x402-chat-candidate > button { justify-self: start; }
+.x402-inline-review { display: grid; gap: 7px; padding: 15px; border: 1px solid rgba(138,104,0,.3); border-radius: 12px; background: rgba(245,205,69,.14); }
+.x402-inline-review small, .x402-inline-review code { overflow-wrap: anywhere; color: var(--muted); }
+.x402-inline-review p { margin: 2px 0 0; color: #765a00; font-size: 13px; line-height: 1.5; }
+.x402-chat-note { color: var(--muted); line-height: 1.5; }
 .x402-direct-panel { display: grid; gap: 16px; }
 .x402-workflow > .workflow-tabs + .x402-service-browser, .x402-workflow > .workflow-tabs + .x402-direct-panel { margin-top: -18px; }
 .x402-service-browser { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #faf8f2; }

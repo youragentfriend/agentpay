@@ -15,5 +15,6 @@ test("normalizes BSC, Base, and Solana x402 v2 catalog resources",()=>withSettin
 
 test("rejects v1 and unsupported-network-only resources",()=>withSettings(()=>{
  assert.equal(normalizeBazaarResource({x402Version:1,resource:"https://merchant.example/api",accepts:[{network:"eip155:56"}]},"source",[]),undefined);
+ assert.equal(normalizeBazaarResource({resource:"https://merchant.example/api",accepts:[{network:"eip155:56"}]},"source",[]),undefined);
  assert.equal(normalizeBazaarResource({x402Version:2,resource:"https://merchant.example/api",accepts:[{network:"eip155:1"}]},"source",[]),undefined);
 }));

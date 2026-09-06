@@ -5,6 +5,15 @@ import path from "node:path";
 import test from "node:test";
 import { cancelX402Intent, createX402Intent, getX402Intent, resetX402StoreForTests } from "../lib/server/x402-store";
 import { createX402Chat, resetX402ChatStoreForTests, updateX402Chat } from "../lib/server/x402-chat-store";
+import { isX402Confirmation, isX402Decline } from "../app/api/x402/chat/route";
+
+test("accepts clear confirmation but rejects questions and ambiguous replies", () => {
+  assert.equal(isX402Confirmation("Yes, proceed with this exact purchase"), true);
+  assert.equal(isX402Confirmation("Can you explain the network first?"), false);
+  assert.equal(isX402Confirmation("yes, but how does it work?"), false);
+  assert.equal(isX402Confirmation("not yet"), false);
+  assert.equal(isX402Decline("Cancel this payment"), true);
+});
 
 test("persists an x402 chat and cancels an unpaid intent without signing", () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "agentpay-x402-chat-"));

@@ -63,13 +63,15 @@ test("aggregates persisted daily spend across all payment rails", () => {
   database.exec(`
     CREATE TABLE payment_intents (amount_usd TEXT, status TEXT, submitted_at TEXT, approved_at TEXT, created_at TEXT);
     CREATE TABLE binance_pay_orders (amount TEXT, currency TEXT, status TEXT, updated_at TEXT);
-    CREATE TABLE x402_intents (options_json TEXT, selected_index INTEGER, status TEXT, updated_at TEXT);
+    CREATE TABLE x402_intents (options_json TEXT, selected_index INTEGER, status TEXT, updated_at TEXT, paid_at TEXT, delivery_status TEXT);
   `);
   database.prepare("INSERT INTO payment_intents VALUES ('2.50','confirmed',?,NULL,?)").run(now, now);
   database.prepare("INSERT INTO binance_pay_orders VALUES ('3','USDT','SUCCESS',?)").run(now);
-  database.prepare("INSERT INTO x402_intents VALUES (?,0,'completed',?)").run(JSON.stringify([{ index: 0, amountUsd: "4.25" }]), now);
+  database.prepare("INSERT INTO x402_intents VALUES (?,0,'completed',?,?,?)").run(JSON.stringify([{ index: 0, amountUsd: "4.25" }]), now, now, "delivered");
+  database.prepare("INSERT INTO x402_intents VALUES (?,0,'failed',?,NULL,?)").run(JSON.stringify([{ index: 0, amountUsd: "99" }]), now, "failed_before_payment");
+  database.prepare("INSERT INTO x402_intents VALUES (?,0,'failed',?,?,?)").run(JSON.stringify([{ index: 0, amountUsd: "1.25" }]), now, now, "paid_but_invalid");
   database.close();
-  try { assert.equal(getDailySpendUsd("agentic-wallet"), "2.5"); assert.equal(getDailySpendUsd("binance-pay"), "3"); assert.equal(getDailySpendUsd("x402"), "4.25"); }
+  try { assert.equal(getDailySpendUsd("agentic-wallet"), "2.5"); assert.equal(getDailySpendUsd("binance-pay"), "3"); assert.equal(getDailySpendUsd("x402"), "5.5"); }
   finally {
     resetPaymentPolicyStoreForTests();
     if (previous === undefined) delete process.env.AGENTPAY_DB_PATH;

@@ -16,7 +16,7 @@ function methodValue(value:unknown):X402RequestMethod|undefined {const method=ty
 function categoryValue(description:string,url:string):string { const value=`${description} ${url}`.toLowerCase(); if(/market|price|stock|crypto|token|trading|finance|exchange|quote/.test(value)) return "Market data"; if(/weather|forecast|temperature|climate/.test(value)) return "Weather"; if(/research|search|article|news|summar|document/.test(value)) return "Research"; if(/image|audio|video|media|transcri/.test(value)) return "Media"; return "Other"; }
 
 export function normalizeBazaarResource(row:Record<string,unknown>,source:string,hosts=allowedHosts()):X402CatalogResource|undefined{
- if(row.x402Version!==undefined&&row.x402Version!==2)return;
+ if(row.x402Version!==2)return;
  const resource=row.resource&&typeof row.resource==="object"?row.resource as Record<string,unknown>:row;
  const resourceUrl=[typeof row.resource==="string"?row.resource:undefined,resource.url,row.resourceUrl,row.url].find(v=>typeof v==="string") as string|undefined;if(!resourceUrl)return;
  let url:URL;try{url=new URL(resourceUrl);}catch{return;}if(url.protocol!=="https:"||url.username||url.password||url.port||isIP(url.hostname)||url.hostname.endsWith(".local"))return;
