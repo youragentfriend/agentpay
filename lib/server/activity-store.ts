@@ -151,7 +151,7 @@ function statusMapping(status: string): { group: ActivityStatusGroup; category: 
   if (["success", "succeeded", "successful", "completed", "confirmed"].includes(normalized)) {
     return { group: "successful", category: "green" };
   }
-  if (["awaiting-approval", "awaiting-confirmation", "awaiting-amount", "amount-set", "amount-locked"].includes(normalized)) {
+  if (["awaiting-approval", "awaiting-confirmation", "awaiting-amount", "amount-set", "amount-locked", "prepared", "reviewed", "approved"].includes(normalized)) {
     return { group: "awaiting-approval", category: "yellow" };
   }
   return { group: "in-progress", category: "blue" };
@@ -207,7 +207,19 @@ function x402Projection(row: Record<string, unknown>): Projection {
   const updatedAt = stringValue(row.updated_at) || createdAt;
   const mapped = statusMapping(status);
   const host = stringValue(row.resource_host) || "x402 resource";
-  return makeProjection({ source: "x402", sourceId: String(row.id), activityType: "x402", status, statusGroup: mapped.group, statusCategory: mapped.category, title: `x402 · ${host}`, summary: "x402 payment", occurredAt: updatedAt, createdAt, updatedAt, searchText: [host, status, "x402"].join(" ") });
+  const method = stringValue(row.request_method) || "GET";
+  let selected: Record<string, unknown> | undefined;
+  try {
+    if (typeof row.selected_option_json === "string") selected = JSON.parse(row.selected_option_json) as Record<string, unknown>;
+    else if (typeof row.options_json === "string" && row.selected_index !== null && row.selected_index !== undefined) selected = (JSON.parse(row.options_json) as Record<string, unknown>[]).find((option) => Number(option.index) === Number(row.selected_index));
+  } catch { selected = undefined; }
+  const amount = stringValue(selected?.amount);
+  const asset = stringValue(selected?.tokenSymbol);
+  const network = stringValue(selected?.network) || stringValue((selected?.originalAccept as Record<string, unknown> | undefined)?.network) || stringValue(selected?.binanceChainId);
+  const reference = maskReference(row.settlement_tx_hash || row.approval_tx_hash);
+  const title = [amount, asset].filter(Boolean).join(" ") || `x402 · ${host}`;
+  const summary = `${method} ${host}${network ? ` · ${network}` : ""}`;
+  return makeProjection({ source: "x402", sourceId: String(row.id), activityType: "x402", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, host, method, network, status, asset, "x402"].filter(Boolean).join(" ") });
 }
 
 function sourceProjections(): Projection[] {

@@ -39,6 +39,7 @@ function db() {
       wallet_daily_usd_limit TEXT,
       trusted_wallet_destinations TEXT NOT NULL DEFAULT '[]',
       trusted_x402_hosts TEXT NOT NULL DEFAULT '[]',
+      trusted_x402_endpoints TEXT NOT NULL DEFAULT '[]',
       updated_at TEXT NOT NULL
     )
   `);
@@ -54,6 +55,15 @@ function db() {
   if (!columns.has("wallet_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN wallet_daily_usd_limit TEXT");
   if (!columns.has("trusted_wallet_destinations")) database.exec("ALTER TABLE app_settings ADD COLUMN trusted_wallet_destinations TEXT NOT NULL DEFAULT '[]'");
   if (!columns.has("trusted_x402_hosts")) database.exec("ALTER TABLE app_settings ADD COLUMN trusted_x402_hosts TEXT NOT NULL DEFAULT '[]'");
+  if (!columns.has("trusted_x402_endpoints")) {
+    database.exec("ALTER TABLE app_settings ADD COLUMN trusted_x402_endpoints TEXT NOT NULL DEFAULT '[]'");
+    const rows = database.prepare("SELECT id, trusted_x402_hosts FROM app_settings").all() as unknown as Array<{id:number;trusted_x402_hosts:string}>;
+    const update = database.prepare("UPDATE app_settings SET trusted_x402_endpoints=? WHERE id=?");
+    for (const row of rows) {
+      const hosts = parseStoredList(row.trusted_x402_hosts);
+      update.run(JSON.stringify(hosts.map((host) => `GET https://${host}/`)), row.id);
+    }
+  }
   const now = new Date().toISOString();
   database.prepare(`
     INSERT OR IGNORE INTO app_settings (id, display_name, display_currency, time_zone,
@@ -162,6 +172,24 @@ function validateX402Hosts(value: unknown): string[] {
   return [...new Set(hosts)];
 }
 
+export function normalizeTrustedX402Endpoint(value: string): string {
+  const match = value.trim().match(/^(GET|POST)\s+(.+)$/i);
+  if (!match) throw new SettingsValidationError("Trusted x402 endpoints must use METHOD https://host/path format.");
+  let url: URL;
+  try { url = new URL(match[2]); } catch { throw new SettingsValidationError("Trusted x402 endpoints must contain a valid HTTPS URL."); }
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash || host === "localhost" || host.endsWith(".local") || isIP(host) !== 0) {
+    throw new SettingsValidationError("Trusted x402 endpoints must be public HTTPS URLs without credentials, custom ports, or fragments.");
+  }
+  url.hostname = host;
+  return `${match[1].toUpperCase()} ${url.toString()}`;
+}
+
+function validateX402Endpoints(value: unknown, legacyHosts: string[]): string[] {
+  if (value === undefined) return legacyHosts.map((host) => `GET https://${host}/`);
+  return [...new Set(validateStringArray(value, "Trusted x402 endpoints").map(normalizeTrustedX402Endpoint))];
+}
+
 function validateSpendingLimits(value: unknown): UpdateAgentPaySettings["spendingLimits"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Spending limits must be provided for each payment rail.");
   const input = value as Record<string, unknown>;
@@ -187,6 +215,7 @@ function validateSpendingLimits(value: unknown): UpdateAgentPaySettings["spendin
 export function validateSettingsUpdate(value: unknown): UpdateAgentPaySettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Settings must be a JSON object.");
   const input = value as Record<string, unknown>;
+  const trustedX402Hosts = validateX402Hosts(input.trustedX402Hosts ?? []);
   return {
     displayName: validateDisplayName(input.displayName),
     profileImageDataUrl: validateProfileImage(input.profileImageDataUrl),
@@ -194,7 +223,8 @@ export function validateSettingsUpdate(value: unknown): UpdateAgentPaySettings {
     timeZone: validateTimeZone(input.timeZone),
     spendingLimits: validateSpendingLimits(input.spendingLimits),
     trustedWalletDestinations: validateWalletDestinations(input.trustedWalletDestinations),
-    trustedX402Hosts: validateX402Hosts(input.trustedX402Hosts),
+    trustedX402Hosts,
+    trustedX402Endpoints: validateX402Endpoints(input.trustedX402Endpoints, trustedX402Hosts),
   };
 }
 
@@ -219,6 +249,7 @@ function mapSettings(row: Record<string, unknown>): AgentPaySettings {
     },
     trustedWalletDestinations: parseStoredList(row.trusted_wallet_destinations),
     trustedX402Hosts: parseStoredList(row.trusted_x402_hosts),
+    trustedX402Endpoints: parseStoredList(row.trusted_x402_endpoints),
     updatedAt: String(row.updated_at),
   };
 }
@@ -240,13 +271,13 @@ export function updateAgentPaySettings(value: unknown): AgentPaySettings {
     UPDATE app_settings
     SET display_name = ?, profile_image_data_url = ?, display_currency = ?, time_zone = ?,
         binance_pay_per_payment_usd_limit=?, binance_pay_daily_usd_limit=?, x402_per_payment_usd_limit=?, x402_daily_usd_limit=?, wallet_per_payment_usd_limit=?, wallet_daily_usd_limit=?,
-        trusted_wallet_destinations = ?, trusted_x402_hosts = ?, updated_at = ?
+        trusted_wallet_destinations = ?, trusted_x402_hosts = ?, trusted_x402_endpoints = ?, updated_at = ?
     WHERE id = 1
   `).run(settings.displayName, settings.profileImageDataUrl, settings.displayCurrency, settings.timeZone,
     settings.spendingLimits["binance-pay"].perPaymentUsdLimit, settings.spendingLimits["binance-pay"].dailyUsdLimit,
     settings.spendingLimits.x402.perPaymentUsdLimit, settings.spendingLimits.x402.dailyUsdLimit,
     settings.spendingLimits["agentic-wallet"].perPaymentUsdLimit, settings.spendingLimits["agentic-wallet"].dailyUsdLimit,
-    JSON.stringify(settings.trustedWalletDestinations), JSON.stringify(settings.trustedX402Hosts), updatedAt);
+    JSON.stringify(settings.trustedWalletDestinations), JSON.stringify(settings.trustedX402Hosts), JSON.stringify(settings.trustedX402Endpoints), updatedAt);
   return getAgentPaySettings();
 }
 

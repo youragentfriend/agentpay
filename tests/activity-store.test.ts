@@ -33,7 +33,7 @@ db.prepare(`INSERT INTO payment_intents (id,status,amount,asset,available_balanc
 db.prepare(`INSERT INTO payment_intents (id,status,amount,asset,available_balance,recipient,token_address,chain_id,chain_name,gas_level,created_at,expires_at,warnings) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run("payment-awaiting", "awaiting-approval", "3", "BNB", "3", "0xrecipient", "0xtoken", "56", "BSC", "HIGH", time, time, "[]");
 db.prepare(`INSERT INTO binance_pay_orders (id,checkout_id,status,amount,currency,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`).run("binance-success", "checkout-success", "SUCCESS", "4", "USDT", time, "2026-09-04T02:00:00.000Z");
 db.prepare(`INSERT INTO binance_pay_orders (id,checkout_id,status,amount,currency,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`).run("binance-failed", "checkout-failed", "FAILED", "5", "USDT", time, "2026-09-04T03:00:00.000Z");
-db.prepare(`INSERT INTO x402_intents (id,resource_url,resource_host,request_method,status,payment_id,options_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`).run("x402-completed", "https://api.example.com/a", "api.example.com", "GET", "completed", "p1", "[]", time, "2026-09-04T04:00:00.000Z");
+db.prepare(`INSERT INTO x402_intents (id,resource_url,resource_host,request_method,status,payment_id,options_json,selected_index,settlement_tx_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run("x402-completed", "https://api.example.com/a", "api.example.com", "GET", "completed", "p1", JSON.stringify([{index:1,amount:"0.5",amountUsd:"0.50",tokenSymbol:"USDC",network:"eip155:8453"}]), 1, "0xsettlement", time, "2026-09-04T04:00:00.000Z");
 
 test("maps failed, successful provider statuses, and approval statuses", () => {
   const events = queryActivityEvents({ limit: 100 }).events;
@@ -44,6 +44,10 @@ test("maps failed, successful provider statuses, and approval statuses", () => {
   assert.equal(events.find((event) => event.title === "3 BNB")?.statusGroup, "awaiting-approval");
   assert.equal(events.find((event) => event.title === "4 USDT")?.statusGroup, "successful");
   assert.equal(events.find((event) => event.title === "5 USDT")?.statusCategory, "red");
+  const x402 = events.find((event) => event.source === "x402");
+  assert.equal(x402?.title, "0.5 USDC");
+  assert.match(x402?.summary || "", /GET api\.example\.com · eip155:8453/);
+  assert.equal(x402?.reference, "0xse…ment");
 });
 
 test("filters by source, activity type, and search", () => {

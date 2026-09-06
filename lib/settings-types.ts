@@ -30,7 +30,9 @@ export type AgentPaySettings = {
   requireApproval: true;
   spendingLimits: SpendingLimits;
   trustedWalletDestinations: string[];
+  /** Legacy host entries retained for migration visibility; exact endpoint trust is enforced. */
   trustedX402Hosts: string[];
+  trustedX402Endpoints: string[];
   updatedAt: string;
 };
 
@@ -42,6 +44,7 @@ export type UpdateAgentPaySettings = {
   spendingLimits: SpendingLimits;
   trustedWalletDestinations: string[];
   trustedX402Hosts: string[];
+  trustedX402Endpoints: string[];
 };
 
 export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
@@ -56,4 +59,5 @@ export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
   },
   trustedWalletDestinations: [],
   trustedX402Hosts: [],
+  trustedX402Endpoints: [],
 };

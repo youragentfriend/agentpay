@@ -14,7 +14,7 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   const [activeRail, setActiveRail] = useState<PaymentRail>("binance-pay");
   const [limits, setLimits] = useState<SpendingLimits>(settings.spendingLimits);
   const [walletDestinations, setWalletDestinations] = useState(settings.trustedWalletDestinations.join("\n"));
-  const [x402Hosts, setX402Hosts] = useState(settings.trustedX402Hosts.join("\n"));
+  const [x402Endpoints, setX402Endpoints] = useState(settings.trustedX402Endpoints.join("\n"));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -22,8 +22,8 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   useEffect(() => {
     setLimits(settings.spendingLimits);
     setWalletDestinations(settings.trustedWalletDestinations.join("\n"));
-    setX402Hosts(settings.trustedX402Hosts.join("\n"));
-  }, [settings.spendingLimits, settings.trustedWalletDestinations, settings.trustedX402Hosts]);
+    setX402Endpoints(settings.trustedX402Endpoints.join("\n"));
+  }, [settings.spendingLimits, settings.trustedWalletDestinations, settings.trustedX402Endpoints]);
 
   function setLimit(field: "perPaymentUsdLimit" | "dailyUsdLimit", value: string) {
     setLimits((current) => ({ ...current, [activeRail]: { ...current[activeRail], [field]: value } }));
@@ -49,7 +49,8 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
           displayName: settings.displayName, profileImageDataUrl: settings.profileImageDataUrl, displayCurrency: settings.displayCurrency, timeZone: settings.timeZone,
           spendingLimits: normalizedLimits,
           trustedWalletDestinations: walletDestinations.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
-          trustedX402Hosts: x402Hosts.split(/\r?\n|,/).map((value) => value.trim()).filter(Boolean),
+          trustedX402Hosts: settings.trustedX402Hosts,
+          trustedX402Endpoints: x402Endpoints.split(/\r?\n/).map((value) => value.trim()).filter(Boolean),
         }),
       });
       const data = await response.json();
@@ -80,7 +81,7 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
     </section>
     <div className="trusted-rules-grid">
       <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted wallet destinations</strong><span>Agentic Wallet rejects every other destination when this list is populated.</span></div></div><label className="field"><textarea rows={4} value={walletDestinations} onChange={(event) => setWalletDestinations(event.target.value)} placeholder="One EVM or Solana address per line"/></label></section>
-      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted x402 hosts</strong><span>Hostnames only. The server environment allowlist still applies independently.</span></div></div><label className="field"><textarea rows={4} value={x402Hosts} onChange={(event) => setX402Hosts(event.target.value)} placeholder="api.example.com"/></label></section>
+      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted x402 endpoints</strong><span>Exact HTTP method and HTTPS URL. The server host allowlist and SSRF checks still apply independently.</span></div></div><label className="field"><textarea rows={4} value={x402Endpoints} onChange={(event) => setX402Endpoints(event.target.value)} placeholder="GET https://api.example.com/resource"/></label>{settings.trustedX402Hosts.length>0&&<small className="field-help">Legacy hosts were retained for migration visibility but do not grant endpoint trust.</small>}</section>
     </div>
     {error && <div className="workflow-error">{error}</div>}
     {saved && <div className="settings-success">Rules saved and active on the server.</div>}

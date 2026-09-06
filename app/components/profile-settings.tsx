@@ -90,6 +90,7 @@ export function ProfileSettings({ settings, onSaved }: { settings: AgentPaySetti
           spendingLimits: settings.spendingLimits,
           trustedWalletDestinations: settings.trustedWalletDestinations,
           trustedX402Hosts: settings.trustedX402Hosts,
+          trustedX402Endpoints: settings.trustedX402Endpoints,
         }),
       });
       const data = await response.json();

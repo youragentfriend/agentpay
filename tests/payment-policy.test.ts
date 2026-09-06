@@ -21,7 +21,7 @@ const trusted = "0x1111111111111111111111111111111111111111";
 const other = "0x2222222222222222222222222222222222222222";
 const settings: AgentPaySettings = {
   displayName: "Mark", profileImageDataUrl: null, displayCurrency: "USD", timeZone: "UTC", updatedAt: new Date().toISOString(), requireApproval: true,
-  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, x402: { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" } }, trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
+  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, x402: { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" } }, trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"], trustedX402Endpoints: ["GET https://api.example.com/resource"],
 };
 
 test("computes wallet USD values without floating-point arithmetic", () => {
@@ -87,11 +87,11 @@ test("all execution-rail guards re-read persisted rules before execution", () =>
   try {
     updateAgentPaySettings({
       displayName: "Mark", profileImageDataUrl: null, displayCurrency: "USD", timeZone: "UTC", spendingLimits: { "binance-pay": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "1", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "1", dailyUsdLimit: "100" } },
-      trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"],
+      trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"], trustedX402Endpoints: ["GET https://api.example.com/resource"],
     });
     assert.throws(() => enforcePaymentPolicy({ rail: "agentic-wallet", amountUsd: "2", destination: trusted }), (error) => error instanceof PaymentPolicyError && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");
     assert.throws(() => enforceBinancePaymentPolicy({ status: "AWAITING_CONFIRMATION", amount: "2", currency: "USDT" }), /per-payment limit/i);
-    assert.throws(() => enforceX402OptionPolicy("api.example.com", { index: 0, status: "READY_TO_SIGN", reasons: [], amountUsd: "2" }), (error) => error instanceof X402Error && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");
+    assert.throws(() => enforceX402OptionPolicy({ resourceUrl: "https://api.example.com/resource", requestMethod: "GET" }, { index: 0, status: "READY_TO_SIGN", reasons: [], amountUsd: "2", network: "eip155:56" }), (error) => error instanceof X402Error && error.code === "POLICY_PER_PAYMENT_LIMIT_EXCEEDED");
   } finally {
     resetSettingsStoreForTests();
     resetPaymentPolicyStoreForTests();

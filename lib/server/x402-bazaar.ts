@@ -1,78 +1,33 @@
 import { createHash } from "node:crypto";
 import { isIP } from "node:net";
-import type { X402BazaarResource } from "@/lib/x402-types";
+import type { X402CatalogResource, X402RequestMethod } from "@/lib/x402-types";
+import { isTrustedX402Endpoint } from "@/lib/server/payment-policy";
 
 const DEFAULT_SOURCES = ["https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources?type=http&limit=100&offset=0"];
-
-function configuredSources(): string[] {
-  const configured = (process.env.AGENTPAY_X402_BAZAAR_URLS || "").split(",").map((value) => value.trim()).filter(Boolean);
-  return configured.length ? configured : DEFAULT_SOURCES;
+export const SUPPORTED_X402_NETWORKS = ["eip155:56", "eip155:8453"] as const;
+export function isSupportedX402Network(value: unknown): value is string {
+  return typeof value === "string" && (SUPPORTED_X402_NETWORKS.includes(value as typeof SUPPORTED_X402_NETWORKS[number]) || value.startsWith("solana:"));
 }
+function configuredSources(): string[] { const values=(process.env.AGENTPAY_X402_BAZAAR_URLS||"").split(",").map(v=>v.trim()).filter(Boolean); return values.length?values:DEFAULT_SOURCES; }
+function allowedHosts():string[]{return (process.env.AGENTPAY_X402_ALLOWED_HOSTS||"").split(",").map(v=>v.trim().toLowerCase()).filter(Boolean);}
+function validateSource(raw:string):URL{const url=new URL(raw),host=url.hostname.toLowerCase();if(url.protocol!=="https:"||url.username||url.password||url.port||host==="localhost"||host.endsWith(".local")||isIP(host))throw new Error("Catalog sources must be public HTTPS URLs.");return url;}
+function rows(value:unknown):Record<string,unknown>[] {if(Array.isArray(value))return value.filter(v=>v&&typeof v==="object") as Record<string,unknown>[];if(!value||typeof value!=="object")return[];const record=value as Record<string,unknown>;for(const key of ["items","resources","data"])if(Array.isArray(record[key]))return rows(record[key]);return[];}
+function methodValue(value:unknown):X402RequestMethod|undefined {const method=typeof value==="string"?value.toUpperCase():"GET";return method==="GET"||method==="POST"?method:undefined;}
 
-function validateSource(raw: string): URL {
-  const url = new URL(raw);
-  const host = url.hostname.toLowerCase();
-  if (url.protocol !== "https:" || url.username || url.password || url.port || host === "localhost" || host.endsWith(".local") || isIP(host)) throw new Error("Bazaar sources must be public HTTPS URLs.");
-  return url;
+export function normalizeBazaarResource(row:Record<string,unknown>,source:string,hosts=allowedHosts()):X402CatalogResource|undefined{
+ if(row.x402Version!==undefined&&row.x402Version!==2)return;
+ const resource=row.resource&&typeof row.resource==="object"?row.resource as Record<string,unknown>:row;
+ const resourceUrl=[typeof row.resource==="string"?row.resource:undefined,resource.url,row.resourceUrl,row.url].find(v=>typeof v==="string") as string|undefined;if(!resourceUrl)return;
+ let url:URL;try{url=new URL(resourceUrl);}catch{return;}if(url.protocol!=="https:"||url.username||url.password||url.port||isIP(url.hostname)||url.hostname.endsWith(".local"))return;
+ const requirements=row.paymentRequirements&&typeof row.paymentRequirements==="object"?row.paymentRequirements as Record<string,unknown>:row;
+ const extensions=row.extensions&&typeof row.extensions==="object"?row.extensions as Record<string,unknown>:{};
+ const bazaar=extensions.bazaar&&typeof extensions.bazaar==="object"?extensions.bazaar as Record<string,unknown>:{};
+ const info=bazaar.info&&typeof bazaar.info==="object"?bazaar.info as Record<string,unknown>:{};
+ const input=info.input&&typeof info.input==="object"?info.input as Record<string,unknown>:{};
+ const accepts=Array.isArray(requirements.accepts)?requirements.accepts.filter(v=>v&&typeof v==="object") as Record<string,unknown>[]:[];
+ const supported=accepts.filter(item=>isSupportedX402Network(item.network)).map(item=>({scheme:typeof item.scheme==="string"?item.scheme:undefined,network:String(item.network),asset:typeof item.asset==="string"?item.asset:undefined,amount:typeof item.amount==="string"?item.amount:undefined,payTo:typeof item.payTo==="string"?item.payTo:undefined}));if(!supported.length)return;
+ const method=methodValue(input.method??resource.method);if(!method)return;
+ return {id:createHash("sha256").update(`${source}\n${method}\n${url.toString()}`).digest("hex").slice(0,20),source,resourceUrl:url.toString(),resourceHost:url.hostname.toLowerCase(),description:(typeof resource.description==="string"?resource.description:"Published x402 service").slice(0,240),method,requestBody:input.body,networks:[...new Set(supported.map(v=>v.network))],paymentOptions:supported,allowlisted:hosts.includes(url.hostname.toLowerCase()),trusted:isTrustedX402Endpoint(url.toString(),method)};
 }
-
-function rows(value: unknown): Record<string, unknown>[] {
-  if (Array.isArray(value)) return value.filter((item) => item && typeof item === "object") as Record<string, unknown>[];
-  if (!value || typeof value !== "object") return [];
-  const record = value as Record<string, unknown>;
-  for (const key of ["items", "resources", "data"]) if (Array.isArray(record[key])) return rows(record[key]);
-  return [];
-}
-
-export function normalizeBazaarResource(row: Record<string, unknown>, source: string, allowedHosts: string[]): X402BazaarResource | undefined {
-  if (row.x402Version !== undefined && row.x402Version !== 2) return;
-  const resource = row.resource && typeof row.resource === "object" ? row.resource as Record<string, unknown> : row;
-  const resourceUrl = [typeof row.resource === "string" ? row.resource : undefined, resource.url, row.resourceUrl, row.url].find((value) => typeof value === "string") as string | undefined;
-  if (!resourceUrl) return;
-  let url: URL; try { url = new URL(resourceUrl); } catch { return; }
-  if (url.protocol !== "https:") return;
-  const requirements = row.paymentRequirements && typeof row.paymentRequirements === "object" ? row.paymentRequirements as Record<string, unknown> : row;
-  const extensions = row.extensions && typeof row.extensions === "object" ? row.extensions as Record<string, unknown> : {};
-  const bazaar = extensions.bazaar && typeof extensions.bazaar === "object" ? extensions.bazaar as Record<string, unknown> : {};
-  const info = bazaar.info && typeof bazaar.info === "object" ? bazaar.info as Record<string, unknown> : {};
-  const input = info.input && typeof info.input === "object" ? info.input as Record<string, unknown> : {};
-  const accepts = Array.isArray(requirements.accepts) ? requirements.accepts.filter((item) => item && typeof item === "object") as Record<string, unknown>[] : [];
-  const bsc = accepts.filter((item) => item.network === "eip155:56").map((item) => ({
-    scheme: typeof item.scheme === "string" ? item.scheme : undefined,
-    network: "eip155:56",
-    asset: typeof item.asset === "string" ? item.asset : undefined,
-    amount: typeof item.amount === "string" ? item.amount : undefined,
-    payTo: typeof item.payTo === "string" ? item.payTo : undefined,
-  }));
-  if (!bsc.length) return;
-  return {
-    id: createHash("sha256").update(`${source}\n${resourceUrl}`).digest("hex").slice(0, 20), source,
-    resourceUrl, resourceHost: url.hostname,
-    description: typeof resource.description === "string" ? resource.description.slice(0, 240) : "Published x402 resource",
-    method: typeof input.method === "string" ? input.method.toUpperCase() : typeof resource.method === "string" ? resource.method.toUpperCase() : "GET",
-    requestBody: input.body,
-    networks: [...new Set(accepts.map((item) => typeof item.network === "string" ? item.network : "").filter(Boolean))],
-    bscOptions: bsc, allowlisted: allowedHosts.includes(url.hostname.toLowerCase()),
-  };
-}
-
-export function x402BazaarCapability() { return { sources: configuredSources() }; }
-
-export async function listBscBazaarResources(): Promise<{ resources: X402BazaarResource[]; failures: string[] }> {
-  const sources = configuredSources();
-  const allowedHosts = (process.env.AGENTPAY_X402_ALLOWED_HOSTS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
-  const resources: X402BazaarResource[] = []; const failures: string[] = [];
-  await Promise.all(sources.map(async (raw) => {
-    try {
-      const url = validateSource(raw); const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 15_000);
-      try {
-        const response = await fetch(url, { headers: { Accept: "application/json" }, redirect: "error", signal: controller.signal });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const length = Number(response.headers.get("content-length") || 0); if (length > 2_000_000) throw new Error("response too large");
-        const data = JSON.parse((await response.text()).slice(0, 2_000_000));
-        for (const row of rows(data)) { const item = normalizeBazaarResource(row, url.hostname, allowedHosts); if (item) resources.push(item); }
-      } finally { clearTimeout(timer); }
-    } catch (error) { failures.push(`${raw}: ${error instanceof Error ? error.message : "failed"}`); }
-  }));
-  return { resources: resources.sort((a, b) => Number(b.allowlisted) - Number(a.allowlisted)), failures };
-}
+export function x402BazaarCapability(){return {sources:configuredSources()};}
+export async function listX402CatalogResources():Promise<{resources:X402CatalogResource[];failures:string[]}>{const sources=configuredSources(),resources:X402CatalogResource[]=[],failures:string[]=[];await Promise.all(sources.map(async raw=>{try{const url=validateSource(raw),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15_000);try{const response=await fetch(url,{headers:{Accept:"application/json"},redirect:"error",signal:controller.signal});if(!response.ok)throw new Error(`HTTP ${response.status}`);const length=Number(response.headers.get("content-length")||0);if(length>2_000_000)throw new Error("response too large");const data=JSON.parse((await response.text()).slice(0,2_000_000));for(const row of rows(data)){const item=normalizeBazaarResource(row,url.hostname);if(item)resources.push(item);}}finally{clearTimeout(timer);}}catch(error){failures.push(`${raw}: ${error instanceof Error?error.message:"failed"}`);}}));const unique=[...new Map(resources.map(item=>[item.id,item])).values()];return {resources:unique.sort((a,b)=>Number(b.trusted)-Number(a.trusted)||a.description.localeCompare(b.description)),failures};}

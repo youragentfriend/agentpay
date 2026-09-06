@@ -12,6 +12,8 @@ export type PaymentPolicyInput = {
   amountUsd?: string;
   destination?: string;
   x402Host?: string;
+  x402Url?: string;
+  x402Method?: "GET" | "POST";
 };
 
 export class PaymentPolicyError extends Error {
@@ -90,8 +92,11 @@ export function evaluatePaymentPolicy(
       throw new PaymentPolicyError("Wallet destination is not in the trusted destination list.", "POLICY_DESTINATION_NOT_TRUSTED");
     }
   }
-  if (input.x402Host && settings.trustedX402Hosts.length > 0 && !settings.trustedX402Hosts.includes(input.x402Host.toLowerCase())) {
-    throw new PaymentPolicyError("x402 host is not in the trusted host list.", "POLICY_X402_HOST_NOT_TRUSTED");
+  if (input.x402Url && input.x402Method && settings.trustedX402Endpoints.length > 0 && !settings.trustedX402Endpoints.includes(`${input.x402Method} ${new URL(input.x402Url).toString()}`)) {
+    throw new PaymentPolicyError("This exact x402 endpoint and HTTP method are not trusted.", "POLICY_X402_ENDPOINT_NOT_TRUSTED");
+  }
+  if (input.x402Host && !input.x402Url && settings.trustedX402Hosts.length > 0 && !settings.trustedX402Hosts.includes(input.x402Host.toLowerCase())) {
+    throw new PaymentPolicyError("x402 host is not in the legacy trusted host list.", "POLICY_X402_HOST_NOT_TRUSTED");
   }
 }
 
@@ -125,7 +130,7 @@ export function getDailySpendUsd(rail: PaymentPolicyInput["rail"], now = new Dat
     }
   }
   if (rail === "x402" && tableExists("x402_intents")) {
-    for (const row of db().prepare("SELECT options_json, selected_index FROM x402_intents WHERE status IN ('signing','approving','completed') AND updated_at >= ?").all(since) as unknown as Array<{ options_json: string; selected_index: number | null }>) {
+    for (const row of db().prepare("SELECT options_json, selected_index FROM x402_intents WHERE status IN ('signing','approving','replaying','completed','failed') AND updated_at >= ?").all(since) as unknown as Array<{ options_json: string; selected_index: number | null }>) {
       try {
         const options = JSON.parse(row.options_json) as Array<{ index?: number; amountUsd?: string }>;
         amounts.push(options.find((option) => option.index === row.selected_index)?.amountUsd);
@@ -144,11 +149,19 @@ export function enforcePaymentPolicy(input: PaymentPolicyInput): void {
   evaluatePaymentPolicy(input, settings, dailySpend);
 }
 
+export function isTrustedX402Endpoint(url: string, method: "GET" | "POST"): boolean {
+  const settings = getAgentPaySettings();
+  try { return settings.trustedX402Endpoints.includes(`${method} ${new URL(url).toString()}`); } catch { return false; }
+}
+
+export function enforceTrustedX402Endpoint(url: string, method: "GET" | "POST"): void {
+  if (!isTrustedX402Endpoint(url, method)) throw new PaymentPolicyError("This exact x402 endpoint and HTTP method are not trusted. Add it in Settings before preparing a payment.", "POLICY_X402_ENDPOINT_NOT_TRUSTED");
+}
+
+/** Legacy helper retained for callers outside the x402 engine. */
 export function enforceTrustedX402Host(host: string): void {
   const settings = getAgentPaySettings();
-  if (settings.trustedX402Hosts.length > 0 && !settings.trustedX402Hosts.includes(host.toLowerCase())) {
-    throw new PaymentPolicyError("x402 host is not in the trusted host list.", "POLICY_X402_HOST_NOT_TRUSTED");
-  }
+  if (settings.trustedX402Hosts.length > 0 && !settings.trustedX402Hosts.includes(host.toLowerCase())) throw new PaymentPolicyError("x402 host is not in the legacy trusted host list.", "POLICY_X402_HOST_NOT_TRUSTED");
 }
 
 export function resetPaymentPolicyStoreForTests(): void {

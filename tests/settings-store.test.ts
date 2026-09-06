@@ -20,6 +20,7 @@ const policyFields = {
   spendingLimits: { "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" } },
   trustedWalletDestinations: [] as string[],
   trustedX402Hosts: [] as string[],
+  trustedX402Endpoints: [] as string[],
 };
 
 function withDatabase(run: (filename: string) => void) {
@@ -55,13 +56,14 @@ test("updates rules and persists them in SQLite", () => withDatabase(() => {
   const address = "0x1111111111111111111111111111111111111111";
   const saved = updateAgentPaySettings({
     displayName: "Mark Agent", profileImageDataUrl, displayCurrency: "USD", timeZone: "Asia/Manila",
-    spendingLimits: { "binance-pay": { perPaymentUsdLimit: "25.50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "5", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "30" } }, trustedWalletDestinations: [address.toUpperCase().replace("0X", "0x")], trustedX402Hosts: ["API.Example.com"],
+    spendingLimits: { "binance-pay": { perPaymentUsdLimit: "25.50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "5", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "30" } }, trustedWalletDestinations: [address.toUpperCase().replace("0X", "0x")], trustedX402Hosts: ["API.Example.com"], trustedX402Endpoints: ["post https://API.Example.com/v1/report"],
   });
   assert.equal(saved.displayName, "Mark Agent");
   assert.equal(saved.profileImageDataUrl, profileImageDataUrl);
   assert.equal(saved.spendingLimits["binance-pay"].perPaymentUsdLimit, "25.50");
   assert.deepEqual(saved.trustedWalletDestinations, [address]);
   assert.deepEqual(saved.trustedX402Hosts, ["api.example.com"]);
+  assert.deepEqual(saved.trustedX402Endpoints, ["POST https://api.example.com/v1/report"]);
   resetSettingsStoreForTests();
   assert.equal(getAgentPaySettings().spendingLimits["binance-pay"].dailyUsdLimit, "100");
   assert.equal(getAgentPaySettings().profileImageDataUrl, profileImageDataUrl);
@@ -78,6 +80,17 @@ test("migrates a Priority 1 settings database without losing profile values", ()
   assert.equal(settings.profileImageDataUrl, null);
   assert.equal(settings.requireApproval, true);
   assert.deepEqual(settings.trustedX402Hosts, []);
+  assert.deepEqual(settings.trustedX402Endpoints, []);
+}));
+
+test("migrates legacy host trust to a bounded exact GET root endpoint", () => withDatabase((filename) => {
+  const database = new DatabaseSync(filename);
+  database.exec("CREATE TABLE app_settings (id INTEGER PRIMARY KEY, display_name TEXT NOT NULL, display_currency TEXT NOT NULL, time_zone TEXT NOT NULL, trusted_x402_hosts TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)");
+  database.prepare("INSERT INTO app_settings VALUES (1, 'Mark', 'USD', 'UTC', ?, ?)").run(JSON.stringify(["api.example.com"]), new Date().toISOString());
+  database.close();
+  const settings = getAgentPaySettings();
+  assert.deepEqual(settings.trustedX402Hosts, ["api.example.com"]);
+  assert.deepEqual(settings.trustedX402Endpoints, ["GET https://api.example.com/"]);
 }));
 
 test("provides immediate field-level spending range errors", () => {
