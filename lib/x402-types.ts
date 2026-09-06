@@ -74,6 +74,7 @@ export interface X402CatalogResource {
   resourceUrl: string;
   resourceHost: string;
   description: string;
+  category?: string;
   method: X402RequestMethod;
   requestBody?: unknown;
   networks: string[];

@@ -400,7 +400,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .x402-workflow { display: grid; gap: 18px; }
 .x402-finder-panel, .x402-input-card, .x402-lifecycle { display: grid; gap: 16px; padding: 19px; border: 1px solid var(--line); border-radius: 14px; background: #fafaf7; }
 .x402-agent-heading { display: flex; align-items: center; gap: 12px; }
-.x402-agent-heading > span:first-child { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 11px; background: var(--yellow); color: var(--ink); }
+.x402-agent-heading > img { display: block; width: 38px; height: 38px; border-radius: 50%; background: var(--ink); object-fit: contain; }
 .x402-agent-heading > div { flex: 1; }
 .x402-agent-heading p, .x402-agent-message { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .x402-service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -410,6 +410,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .x402-service-card small, .x402-service-card code { overflow-wrap: anywhere; color: var(--muted); font-size: 12px; }
 .x402-network-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .x402-network-row span { padding: 4px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 11px; font-weight: 600; }
+.x402-network-row .x402-category-badge { background: #fff1a8; color: #765a00; }
 .x402-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
 .x402-direct-grid { display: grid; grid-template-columns: 140px minmax(0,1fr); gap: 12px; }
 .code-input, .x402-result pre, .x402-lifecycle pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
