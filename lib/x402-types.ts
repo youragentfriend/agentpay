@@ -1,5 +1,5 @@
 export type X402OptionStatus = "READY_TO_SIGN" | "ACTION_REQUIRED" | "NOT_SIGNABLE";
-export type X402IntentStatus = "prepared" | "reviewed" | "approved" | "signing" | "approving" | "replaying" | "completed" | "failed";
+export type X402IntentStatus = "prepared" | "reviewed" | "approved" | "signing" | "approving" | "replaying" | "completed" | "cancelled" | "failed";
 export type X402RequestMethod = "GET" | "POST";
 
 export interface X402PaymentOption {
@@ -65,7 +65,12 @@ export interface X402Intent {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  deliveryStatus?: "pending" | "delivered" | "paid_but_invalid" | "paid_but_failed" | "failed_before_payment" | "cancelled";
 }
+
+export type X402ChatRole = "user" | "assistant";
+export interface X402ChatMessage { id: string; role: X402ChatRole; content: string; createdAt: string; }
+export interface X402ChatSession { id: string; status: "active" | "awaiting_confirmation" | "completed" | "cancelled" | "failed"; messages: X402ChatMessage[]; intentId?: string; updatedAt: string; }
 
 export interface X402CatalogPaymentOption { scheme?: string; network: string; asset?: string; amount?: string; payTo?: string; }
 export interface X402CatalogResource {
