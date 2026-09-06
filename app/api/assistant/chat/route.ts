@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     }
     return Response.json(await runOverviewSkillRuntime(body.message.trim(), body.conversationId as string | undefined));
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "The AgentPay Overview agent is unavailable.", code: "OVERVIEW_AGENT_UNAVAILABLE" }, { status: 503 });
+    const conversationId = error && typeof error === "object" && "conversationId" in error && typeof error.conversationId === "string" ? error.conversationId : undefined;
+    return Response.json({ error: error instanceof Error ? error.message : "The AgentPay Overview agent is unavailable.", code: "OVERVIEW_AGENT_UNAVAILABLE", conversationId }, { status: 503 });
   }
 }

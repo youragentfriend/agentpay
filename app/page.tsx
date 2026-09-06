@@ -98,19 +98,38 @@ export default function Home() {
 function NavButton({active,icon,label,onClick}:{active:boolean;icon:string;label:string;onClick:()=>void}){return <button className={`nav-item ${active?"active":""}`} onClick={onClick}><span className="nav-icon">{icon}</span><span>{label}</span></button>}
 function NavParent({label,icon,active,open,onNavigate,onToggle}:{label:string;icon:string;active:boolean;open:boolean;onNavigate:()=>void;onToggle:()=>void}){return <div className={`nav-parent ${active?"active":""}`}><button className="nav-parent-main" onClick={onNavigate}><span className="nav-icon">{icon}</span><span>{label}</span></button><button className="nav-chevron" aria-label={`${open?"Collapse":"Expand"} ${label}`} onClick={onToggle}>{open?"⌄":"›"}</button></div>}
 
+type ChatAction = "payment" | "binance-pay" | "payment-link" | "binance-balance" | "activity" | "balance" | "x402";
 type ChatWorkflow = { input: Record<string, string> };
-type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: "payment" | "binance-pay" | "payment-link" | "binance-balance" | "qr" | "activity" | "balance" | "x402"; workflow?: ChatWorkflow; file?: File };
-type StoredConversation = { id: string; title: string; savedAt: string; turns: Array<Omit<ChatTurn, "file">> };
+type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: ChatAction; workflow?: ChatWorkflow; file?: File };
+type ServerConversation = {
+  id: string;
+  title?: string;
+  selectedSkill?: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  collectedFields: Record<string, string>;
+  latestWorkflow?: ChatWorkflow;
+  latestOperation?: string;
+  latestAction?: ChatAction;
+  missingFields: string[];
+  pending: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 
 function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataUrl, timeZone }: { onNavigate: (view: View) => void; walletStatus: WalletConnectionStatus; displayName: string; profileImageDataUrl: string | null; timeZone: string }) {
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [nextId, setNextId] = useState(1);
-  const [recentConversations, setRecentConversations] = useState<StoredConversation[]>([]);
+  const [recentConversations, setRecentConversations] = useState<ServerConversation[]>([]);
+  const [recentState, setRecentState] = useState<"loading" | "ready" | "error">("loading");
+  const [recentError, setRecentError] = useState("");
+  const [activeConversationId, setActiveConversationId] = useState<string>();
   const [welcome, setWelcome] = useState({ greeting: `Welcome back, ${displayName}.` });
   const [assistantBusy, setAssistantBusy] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
   const runtimeConversationId = useRef<string | undefined>(undefined);
+  const requestVersion = useRef(0);
+  const requestController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -126,72 +145,100 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
   }, [turns]);
 
-  useEffect(() => {
+  const loadRecent = useCallback(async () => {
+    setRecentState("loading");
+    setRecentError("");
     try {
-      const saved = JSON.parse(localStorage.getItem("agentpay-conversations") || "[]") as StoredConversation[];
-      if (Array.isArray(saved)) setRecentConversations(saved);
-    } catch { setRecentConversations([]); }
+      const response = await fetch("/api/assistant/conversations?limit=20", { cache: "no-store" });
+      const data = await response.json() as { conversations?: ServerConversation[]; error?: string };
+      if (!response.ok || !Array.isArray(data.conversations)) throw new Error(data.error || "Unable to load recent chats.");
+      setRecentConversations(data.conversations);
+      setRecentState("ready");
+    } catch (error) {
+      setRecentState("error");
+      setRecentError(error instanceof Error ? error.message : "Unable to load recent chats.");
+    }
   }, []);
 
-  function addTurn(text: string, action?: ChatTurn["action"], file?: File) {
-    const id = nextId;
-    setNextId((value) => value + 1);
-    const responses: Partial<Record<NonNullable<ChatTurn["action"]>, string>> = {
-      payment: "I’ll prepare an approval-first Agentic Wallet transfer. Review the exact intent before approving.",
-      "binance-pay": "I’ll open the Binance Pay inspector here so you can paste a link or attach a QR without leaving this conversation.",
-      "payment-link": "I’ll open the live Binance Pay receive-link workflow here. You choose the amount and review the link before sharing it.",
-      "binance-balance": "A separate read-only Binance account connection is required before I can show Spot, Funding, Futures, Earn, or Margin balances.",
-      qr: "I’ll inspect this QR through the shared Binance Pay validation pipeline.",
-      activity: "Here’s the latest activity, normalized across every payment rail.",
-      balance: "Here’s the current Agentic Wallet overview, including balances and connection status.",
-      x402: "I’ll inspect the x402 service here. If your message includes a URL, it is prefilled below.",
-    };
-    setTurns((value) => [...value, { id, role: "user", text, action, file }, { id: id + 0.5, role: "assistant", text: action ? responses[action] ?? "Tell me what you’d like to do." : "Tell me what you’d like to do." }]);
-  }
+  useEffect(() => { void loadRecent(); }, [loadRecent]);
 
-  async function submit() {
-    const value = message.trim();
+  async function sendMessage(rawValue: string, file?: File) {
+    const value = rawValue.trim();
     if (!value || assistantBusy) return;
     const id = nextId;
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
+    const controller = new AbortController();
+    requestController.current = controller;
     setNextId((current) => current + 1);
-    setTurns((current) => [...current, { id, role: "user", text: value }]);
+    setTurns((current) => [...current, { id, role: "user", text: value, file }]);
     setMessage("");
     setAssistantBusy(true);
     try {
-      const response = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, conversationId: runtimeConversationId.current }) });
-      const result = await response.json() as { conversationId?: string; action?: ChatTurn["action"]; workflow?: ChatWorkflow; message?: string; error?: string };
+      const response = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, conversationId: runtimeConversationId.current }), signal: controller.signal });
+      const result = await response.json() as { conversationId?: string; action?: ChatAction; operation?: string; workflow?: ChatWorkflow; message?: string; error?: string };
+      if (version !== requestVersion.current) return;
+      if (result.conversationId) {
+        runtimeConversationId.current = result.conversationId;
+        setActiveConversationId(result.conversationId);
+      }
       if (!response.ok || !result.message) throw new Error(result.error || "AgentPay could not run the selected skill.");
-      if (result.conversationId) runtimeConversationId.current = result.conversationId;
-      setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: result.message!, action: result.action, workflow: result.workflow }]);
+      const action = file && result.operation === "binance-pay-inspect" ? "binance-pay" : result.action;
+      setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: result.message!, action, workflow: result.workflow, file }]);
     } catch (error) {
+      if (version !== requestVersion.current || (error instanceof DOMException && error.name === "AbortError")) return;
       setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: error instanceof Error ? error.message : "The AgentPay assistant is unavailable." }]);
     } finally {
-      setAssistantBusy(false);
+      if (version === requestVersion.current) {
+        setAssistantBusy(false);
+        requestController.current = null;
+        void loadRecent();
+      }
     }
   }
 
+  async function submit() { await sendMessage(message); }
+
   function attach(file: File | undefined) {
-    if (file) addTurn(`Attached QR: ${file.name}`, "qr", file);
+    if (file) void sendMessage(`Inspect the attached Binance Pay QR image named ${file.name}.`, file);
   }
 
   function newConversation() {
-    if (!turns.length) return;
-    const firstRequest = turns.find((turn) => turn.role === "user");
-    if (!firstRequest) return;
-    const saved: StoredConversation = { id: String(Date.now()), title: firstRequest.text, savedAt: new Date().toISOString(), turns: turns.map(({ file: _file, ...turn }) => turn) };
-    const next = [saved, ...recentConversations].slice(0, 10);
-    setRecentConversations(next);
-    localStorage.setItem("agentpay-conversations", JSON.stringify(next));
+    requestVersion.current += 1;
+    requestController.current?.abort();
+    requestController.current = null;
+    setAssistantBusy(false);
     setTurns([]);
     runtimeConversationId.current = undefined;
+    setActiveConversationId(undefined);
     setNextId(1);
     setMessage("");
+    void loadRecent();
   }
 
-  function openConversation(conversation: StoredConversation) {
-    setTurns(conversation.turns);
-    runtimeConversationId.current = undefined;
-    setNextId(Math.max(...conversation.turns.map((turn) => turn.id), 0) + 1);
+  async function openConversation(summary: ServerConversation) {
+    if (assistantBusy) newConversation();
+    try {
+      const response = await fetch(`/api/assistant/conversations?id=${encodeURIComponent(summary.id)}`, { cache: "no-store" });
+      const data = await response.json() as { conversation?: ServerConversation; error?: string };
+      if (!response.ok || !data.conversation) throw new Error(data.error || "Unable to restore this conversation.");
+      const conversation = data.conversation;
+      const lastAssistant = conversation.messages.map((entry, index) => ({ entry, index })).filter(({ entry }) => entry.role === "assistant").at(-1)?.index;
+      const restored = conversation.messages.map((entry, index) => ({
+        id: index + 1,
+        role: entry.role,
+        text: entry.content,
+        action: index === lastAssistant ? conversation.latestAction : undefined,
+        workflow: index === lastAssistant ? conversation.latestWorkflow ?? { input: conversation.collectedFields } : undefined,
+      }));
+      setTurns(restored);
+      runtimeConversationId.current = conversation.id;
+      setActiveConversationId(conversation.id);
+      setNextId(restored.length + 1);
+    } catch (error) {
+      setRecentState("error");
+      setRecentError(error instanceof Error ? error.message : "Unable to restore this conversation.");
+    }
   }
 
   const actions: Array<{ label: string; description: string; icon: string; action: ChatTurn["action"] }> = [
@@ -210,11 +257,11 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
       <section className="assistant-workspace">
       <section className={`assistant-panel${turns.length ? " has-messages" : " empty"}`}>
         <div className="assistant-status"><div className="assistant-identity"><img className="assistant-badge" src="/brand/assistant-badge.svg" alt=""/><div><strong>AgentPay Assistant</strong><small><span className="status-dot active-dot"/> Ready for an instruction</small></div></div></div>
-        <div className="quick-actions">{actions.map((action) => <button key={action.label} onClick={() => addTurn(action.label, action.action)}><span className="quick-action-icon">{action.icon}</span><span><strong>{action.label}</strong><small>{action.description}</small></span><b>→</b></button>)}</div>
-        <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow initialInput={turn.workflow?.input}/>} {turn.action === "binance-pay" && <BinancePayWorkflow embedded initialInput={turn.workflow?.input}/>}{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive" initialInput={turn.workflow?.input}/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>} {turn.action === "qr" && <QrResult file={turns.find((item) => item.id === turn.id - 0.5)?.file} fileName={turns.find((item) => item.id === turn.id - 0.5)?.text.replace("Attached QR: ", "") || "attached QR"}/>} {turn.action === "activity" && <InlineActivity input={turn.workflow?.input}/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={turn.workflow?.input.url || extractUrl(turns.find((item) => item.id === turn.id - 0.5)?.text || "")} initialMessage={turn.workflow?.input.request}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
-        <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} disabled={assistantBusy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={assistantBusy ? "AgentPay is selecting the right skill…" : "Ask AgentPay to prepare, inspect, check, or review…"}/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={assistantBusy} onChange={(event) => attach(event.target.files?.[0])}/></label><div><button className="new-conversation-button" onClick={newConversation} disabled={!turns.length || assistantBusy}>New conversation</button><button className="send-button" onClick={() => void submit()} disabled={assistantBusy || !message.trim()} aria-label="Send instruction">{assistantBusy ? "…" : "↑"}</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay prepares actions for review. Nothing executes without your explicit approval.</p></div>
+        <div className="quick-actions">{actions.map((action) => <button key={action.label} disabled={assistantBusy} onClick={() => void sendMessage(action.label)}><span className="quick-action-icon">{action.icon}</span><span><strong>{action.label}</strong><small>{action.description}</small></span><b>→</b></button>)}</div>
+        <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow initialInput={turn.workflow?.input}/>} {turn.action === "binance-pay" && (turn.file ? <QrResult file={turn.file} fileName={turn.file.name}/> : <BinancePayWorkflow embedded initialInput={turn.workflow?.input}/>) }{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive" initialInput={turn.workflow?.input}/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>}{turn.action === "activity" && <InlineActivity input={turn.workflow?.input}/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={turn.workflow?.input.url || extractUrl(turns.find((item) => item.id === turn.id - 1)?.text || "")} initialMessage={turn.workflow?.input.request}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
+        <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} disabled={assistantBusy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={assistantBusy ? "AgentPay is selecting the right skill…" : "Ask AgentPay to prepare, inspect, check, or review…"}/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={assistantBusy} onChange={(event) => { attach(event.target.files?.[0]); event.currentTarget.value = ""; }}/></label><div><button className="new-conversation-button" onClick={newConversation} disabled={!turns.length && !assistantBusy}>New conversation</button><button className="send-button" onClick={() => void submit()} disabled={assistantBusy || !message.trim()} aria-label="Send instruction">{assistantBusy ? "…" : "↑"}</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay prepares actions for review. Nothing executes without your explicit approval.</p></div>
       </section>
-      <RecentChats conversations={recentConversations} onSelect={openConversation} displayName={displayName} profileImageDataUrl={profileImageDataUrl}/>
+      <RecentChats conversations={recentConversations} state={recentState} error={recentError} activeId={activeConversationId} onRetry={loadRecent} onSelect={openConversation} displayName={displayName} profileImageDataUrl={profileImageDataUrl}/>
       </section>
     </section>
     <section className="overview-secondary-grid">
@@ -232,7 +279,7 @@ function InlineActivity({input={}}:{input?:Record<string,string>}){const [events
 function InlineBalance(){const [data,setData]=useState<WalletOverview|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");useEffect(()=>{void fetch("/api/wallet/overview",{cache:"no-store"}).then(async response=>{const value=await response.json();if(!response.ok)throw new Error(value.error||"Unable to load wallet.");setData(value as WalletOverview)}).catch(e=>setError(e instanceof Error?e.message:"Unable to load wallet.")).finally(()=>setLoading(false))},[]);if(loading)return <div className="inline-state">Loading your Agentic Wallet overview…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!data)return <div className="inline-state">No wallet overview returned.</div>;const total=data.balances.reduce((sum,item)=>sum+(Number(item.value)||0),0);return <div className="inline-balance"><div><span className="metric-label">Agentic Wallet value</span><strong>{data.status==="CONNECTED"?"$"+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"Not connected"}</strong><small>{data.status==="CONNECTED"?data.balances.length+" visible on-chain assets · Live wallet data":"Connect in Agentic Wallet to load on-chain balances."}</small></div>{data.balances.length>0&&<div className="balance-pills">{data.balances.slice(0,5).map(balance=><span key={balance.binanceChainId+":"+balance.address}><b>{balance.symbol}</b> {balance.balance}</span>)}</div>}</div>}
 
 function InlineBinancePortfolio(){const[data,setData]=useState<BinancePortfolio|null>(null);const[loading,setLoading]=useState(true);const[error,setError]=useState("");useEffect(()=>{void fetch("/api/binance-account/portfolio",{cache:"no-store"}).then(async response=>{const value=await response.json();if(!response.ok)throw new Error(value.error||"Unable to load Binance portfolio.");setData(value as BinancePortfolio)}).catch(e=>setError(e instanceof Error?e.message:"Unable to load Binance portfolio.")).finally(()=>setLoading(false))},[]);if(loading)return <div className="inline-state">Loading your read-only Binance exchange portfolio…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!data?.configured)return <div className="inline-state"><strong>Connect Binance portfolio</strong><span>Configure protected read-only credentials on the Binance page. Never paste them into chat.</span></div>;return <div className="inline-balance"><div><span className="metric-label">Binance exchange portfolio</span><strong>{data.estimatedTotalUsd.toLocaleString(undefined,{style:"currency",currency:"USD"})}</strong><small>{data.balances.length} visible holdings across Spot, Funding, Futures, Earn, and Margin · {data.connection}</small></div>{data.balances.length>0&&<div className="balance-pills">{data.balances.slice(0,5).map(balance=><span key={balance.id}><b>{balance.asset}</b> {balance.total} · {balance.sourceLabel}</span>)}</div>}</div>}
-function RecentChats({conversations,onSelect,displayName,profileImageDataUrl}:{conversations:StoredConversation[];onSelect:(conversation:StoredConversation)=>void;displayName:string;profileImageDataUrl:string|null}){const initials=displayName.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()).join("")||"A";return <aside className="recent-chats-panel"><div className="panel-heading"><div><h2>Recent Chats</h2><p>Saved on this browser</p></div></div><div className="recent-chat-list">{conversations.length?conversations.map((conversation)=><button className="recent-chat-item" key={conversation.id} onClick={()=>onSelect(conversation)}><span className="recent-chat-icon">{profileImageDataUrl?<img src={profileImageDataUrl} alt=""/>:initials}</span><span><strong>{conversation.title}</strong><small>{new Date(conversation.savedAt).toLocaleString()}</small></span></button>):<div className="recent-chat-empty"><span>✦</span><strong>No saved conversations</strong><p>Click New conversation after chatting to save it here.</p></div>}</div></aside>}
+function RecentChats({conversations,state,error,activeId,onRetry,onSelect,displayName,profileImageDataUrl}:{conversations:ServerConversation[];state:"loading"|"ready"|"error";error:string;activeId?:string;onRetry:()=>Promise<void>;onSelect:(conversation:ServerConversation)=>void;displayName:string;profileImageDataUrl:string|null}){const initials=displayName.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()).join("")||"A";return <aside className="recent-chats-panel"><div className="panel-heading"><div><h2>Recent Chats</h2><p>Saved securely in AgentPay</p></div></div><div className="recent-chat-list">{state==="loading"?<div className="recent-chat-empty"><span>◌</span><strong>Loading conversations…</strong></div>:state==="error"?<div className="recent-chat-empty"><span>!</span><strong>Couldn’t load chats</strong><p>{error}</p><button className="secondary-button" onClick={()=>void onRetry()}>Try again</button></div>:conversations.length?conversations.map((conversation)=><button className={`recent-chat-item${activeId===conversation.id?" active":""}`} aria-current={activeId===conversation.id?"true":undefined} key={conversation.id} onClick={()=>void onSelect(conversation)}><span className="recent-chat-icon">{profileImageDataUrl?<img src={profileImageDataUrl} alt=""/>:initials}</span><span><strong>{conversation.title||"Conversation in progress"}</strong><small>{conversation.pending?"AgentPay is responding…":new Date(conversation.updatedAt).toLocaleString()}</small></span></button>):<div className="recent-chat-empty"><span>✦</span><strong>No conversations yet</strong><p>Your first message will be saved here automatically.</p></div>}</div></aside>}
 function RecentActivity({onViewAll}:{onViewAll:()=>void}){const [items,setItems]=useState<Array<{id:string;title:string;status:string;time:string;source:string}>>([]);useEffect(()=>{void fetch('/api/payments/activity?page=1&limit=10&sort=newest',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(Array.isArray(data.events)){setItems(data.events.slice(0,10).map((e:any)=>({id:e.id,title:e.title||e.description||e.activityType,status:e.statusGroup,time:e.occurredAt||e.updatedAt,source:e.source})));return}const list=[...(data.x402Intents||[]).map((x:any)=>({id:'x'+x.id,title:`x402 · ${x.resourceHost}`,status:x.status,time:x.updatedAt,source:'x402'})),...(data.binancePayReceipts||[]).map((x:any)=>({id:'b'+x.id,title:`${x.amount||''} ${x.currency||''}`,status:x.status,time:x.updatedAt,source:'Binance Pay'})),...(data.intents||[]).map((x:any)=>({id:'w'+x.id,title:`${x.amount} ${x.asset}`,status:x.status,time:x.createdAt,source:'Agentic Wallet'}))].sort((a,b)=>Date.parse(b.time)-Date.parse(a.time)).slice(0,10);setItems(list)}).catch(()=>setItems([]))},[]);return <aside className="recent-panel"><div className="panel-heading"><h2>Recent Activity</h2><button onClick={onViewAll}>View all</button></div><div className="recent-list">{items.length?items.map(item=><div className="recent-item" key={item.id}><span className={`activity-dot ${statusClass(item.status)}`}/><div><strong>{item.title}</strong><small>{item.source} · {new Date(item.time).toLocaleString()}</small></div><span className={`status-text ${statusClass(item.status)}`}>{friendlyStatus(item.status)}</span></div>):<div className="recent-empty"><span>◷</span><strong>No activity yet</strong><p>Approved transfers and inspected payment requests will appear here.</p></div>}</div></aside>}
 function PaymentRails({walletStatus,onNavigate}:{walletStatus:WalletConnectionStatus;onNavigate:(view:View)=>void}){const[binancePay,setBinancePay]=useState<"checking"|"ready"|"setup"|"unavailable">("checking");const[binanceAccount,setBinanceAccount]=useState<"checking"|"configured"|"setup"|"unavailable">("checking");useEffect(()=>{void fetch("/api/binance-pay/status",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error();const data=await response.json();setBinancePay(data.configured?"ready":"setup")}).catch(()=>setBinancePay("unavailable"));void fetch("/api/binance-account/status",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error();const data=await response.json();setBinanceAccount(data.configured?"configured":"setup")}).catch(()=>setBinanceAccount("unavailable"))},[]);return <section className="payment-rails"><div className="rails-heading"><div><span className="eyebrow">CONNECTIONS</span><h2>Payment rails</h2></div><button onClick={()=>onNavigate("settings")}>Manage</button></div><div className="rail-list"><button className="rail-row" onClick={()=>onNavigate("wallet")}><span className="rail-logo">◇</span><span><strong>Agentic Wallet</strong><small>Balances, transfers, and x402 signing</small></span><span className={`rail-status ${walletStatus==="CONNECTED"?"success":"neutral"}`}>{walletStatus==="CONNECTED"?"Connected":"Not connected"}</span><b>Open →</b></button><button className="rail-row" onClick={()=>onNavigate("binance-pay")}><span className="rail-logo signal">B</span><span><strong>Binance Pay</strong><small>QR, payment links, and receive links</small></span><span className={`rail-status ${binancePay==="ready"?"success":"neutral"}`}>{binancePay==="checking"?"Checking":binancePay==="ready"?"Ready":binancePay==="setup"?"Setup required":"Unavailable"}</span><b>Open →</b></button><button className="rail-row" onClick={()=>onNavigate("binance")}><span className="rail-logo dark">B</span><span><strong>Binance Account</strong><small>Read-only portfolio overview</small></span><span className={`rail-status ${binanceAccount==="configured"?"success":"neutral"}`}>{binanceAccount==="checking"?"Checking":binanceAccount==="configured"?"Configured":binanceAccount==="setup"?"Setup required":"Unavailable"}</span><b>Review →</b></button></div></section>}
 function statusClass(status:string){const s=String(status).toLowerCase();if(['failed','failure','rejected'].some(x=>s.includes(x)))return'failed';if(['success','confirmed','completed'].some(x=>s.includes(x)))return'success';if(s.includes('awaiting')||s.includes('approval'))return'awaiting';return'pending'}
