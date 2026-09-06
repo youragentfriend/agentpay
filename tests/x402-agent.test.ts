@@ -32,6 +32,7 @@ test("uses Gemini Google Search by default and validates the returned x402 candi
     assert.match(String(input), /generativelanguage\.googleapis\.com\/v1beta\/interactions$/);
     assert.equal((init?.headers as Record<string, string>)["x-goog-api-key"], "test-key");
     const request = JSON.parse(String(init?.body));
+    assert.equal(request.model, "gemini-3.6-flash");
     assert.deepEqual(request.tools, [{ type: "google_search" }]);
     return Response.json({ output_text: JSON.stringify(validResult) });
   };

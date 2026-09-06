@@ -1,8 +1,14 @@
 import type { X402ChatMessage, X402RequestMethod } from "@/lib/x402-types";
 import { isSupportedX402Network } from "@/lib/server/x402-networks";
+import { EnvHttpProxyAgent, fetch as proxyFetch } from "undici";
 
 const MAX_MESSAGES = 12;
 const MAX_TRANSCRIPT_CHARS = 12_000;
+const proxyAgent = new EnvHttpProxyAgent();
+async function providerFetch(url: string, key: string, init: RequestInit) {
+  if (key.startsWith("oc-sent-v2.")) return proxyFetch(url, { ...init, dispatcher: proxyAgent } as Parameters<typeof proxyFetch>[1]);
+  return fetch(url, init);
+}
 const RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -54,7 +60,7 @@ export function x402AgentStatus() {
     ? (process.env.AGENTPAY_LLM_API_KEY || process.env.GEMINI_API_KEY || "").trim()
     : provider === "openai" ? (process.env.AGENTPAY_LLM_API_KEY || process.env.OPENAI_API_KEY || "").trim() : "";
   const model = provider === "gemini"
-    ? (process.env.AGENTPAY_LLM_MODEL || "gemini-3.8-flash")
+    ? (process.env.AGENTPAY_LLM_MODEL || "gemini-3.6-flash")
     : provider === "openai" ? (process.env.AGENTPAY_LLM_MODEL || "gpt-5.6-luna") : null;
   return { configured: Boolean(provider && key), provider, model, liveSearch: Boolean(provider && key) };
 }
@@ -74,7 +80,15 @@ function extractText(value: unknown): string {
     }
     if (parts.length) return parts.join("\n");
   }
+  if (Array.isArray(row.candidates)) {
+    const parts = row.candidates.flatMap(candidate => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>).content && typeof (candidate as Record<string, unknown>).content === "object" && Array.isArray(((candidate as Record<string, unknown>).content as Record<string, unknown>).parts) ? (((candidate as Record<string, unknown>).content as Record<string, unknown>).parts as unknown[]) : []);
+    const text = shopper(parts);
+    if (text.length) return text.join("\n");
+  }
   return "";
+}
+function shopper(parts: unknown[]): string[] {
+  return parts.filter(part => part && typeof part === "object" && typeof (part as Record<string, unknown>).text === "string").map(part => String((part as Record<string, unknown>).text));
 }
 function jsonText(text: string): string {
   const trimmed = text.trim();
@@ -110,13 +124,13 @@ function validateResult(value: unknown): X402AgentResult {
 
 async function callOpenAi(key: string, model: string, transcript: string, signal: AbortSignal): Promise<unknown> {
   const base = (process.env.AGENTPAY_LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
-  const response = await fetch(`${base}/responses`, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, store: false, tools: [{ type: "web_search" }], tool_choice: "auto", instructions: INSTRUCTIONS, input: transcript, text: { format: { type: "json_schema", name: "agentpay_x402_search", strict: true, schema: RESULT_SCHEMA } } }), signal });
+  const response = await providerFetch(`${base}/responses`, key, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, store: false, tools: [{ type: "web_search" }], tool_choice: "auto", instructions: INSTRUCTIONS, input: transcript, text: { format: { type: "json_schema", name: "agentpay_x402_search", strict: true, schema: RESULT_SCHEMA } } }), signal });
   if (!response.ok) throw new Error(`The OpenAI x402 search agent is unavailable (HTTP ${response.status}).`);
   return response.json();
 }
 async function callGemini(key: string, model: string, transcript: string, signal: AbortSignal): Promise<unknown> {
   const base = (process.env.AGENTPAY_LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-  const response = await fetch(`${base}/interactions`, { method: "POST", headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ model, input: `${INSTRUCTIONS}\n\nConversation:\n${transcript}`, tools: [{ type: "google_search" }] }), signal });
+  const response = await providerFetch(`${base}/interactions`, key, { method: "POST", headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ model, input: `${INSTRUCTIONS}\n\nConversation:\n${transcript}`, tools: [{ type: "google_search" }] }), signal });
   if (!response.ok) throw new Error(`The Gemini x402 search agent is unavailable (HTTP ${response.status}).`);
   return response.json();
 }
