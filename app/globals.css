@@ -403,15 +403,28 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .x402-agent-heading > img { display: block; width: 38px; height: 38px; border-radius: 50%; background: var(--ink); object-fit: contain; }
 .x402-agent-heading > div { flex: 1; }
 .x402-agent-heading p, .x402-agent-message { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.x402-direct-panel { display: grid; gap: 16px; }
+.x402-service-browser { display: grid; gap: 14px; }
+.x402-service-toolbar { display: grid; grid-template-columns: repeat(2, minmax(170px, 230px)) 1fr; align-items: end; gap: 10px; }
+.x402-service-toolbar label { display: grid; gap: 6px; }
+.x402-service-toolbar label > span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.x402-service-toolbar select { width: 100%; height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); }
+.x402-service-count { justify-self: end; padding-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .x402-service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .x402-service-card { display: grid; min-width: 0; gap: 10px; padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
 .x402-service-card.selected { border-color: var(--yellow-deep); box-shadow: 0 0 0 2px rgba(245,205,69,.18); }
 .x402-service-card h3 { margin: 0; font-size: 15px; line-height: 1.4; }
 .x402-service-card small, .x402-service-card code { overflow-wrap: anywhere; color: var(--muted); font-size: 12px; }
 .x402-network-row { display: flex; flex-wrap: wrap; gap: 5px; }
-.x402-network-row span { padding: 4px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 11px; font-weight: 600; }
+.x402-network-row span { padding: 4px 7px; border-radius: 0; background: var(--soft); color: var(--muted); font-size: 11px; font-weight: 700; }
 .x402-network-row .x402-category-badge { background: #fff1a8; color: #765a00; }
+.x402-network-row .network-bsc { background: #f0b90b; color: #1e2026; }
+.x402-network-row .network-base { background: #1652f0; color: #fff; }
+.x402-network-row .network-solana { background: #9945ff; color: #fff; }
 .x402-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; }
+.x402-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.x402-pagination > span { color: var(--muted); font-size: 12px; }
+.x402-pagination > div { display: flex; gap: 8px; }
 .x402-direct-grid { display: grid; grid-template-columns: 140px minmax(0,1fr); gap: 12px; }
 .code-input, .x402-result pre, .x402-lifecycle pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .x402-input-card h3 { margin: 3px 0 8px; }
@@ -437,7 +450,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .x402-provenance code { overflow-wrap: anywhere; }
 .review-status.prepared, .review-status.reviewed, .review-status.approved { background: rgba(245,205,69,.25); color: #765a00; }
 .review-status.signing, .review-status.approving, .review-status.replaying { background: rgba(49,95,140,.1); color: #315f8c; }
-@media (max-width: 760px) { .x402-service-grid, .x402-exact-review, .x402-direct-grid { grid-template-columns: 1fr; } .x402-review-header, .x402-action-box { align-items: stretch; flex-direction: column; } .x402-review-header code { max-width: none; text-align: left; } .x402-stepper strong { display: none; } }
+@media (max-width: 760px) { .x402-service-grid, .x402-exact-review, .x402-direct-grid, .x402-service-toolbar { grid-template-columns: 1fr; } .x402-service-count { justify-self: start; padding-bottom: 0; } .x402-review-header, .x402-action-box { align-items: stretch; flex-direction: column; } .x402-review-header code { max-width: none; text-align: left; } .x402-stepper strong { display: none; } }
 .inline-state { display: grid; gap: 4px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); font-size: 13px; }
 .inline-state strong { color: var(--ink); }
 .inline-events { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; }
