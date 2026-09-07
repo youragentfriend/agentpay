@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadOverviewSkillDescriptions, runOverviewAgent, validateOverviewAgentResult } from "../lib/server/overview-agent";
+import { setDeepSeekBridgeRunnerForTests } from "../lib/server/deepseek";
 
 test("loads five deliberately distinct Overview skills", () => {
   const skills = loadOverviewSkillDescriptions();
@@ -22,28 +23,22 @@ test("accepts actions only for the selected skill", () => {
   assert.throws(() => validateOverviewAgentResult({ skill: "activity-reporting", action: "payment", message: "Wrong operation." }), /invalid action/);
 });
 
-test("asks DeepSeek to select from skill descriptions without provider fallback", async () => {
-  const previous = { key: process.env.DEEPSEEK_API_KEY, model: process.env.AGENTPAY_DEEPSEEK_MODEL };
-  const originalFetch = globalThis.fetch;
-  process.env.DEEPSEEK_API_KEY = "test-key";
+test("asks the OpenClaw DeepSeek bridge to select from skill descriptions without fallback", async () => {
+  const previousModel = process.env.AGENTPAY_DEEPSEEK_MODEL;
   process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
-  let requestBody = "";
-  globalThis.fetch = async (input, init) => {
-    assert.equal(String(input), "https://api.deepseek.com/responses");
-    assert.equal((init?.headers as Record<string, string>).Authorization, "Bearer test-key");
-    requestBody = String(init?.body || "");
-    return Response.json({ output_text: JSON.stringify({ skill: "binance-portfolio", action: "binance-balance", message: "Loading your read-only Binance exchange portfolio." }) });
-  };
+  let prompt = "";
+  setDeepSeekBridgeRunnerForTests(async (input) => {
+    prompt = input;
+    return { stdout: JSON.stringify({ status: "ok", result: { payloads: [{ text: JSON.stringify({ skill: "binance-portfolio", action: "binance-balance", message: "Loading your read-only Binance exchange portfolio." }) }], meta: { agentMeta: { provider: "deepseek", model: "deepseek-test" } }, executionTrace: { winnerProvider: "deepseek", winnerModel: "deepseek-test", fallbackUsed: false } } }), stderr: "" };
+  });
   try {
     const result = await runOverviewAgent([{ role: "user", content: "Show my Spot and Earn holdings" }]);
     assert.equal(result.skill, "binance-portfolio");
     assert.equal(result.action, "binance-balance");
-    assert.match(requestBody, /Agentic Wallet is an on-chain wallet/);
-    assert.match(requestBody, /Binance Portfolio is the read-only Binance exchange account/);
-    assert.equal(JSON.parse(requestBody).model, "deepseek-test");
+    assert.match(prompt, /Agentic Wallet is an on-chain wallet/);
+    assert.match(prompt, /Binance Portfolio is the read-only Binance exchange account/);
   } finally {
-    globalThis.fetch = originalFetch;
-    if (previous.key === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = previous.key;
-    if (previous.model === undefined) delete process.env.AGENTPAY_DEEPSEEK_MODEL; else process.env.AGENTPAY_DEEPSEEK_MODEL = previous.model;
+    setDeepSeekBridgeRunnerForTests();
+    if (previousModel === undefined) delete process.env.AGENTPAY_DEEPSEEK_MODEL; else process.env.AGENTPAY_DEEPSEEK_MODEL = previousModel;
   }
 });

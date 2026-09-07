@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test, { afterEach, beforeEach } from "node:test";
 import { runOverviewSkillRuntime } from "../lib/server/overview-agent";
+import { setDeepSeekBridgeRunnerForTests } from "../lib/server/deepseek";
 import {
   createOverviewConversation,
   getOverviewConversation,
@@ -16,23 +17,24 @@ import {
 } from "../lib/server/overview-skill-runtime";
 
 let directory = "";
-let originalFetch: typeof globalThis.fetch;
 const previousEnv: Record<string, string | undefined> = {};
+
+function bridgeEnvelope(value: unknown) {
+  return JSON.stringify({ status: "ok", result: { payloads: [{ text: JSON.stringify(value) }], meta: { agentMeta: { provider: "deepseek", model: "deepseek-test" } }, executionTrace: { winnerProvider: "deepseek", winnerModel: "deepseek-test", fallbackUsed: false } } });
+}
 
 beforeEach(() => {
   directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-overview-"));
-  for (const name of ["AGENTPAY_DB_PATH", "DEEPSEEK_API_KEY", "AGENTPAY_DEEPSEEK_MODEL", "AGENTPAY_ENABLE_WALLET_SEND", "AGENTPAY_ENABLE_BINANCE_PAY", "AGENTPAY_ENABLE_X402"]) previousEnv[name] = process.env[name];
+  for (const name of ["AGENTPAY_DB_PATH", "AGENTPAY_DEEPSEEK_MODEL", "AGENTPAY_ENABLE_WALLET_SEND", "AGENTPAY_ENABLE_BINANCE_PAY", "AGENTPAY_ENABLE_X402"]) previousEnv[name] = process.env[name];
   process.env.AGENTPAY_DB_PATH = path.join(directory, "agentpay.sqlite");
-  process.env.DEEPSEEK_API_KEY = "test-key";
   process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
   process.env.AGENTPAY_ENABLE_WALLET_SEND = "false";
   process.env.AGENTPAY_ENABLE_BINANCE_PAY = "false";
   process.env.AGENTPAY_ENABLE_X402 = "false";
-  originalFetch = globalThis.fetch;
 });
 
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  setDeepSeekBridgeRunnerForTests();
   resetOverviewSkillRuntimeForTests();
   rmSync(directory, { recursive: true, force: true });
   for (const [name, value] of Object.entries(previousEnv)) {
@@ -41,12 +43,12 @@ afterEach(() => {
 });
 
 function mockDeepSeek(values: unknown[], prompts: string[] = []) {
-  globalThis.fetch = async (_input, init) => {
-    prompts.push(String(JSON.parse(String(init?.body)).input));
+  setDeepSeekBridgeRunnerForTests(async (input) => {
+    prompts.push(input);
     const value = values.shift();
     assert.notEqual(value, undefined, "unexpected DeepSeek call");
-    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200, headers: { "Content-Type": "application/json" } });
-  };
+    return { stdout: bridgeEnvelope(value), stderr: "" };
+  });
 }
 
 const cases = [
@@ -110,7 +112,7 @@ test("switches skills only on an explicit domain-change decision", async () => {
 
 test("clarifies ambiguous USDT balance source before selecting a skill", async () => {
   let calls = 0;
-  globalThis.fetch = async () => { calls += 1; throw new Error("should not call provider"); };
+  setDeepSeekBridgeRunnerForTests(async () => { calls += 1; throw new Error("should not call provider"); });
   assert.equal(isAmbiguousBalanceRequest("show my USDT balance"), true);
   const result = await runOverviewSkillRuntime("show my USDT balance");
   assert.equal(result.skill, undefined);
