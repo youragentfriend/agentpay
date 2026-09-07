@@ -9,7 +9,6 @@ const SOURCE_COLORS: Record<string, string> = { "agentic-wallet": "#171815", "bi
 function usd(value: string) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0)); }
 function monthShift(value: string, delta: number) { const [year, month] = value.split("-").map(Number); const date = new Date(Date.UTC(year, month - 1 + delta, 1)); return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`; }
 function dateParts(date: Date, timeZone: string) { const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date); const get = (type: string) => parts.find(part => part.type === type)?.value || ""; return `${get("year")}-${get("month")}-${get("day")}`; }
-function sourceLabel(source: string) { return source === "agentic-wallet" ? "Agentic Wallet" : source === "binance-pay" ? "Binance Pay" : "x402"; }
 
 export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
   const [report, setReport] = useState(EMPTY);
@@ -77,7 +76,6 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
         <article className="reports-card reports-assets-card"><div className="reports-card-heading"><div><span className="eyebrow">Assets</span><h3>Spending by asset</h3></div></div><AssetBars report={report} /></article>
       </div>
 
-      <article className="reports-card reports-transactions"><div className="reports-card-heading"><div><span className="eyebrow">Included activity</span><h3>Matching transactions</h3></div><span>{report.transactions.length} shown</span></div>{report.transactions.length ? <div className="reports-transaction-list">{report.transactions.map(item => <div className="reports-transaction" key={item.id}><span className={`reports-source-dot ${item.source}`} /><div><strong>{item.title}</strong><small>{sourceLabel(item.source)} · {item.summary}</small></div><div><strong>{usd(item.amountUsd)}</strong><small>{new Date(item.occurredAt).toLocaleString("en-US", { timeZone: report.timezone })}{item.spendState === "pending" ? " · Pending" : ""}</small></div></div>)}</div> : <div className="reports-empty"><strong>No settled spending for this period</strong><span>Prepared, approved, cancelled, and failed-before-payment requests are not counted as spending.</span></div>}</article>
       <footer className="reports-print-footer">Generated {report.generatedAt ? new Date(report.generatedAt).toLocaleString("en-US", { timeZone: report.timezone }) : "—"} · Pending and unvalued activity is shown separately and never silently added to settled totals.</footer>
     </>}
   </section>;
