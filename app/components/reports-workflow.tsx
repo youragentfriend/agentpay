@@ -44,15 +44,18 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
   function clearDay() { setFrom(""); setTo(""); setRange("month"); }
 
   return <section className="reports-workspace">
-    <div className="reports-toolbar no-print">
-      <div className="reports-presets" aria-label="Report period">{PRESETS.map(item => <button key={item.value} className={range === item.value ? "active" : ""} onClick={() => setRange(item.value)}>{item.label}</button>)}</div>
-      <div className="reports-filter-row">
-        <label><span>Payment rail</span><select value={source} onChange={event => setSource(event.target.value)}><option value="">All rails</option><option value="agentic-wallet">Agentic Wallet</option><option value="binance-pay">Binance Pay</option><option value="x402">x402</option></select></label>
-        <label><span>Asset</span><select value={asset} onChange={event => setAsset(event.target.value)}><option value="">All assets</option>{assetOptions.map(item => <option key={item}>{item}</option>)}</select></label>
-        <label className="reports-pending-toggle"><input type="checkbox" checked={includePending} onChange={event => setIncludePending(event.target.checked)} /><span>Include pending transactions</span></label>
-        <button className="secondary-button" onClick={() => window.print()}>Print report</button>
+    <div className="reports-top-row">
+      <article className="reports-card reports-rail-card"><div className="reports-card-heading"><div><span className="eyebrow">Payment rails</span><h3>Spending by rail</h3></div></div><RailDonut report={report} /></article>
+      <div className="reports-toolbar no-print">
+        <div className="reports-presets" aria-label="Report period">{PRESETS.map(item => <button key={item.value} className={range === item.value ? "active" : ""} onClick={() => setRange(item.value)}>{item.label}</button>)}</div>
+        <div className="reports-filter-row">
+          <label><span>Payment rail</span><select value={source} onChange={event => setSource(event.target.value)}><option value="">All rails</option><option value="agentic-wallet">Agentic Wallet</option><option value="binance-pay">Binance Pay</option><option value="x402">x402</option></select></label>
+          <label><span>Asset</span><select value={asset} onChange={event => setAsset(event.target.value)}><option value="">All assets</option>{assetOptions.map(item => <option key={item}>{item}</option>)}</select></label>
+          <label className="reports-pending-toggle"><input type="checkbox" checked={includePending} onChange={event => setIncludePending(event.target.checked)} /><span>Include pending transactions</span></label>
+          <button className="secondary-button" onClick={() => window.print()}>Print report</button>
+        </div>
+        {range === "custom" && <div className="reports-custom-range"><label><span>From</span><input type="date" max={dateParts(new Date(), timeZone)} value={from} onChange={event => setFrom(event.target.value)} /></label><label><span>To</span><input type="date" max={dateParts(new Date(), timeZone)} value={to} onChange={event => setTo(event.target.value)} /></label>{from && to && from === to && <button className="ghost-button" onClick={clearDay}>Clear selected day</button>}</div>}
       </div>
-      {range === "custom" && <div className="reports-custom-range"><label><span>From</span><input type="date" max={dateParts(new Date(), timeZone)} value={from} onChange={event => setFrom(event.target.value)} /></label><label><span>To</span><input type="date" max={dateParts(new Date(), timeZone)} value={to} onChange={event => setTo(event.target.value)} /></label>{from && to && from === to && <button className="ghost-button" onClick={clearDay}>Clear selected day</button>}</div>}
     </div>
 
     <header className="reports-print-heading"><div><span className="eyebrow">AgentPay analytics</span><h2>Spending report</h2><p>{report.range.label} · {report.timezone}</p></div><div><strong>{usd(report.summary.settledTotalUsd)}</strong><span>Settled spending</span></div></header>
@@ -71,7 +74,6 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
           <div className="reports-card-heading"><div><span className="eyebrow">Spending activity</span><h3>{view === "trend" ? "Spending over time" : report.calendar.label}</h3></div><div className="reports-view-toggle no-print"><button className={view === "trend" ? "active" : ""} onClick={() => setView("trend")}>Trend</button><button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")}>Calendar</button></div></div>
           {view === "trend" ? <SpendingTrend report={report} /> : <SpendingCalendar report={report} currentMonth={currentMonth} onPrevious={() => setCalendarMonth(monthShift(report.calendar.month, -1))} onNext={() => setCalendarMonth(monthShift(report.calendar.month, 1))} onSelect={chooseDate} />}
         </article>
-        <article className="reports-card reports-rail-card"><div className="reports-card-heading"><div><span className="eyebrow">Payment rails</span><h3>Spending by rail</h3></div></div><RailDonut report={report} /></article>
         <article className="reports-card reports-assets-card"><div className="reports-card-heading"><div><span className="eyebrow">Assets</span><h3>Spending by asset</h3></div></div><AssetBars report={report} /></article>
       </div>
 

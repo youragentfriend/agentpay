@@ -513,6 +513,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 /* Spending reports */
 .reports-workspace { display: grid; gap: 18px; margin-top: 28px; }
+.reports-top-row { display: grid; grid-template-columns: minmax(280px,2fr) minmax(0,3fr); gap: 12px; align-items: stretch; }
 .reports-toolbar { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fafaf7; }
 .reports-presets { display: flex; flex-wrap: wrap; gap: 5px; }
 .reports-presets button, .reports-view-toggle button { padding: 8px 11px; border-radius: 9px; color: var(--muted); font-size: 12px; font-weight: 700; }
@@ -543,6 +544,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .reports-card-heading h3 { margin: 4px 0 0; font-size: 16px; }
 .reports-card-heading > span { color: var(--muted); font-size: 12px; }
 .reports-view-toggle { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--soft); }
+.reports-primary-card { grid-column: 1 / -1; }
 .reports-assets-card { grid-column: 1 / -1; }
 .reports-trend { position: relative; min-height: 245px; padding: 18px 4px 0 48px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .reports-y-label { position: absolute; top: 0; left: 0; color: var(--muted-2); font-size: 10px; }
@@ -599,6 +601,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .reports-print-footer { color: var(--muted); font-size: 10px; line-height: 1.5; }
 
 @media (max-width: 900px) {
+  .reports-top-row { grid-template-columns: 1fr; }
   .reports-filter-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .reports-summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .reports-grid { grid-template-columns: 1fr; }
@@ -621,6 +624,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .app-shell, .main-shell, .content, .standard-page { display: block !important; width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
   .standard-page > .eyebrow, .standard-page > h1, .standard-page > .lead { display: none !important; }
   .reports-workspace { margin: 0; gap: 11px; }
+  .reports-top-row { grid-template-columns: 1fr; }
   .reports-print-heading, .reports-summary-grid, .reports-card { break-inside: avoid; }
   .reports-summary-grid { grid-template-columns: repeat(4,1fr); }
   .reports-grid { grid-template-columns: 1.55fr .85fr; gap: 9px; }
