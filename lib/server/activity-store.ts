@@ -19,6 +19,9 @@ export interface ActivityEvent {
   statusCategory: ActivityStatusCategory;
   amount?: string;
   asset?: string;
+  amountUsd?: string;
+  direction: "outgoing" | "incoming" | "neutral";
+  spendState: "settled" | "pending" | "none";
   title: string;
   summary: string;
   occurredAt: string;
@@ -67,6 +70,9 @@ interface ActivityRow {
   status_category: ActivityStatusCategory;
   amount: string | null;
   asset: string | null;
+  amount_usd: string | null;
+  direction: "outgoing" | "incoming" | "neutral";
+  spend_state: "settled" | "pending" | "none";
   title: string;
   summary: string;
   safe_reference: string | null;
@@ -86,6 +92,9 @@ interface Projection {
   statusCategory: ActivityStatusCategory;
   amount?: string;
   asset?: string;
+  amountUsd?: string;
+  direction: "outgoing" | "incoming" | "neutral";
+  spendState: "settled" | "pending" | "none";
   title: string;
   summary: string;
   reference?: string;
@@ -115,6 +124,9 @@ function getDatabase(): DatabaseSync {
       status_category TEXT NOT NULL,
       amount TEXT,
       asset TEXT,
+      amount_usd TEXT,
+      direction TEXT NOT NULL DEFAULT 'neutral',
+      spend_state TEXT NOT NULL DEFAULT 'none',
       title TEXT NOT NULL,
       summary TEXT NOT NULL,
       safe_reference TEXT,
@@ -130,6 +142,10 @@ function getDatabase(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS activity_events_activity_type ON activity_events(activity_type);
     CREATE INDEX IF NOT EXISTS activity_events_asset ON activity_events(asset);
   `);
+  const columns = new Set((database.prepare("PRAGMA table_info(activity_events)").all() as Array<{ name: string }>).map((column) => column.name));
+  if (!columns.has("amount_usd")) database.exec("ALTER TABLE activity_events ADD COLUMN amount_usd TEXT");
+  if (!columns.has("direction")) database.exec("ALTER TABLE activity_events ADD COLUMN direction TEXT NOT NULL DEFAULT 'neutral'");
+  if (!columns.has("spend_state")) database.exec("ALTER TABLE activity_events ADD COLUMN spend_state TEXT NOT NULL DEFAULT 'none'");
   return database;
 }
 
@@ -179,26 +195,31 @@ function paymentProjection(row: Record<string, unknown>): Projection {
   const status = stringValue(row.status) || "unknown";
   const amount = stringValue(row.amount);
   const asset = stringValue(row.asset);
+  const amountUsd = stringValue(row.amount_usd);
   const createdAt = stringValue(row.created_at) || new Date(0).toISOString();
   const updatedAt = stringValue(row.confirmed_at) || stringValue(row.submitted_at) || stringValue(row.approved_at) || createdAt;
   const mapped = statusMapping(status);
   const title = [amount, asset].filter(Boolean).join(" ") || "Wallet transfer";
   const summary = `${stringValue(row.chain_name) || "Wallet"} transfer`;
   const reference = maskReference(row.tx_hash);
-  return makeProjection({ source: "agentic-wallet", sourceId: String(row.id), activityType: "transfer", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset, stringValue(row.chain_name)].filter(Boolean).join(" ") });
+  const spendState = status.toLowerCase() === "confirmed" ? "settled" as const : status.toLowerCase() === "submitted" ? "pending" as const : "none" as const;
+  return makeProjection({ source: "agentic-wallet", sourceId: String(row.id), activityType: "transfer", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset, stringValue(row.chain_name)].filter(Boolean).join(" ") });
 }
 
 function binanceProjection(row: Record<string, unknown>): Projection {
   const status = stringValue(row.status) || "unknown";
   const amount = stringValue(row.amount);
   const asset = stringValue(row.currency);
+  const amountUsd = asset && ["USDT", "USDC", "FDUSD", "BUSD", "USD"].includes(asset.toUpperCase()) ? amount : undefined;
   const createdAt = stringValue(row.created_at) || new Date(0).toISOString();
   const updatedAt = stringValue(row.updated_at) || createdAt;
   const mapped = statusMapping(status);
   const title = [amount, asset].filter(Boolean).join(" ") || "Binance Pay order";
   const summary = "Binance Pay order";
   const reference = maskReference(row.pay_order_id || row.checkout_id);
-  return makeProjection({ source: "binance-pay", sourceId: String(row.id), activityType: "binance-pay", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset].filter(Boolean).join(" ") });
+  const normalizedStatus = status.toUpperCase();
+  const spendState = ["SUCCESS", "COMPLETED"].includes(normalizedStatus) ? "settled" as const : ["PROCESSING", "PENDING"].includes(normalizedStatus) ? "pending" as const : "none" as const;
+  return makeProjection({ source: "binance-pay", sourceId: String(row.id), activityType: "binance-pay", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset].filter(Boolean).join(" ") });
 }
 
 function x402Projection(row: Record<string, unknown>): Projection {
@@ -215,11 +236,14 @@ function x402Projection(row: Record<string, unknown>): Projection {
   } catch { selected = undefined; }
   const amount = stringValue(selected?.amount);
   const asset = stringValue(selected?.tokenSymbol);
+  const amountUsd = stringValue(row.amount_usd) || stringValue(selected?.amountUsd);
   const network = stringValue(selected?.network) || stringValue((selected?.originalAccept as Record<string, unknown> | undefined)?.network) || stringValue(selected?.binanceChainId);
   const reference = maskReference(row.settlement_tx_hash || row.approval_tx_hash);
   const title = [amount, asset].filter(Boolean).join(" ") || `x402 · ${host}`;
   const summary = `${method} ${host}${network ? ` · ${network}` : ""}`;
-  return makeProjection({ source: "x402", sourceId: String(row.id), activityType: "x402", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, host, method, network, status, asset, "x402"].filter(Boolean).join(" ") });
+  const delivery = stringValue(row.delivery_status);
+  const spendState = ["delivered", "paid_but_invalid", "paid_but_failed"].includes(delivery || "") || status.toLowerCase() === "completed" ? "settled" as const : row.paid_at || ["approving", "replaying"].includes(status.toLowerCase()) ? "pending" as const : "none" as const;
+  return makeProjection({ source: "x402", sourceId: String(row.id), activityType: "x402", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, host, method, network, status, asset, "x402"].filter(Boolean).join(" ") });
 }
 
 function sourceProjections(): Projection[] {
@@ -243,20 +267,20 @@ export function syncActivityEvents(): { inserted: number; updated: number; uncha
   const existing = new Map<string, ActivityRow>();
   for (const row of db.prepare("SELECT * FROM activity_events").all() as unknown as ActivityRow[]) existing.set(`${row.source}:${row.source_id}`, row);
   const upsert = db.prepare(`INSERT INTO activity_events
-    (id,source,source_id,activity_type,raw_status,status_group,status_category,amount,asset,title,summary,safe_reference,occurred_at,created_at,updated_at,search_text)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    (id,source,source_id,activity_type,raw_status,status_group,status_category,amount,asset,amount_usd,direction,spend_state,title,summary,safe_reference,occurred_at,created_at,updated_at,search_text)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(source,source_id) DO UPDATE SET
       id=excluded.id, activity_type=excluded.activity_type, raw_status=excluded.raw_status,
       status_group=excluded.status_group, status_category=excluded.status_category, amount=excluded.amount,
-      asset=excluded.asset, title=excluded.title, summary=excluded.summary, safe_reference=excluded.safe_reference,
+      asset=excluded.asset, amount_usd=excluded.amount_usd, direction=excluded.direction, spend_state=excluded.spend_state, title=excluded.title, summary=excluded.summary, safe_reference=excluded.safe_reference,
       occurred_at=excluded.occurred_at, created_at=excluded.created_at, updated_at=excluded.updated_at,
       search_text=excluded.search_text`);
   let inserted = 0; let updated = 0; let unchanged = 0;
   for (const event of projections) {
     const previous = existing.get(`${event.source}:${event.sourceId}`);
-    const next = [event.id, event.source, event.sourceId, event.activityType, event.status, event.statusGroup, event.statusCategory, event.amount ?? null, event.asset ?? null, event.title, event.summary, event.reference ?? null, event.occurredAt, event.createdAt, event.updatedAt, event.searchText];
+    const next = [event.id, event.source, event.sourceId, event.activityType, event.status, event.statusGroup, event.statusCategory, event.amount ?? null, event.asset ?? null, event.amountUsd ?? null, event.direction, event.spendState, event.title, event.summary, event.reference ?? null, event.occurredAt, event.createdAt, event.updatedAt, event.searchText];
     if (!previous) inserted += 1;
-    else if ([previous.id, previous.source, previous.source_id, previous.activity_type, previous.raw_status, previous.status_group, previous.status_category, previous.amount, previous.asset, previous.title, previous.summary, previous.safe_reference, previous.occurred_at, previous.created_at, previous.updated_at, previous.search_text].every((value, index) => value === next[index])) unchanged += 1;
+    else if ([previous.id, previous.source, previous.source_id, previous.activity_type, previous.raw_status, previous.status_group, previous.status_category, previous.amount, previous.asset, previous.amount_usd, previous.direction, previous.spend_state, previous.title, previous.summary, previous.safe_reference, previous.occurred_at, previous.created_at, previous.updated_at, previous.search_text].every((value, index) => value === next[index])) unchanged += 1;
     else updated += 1;
     upsert.run(...next);
   }
@@ -264,7 +288,7 @@ export function syncActivityEvents(): { inserted: number; updated: number; uncha
 }
 
 function toEvent(row: ActivityRow): ActivityEvent {
-  return { id: row.id, source: row.source, activityType: row.activity_type, status: row.raw_status, statusGroup: row.status_group, statusCategory: row.status_category, amount: row.amount ?? undefined, asset: row.asset ?? undefined, title: row.title, summary: row.summary, occurredAt: row.occurred_at, createdAt: row.created_at, updatedAt: row.updated_at, reference: row.safe_reference ?? undefined };
+  return { id: row.id, source: row.source, activityType: row.activity_type, status: row.raw_status, statusGroup: row.status_group, statusCategory: row.status_category, amount: row.amount ?? undefined, asset: row.asset ?? undefined, amountUsd: row.amount_usd ?? undefined, direction: row.direction, spendState: row.spend_state, title: row.title, summary: row.summary, occurredAt: row.occurred_at, createdAt: row.created_at, updatedAt: row.updated_at, reference: row.safe_reference ?? undefined };
 }
 
 const sourceAliases: Record<string, ActivitySource> = { "agentic-wallet": "agentic-wallet", "agentic_wallet": "agentic-wallet", wallet: "agentic-wallet", payment: "agentic-wallet", "payment-intent": "agentic-wallet", "payment-intents": "agentic-wallet", payment_intents: "agentic-wallet", "binance-pay": "binance-pay", binance: "binance-pay", "binance_pay": "binance-pay", binance_pay_orders: "binance-pay", x402: "x402", x402_intents: "x402" };
@@ -343,3 +367,8 @@ export function queryActivityEvents(input: ActivityQuery = {}): ActivityPage {
 export const listActivityEvents = queryActivityEvents;
 export const getActivityEvents = queryActivityEvents;
 export const backfillActivityEvents = syncActivityEvents;
+
+export function listReportActivityEvents(): ActivityEvent[] {
+  syncActivityEvents();
+  return (getDatabase().prepare("SELECT * FROM activity_events ORDER BY occurred_at ASC, id ASC").all() as unknown as ActivityRow[]).map(toEvent);
+}
