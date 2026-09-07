@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "env -u NODE_USE_ENV_PROXY next start",
+    "setup:deepseek": "python3 scripts/setup-deepseek.py",
     "setup:binance-account": "python3 scripts/setup-binance-readonly.py",
     "skills:validate": "tsx scripts/validate-agentpay-skills.ts",
     "lint": "tsc --noEmit",
