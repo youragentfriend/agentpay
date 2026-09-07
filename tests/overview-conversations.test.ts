@@ -6,7 +6,6 @@ import test, { afterEach, beforeEach } from "node:test";
 import { GET, POST as CREATE } from "../app/api/assistant/conversations/route";
 import { POST as CHAT } from "../app/api/assistant/chat/route";
 import { runOverviewSkillRuntime } from "../lib/server/overview-agent";
-import { setDeepSeekBridgeRunnerForTests } from "../lib/server/deepseek";
 import {
   createOverviewConversation,
   getOverviewConversation,
@@ -16,33 +15,32 @@ import {
 } from "../lib/server/overview-skill-runtime";
 
 let directory = "";
+let originalFetch: typeof globalThis.fetch;
 const previousEnv: Record<string, string | undefined> = {};
-
-function bridgeEnvelope(value: unknown) {
-  return JSON.stringify({ status: "ok", result: { payloads: [{ text: JSON.stringify(value) }], meta: { agentMeta: { provider: "deepseek", model: "deepseek-test" } }, executionTrace: { winnerProvider: "deepseek", winnerModel: "deepseek-test", fallbackUsed: false } } });
-}
 
 beforeEach(() => {
   directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-conversations-"));
-  for (const name of ["AGENTPAY_DB_PATH", "AGENTPAY_DEEPSEEK_MODEL"]) previousEnv[name] = process.env[name];
+  for (const name of ["AGENTPAY_DB_PATH", "DEEPSEEK_API_KEY", "AGENTPAY_DEEPSEEK_MODEL"]) previousEnv[name] = process.env[name];
   process.env.AGENTPAY_DB_PATH = path.join(directory, "agentpay.sqlite");
+  process.env.DEEPSEEK_API_KEY = "test-key";
   process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
+  originalFetch = globalThis.fetch;
 });
 
 afterEach(() => {
-  setDeepSeekBridgeRunnerForTests();
+  globalThis.fetch = originalFetch;
   resetOverviewSkillRuntimeForTests();
   rmSync(directory, { recursive: true, force: true });
   for (const [name, value] of Object.entries(previousEnv)) value === undefined ? delete process.env[name] : process.env[name] = value;
 });
 
 function mockDeepSeek(values: unknown[], prompts: string[] = []) {
-  setDeepSeekBridgeRunnerForTests(async (input) => {
-    prompts.push(input);
+  globalThis.fetch = async (_input, init) => {
+    prompts.push(String(JSON.parse(String(init?.body)).input));
     const value = values.shift();
     assert.notEqual(value, undefined, "unexpected DeepSeek call");
-    return { stdout: bridgeEnvelope(value), stderr: "" };
-  });
+    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200 });
+  };
 }
 
 const activitySelection = { skill: "activity-reporting", switchSkill: false };
@@ -68,18 +66,18 @@ test("list/get APIs persist non-empty conversations and omit empty sessions", as
 });
 
 test("persists the user turn immediately while DeepSeek is in flight", async () => {
-  let release!: (result: { stdout: string; stderr: string }) => void;
+  let release!: (response: Response) => void;
   let calls = 0;
-  setDeepSeekBridgeRunnerForTests(async () => {
+  globalThis.fetch = () => {
     calls += 1;
-    if (calls === 1) return await new Promise((resolve) => { release = resolve; });
-    throw new Error("bridge unavailable");
-  });
+    if (calls === 1) return new Promise<Response>((resolve) => { release = resolve; });
+    return Promise.resolve(new Response("{}", { status: 503 }));
+  };
   const running = runOverviewSkillRuntime("Show my latest payment activity");
   const pending = listOverviewConversations()[0];
   assert.equal(pending.messages[0].content, "Show my latest payment activity");
   assert.equal(pending.pending, true);
-  release({ stdout: bridgeEnvelope(activitySelection), stderr: "" });
+  release(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(activitySelection) }] } }] }), { status: 200 }));
   await assert.rejects(running);
   const completed = getOverviewConversation(pending.id);
   assert.equal(completed.pending, false);
@@ -125,15 +123,16 @@ test("restores skill, collected fields, pending state, and latest workflow befor
 });
 
 test("supports multiple concurrent conversations without mixing state", async () => {
-  setDeepSeekBridgeRunnerForTests(async (prompt) => {
+  globalThis.fetch = async (_input, init) => {
+    const prompt = String(JSON.parse(String(init?.body)).input);
     const activity = prompt.includes("alpha activity request");
     const value = prompt.includes("You are AgentPay's skill selector")
       ? { skill: activity ? "activity-reporting" : "binance-portfolio", switchSkill: false }
       : activity
         ? { operation: "activity-report", message: "Alpha activity ready.", parameters: { sort: "newest" }, missingFields: [], title: "Alpha Payment Activity Review" }
         : { operation: "binance-portfolio", message: "Beta holdings ready.", parameters: { source: "Spot" }, missingFields: [], title: "Beta Exchange Holdings Review" };
-    return { stdout: bridgeEnvelope(value), stderr: "" };
-  });
+    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200 });
+  };
   const [first, second] = await Promise.all([
     runOverviewSkillRuntime("alpha activity request"),
     runOverviewSkillRuntime("beta exchange holdings request"),
