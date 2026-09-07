@@ -9,10 +9,10 @@ test("removes run-bound proxy variables from ordinary provider subprocesses", ()
     HTTP_PROXY: "http://proxy.invalid",
     HTTPS_PROXY: "http://proxy.invalid",
     NODE_USE_ENV_PROXY: "1",
-    GEMINI_API_KEY: "protected-sentinel",
+    DEEPSEEK_API_KEY: "protected-sentinel",
   });
   assert.equal(environment.PATH, "/usr/bin");
-  assert.equal(environment.GEMINI_API_KEY, "protected-sentinel");
+  assert.equal(environment.DEEPSEEK_API_KEY, "protected-sentinel");
   assert.equal(environment.HTTP_PROXY, undefined);
   assert.equal(environment.HTTPS_PROXY, undefined);
   assert.equal(environment.NODE_USE_ENV_PROXY, undefined);

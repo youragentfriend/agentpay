@@ -21,11 +21,10 @@ const previousEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-overview-"));
-  for (const name of ["AGENTPAY_DB_PATH", "AGENTPAY_LLM_PROVIDER", "AGENTPAY_LLM_API_KEY", "AGENTPAY_LLM_MODEL", "AGENTPAY_ENABLE_WALLET_SEND", "AGENTPAY_ENABLE_BINANCE_PAY", "AGENTPAY_ENABLE_X402"]) previousEnv[name] = process.env[name];
+  for (const name of ["AGENTPAY_DB_PATH", "DEEPSEEK_API_KEY", "AGENTPAY_DEEPSEEK_MODEL", "AGENTPAY_ENABLE_WALLET_SEND", "AGENTPAY_ENABLE_BINANCE_PAY", "AGENTPAY_ENABLE_X402"]) previousEnv[name] = process.env[name];
   process.env.AGENTPAY_DB_PATH = path.join(directory, "agentpay.sqlite");
-  process.env.AGENTPAY_LLM_PROVIDER = "gemini";
-  process.env.AGENTPAY_LLM_API_KEY = "test-key";
-  process.env.AGENTPAY_LLM_MODEL = "gemini-test";
+  process.env.DEEPSEEK_API_KEY = "test-key";
+  process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
   process.env.AGENTPAY_ENABLE_WALLET_SEND = "false";
   process.env.AGENTPAY_ENABLE_BINANCE_PAY = "false";
   process.env.AGENTPAY_ENABLE_X402 = "false";
@@ -41,12 +40,12 @@ afterEach(() => {
   }
 });
 
-function mockGemini(values: unknown[], prompts: string[] = []) {
+function mockDeepSeek(values: unknown[], prompts: string[] = []) {
   globalThis.fetch = async (_input, init) => {
     prompts.push(String(JSON.parse(String(init?.body)).input));
     const value = values.shift();
-    assert.notEqual(value, undefined, "unexpected Gemini call");
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    assert.notEqual(value, undefined, "unexpected DeepSeek call");
+    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
 }
 
@@ -61,7 +60,7 @@ const cases = [
 for (const item of cases) {
   test(`routes and executes the ${item.skill} boundary`, async () => {
     const prompts: string[] = [];
-    mockGemini([
+    mockDeepSeek([
       { skill: item.skill, switchSkill: false },
       { operation: item.operation, message: "Prepared the deterministic workflow for review.", parameters: item.parameters, missingFields: [] },
     ], prompts);
@@ -81,7 +80,7 @@ for (const item of cases) {
 }
 
 test("keeps the selected skill across a follow-up and collects missing transfer fields", async () => {
-  mockGemini([
+  mockDeepSeek([
     { skill: "agentic-wallet-operations", switchSkill: false },
     { operation: "wallet-transfer", message: "What amount and recipient should I use?", parameters: { asset: "USDT" }, missingFields: ["amount", "recipient", "network"] },
     { skill: "agentic-wallet-operations", switchSkill: false },
@@ -97,7 +96,7 @@ test("keeps the selected skill across a follow-up and collects missing transfer 
 });
 
 test("switches skills only on an explicit domain-change decision", async () => {
-  mockGemini([
+  mockDeepSeek([
     { skill: "binance-portfolio", switchSkill: false },
     { operation: "binance-portfolio", message: "Opening exchange holdings.", parameters: {}, missingFields: [] },
     { skill: "activity-reporting", switchSkill: true },

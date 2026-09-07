@@ -22,20 +22,17 @@ test("accepts actions only for the selected skill", () => {
   assert.throws(() => validateOverviewAgentResult({ skill: "activity-reporting", action: "payment", message: "Wrong operation." }), /invalid action/);
 });
 
-test("asks Gemini to select from skill descriptions without provider fallback", async () => {
-  const previous = {
-    provider: process.env.AGENTPAY_LLM_PROVIDER,
-    key: process.env.AGENTPAY_LLM_API_KEY,
-    model: process.env.AGENTPAY_LLM_MODEL,
-  };
+test("asks DeepSeek to select from skill descriptions without provider fallback", async () => {
+  const previous = { key: process.env.DEEPSEEK_API_KEY, model: process.env.AGENTPAY_DEEPSEEK_MODEL };
   const originalFetch = globalThis.fetch;
-  process.env.AGENTPAY_LLM_PROVIDER = "gemini";
-  process.env.AGENTPAY_LLM_API_KEY = "test-key";
-  process.env.AGENTPAY_LLM_MODEL = "gemini-test";
+  process.env.DEEPSEEK_API_KEY = "test-key";
+  process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
   let requestBody = "";
-  globalThis.fetch = async (_input, init) => {
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), "https://api.deepseek.com/responses");
+    assert.equal((init?.headers as Record<string, string>).Authorization, "Bearer test-key");
     requestBody = String(init?.body || "");
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ skill: "binance-portfolio", action: "binance-balance", message: "Loading your read-only Binance exchange portfolio." }) }] } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return Response.json({ output_text: JSON.stringify({ skill: "binance-portfolio", action: "binance-balance", message: "Loading your read-only Binance exchange portfolio." }) });
   };
   try {
     const result = await runOverviewAgent([{ role: "user", content: "Show my Spot and Earn holdings" }]);
@@ -43,10 +40,10 @@ test("asks Gemini to select from skill descriptions without provider fallback", 
     assert.equal(result.action, "binance-balance");
     assert.match(requestBody, /Agentic Wallet is an on-chain wallet/);
     assert.match(requestBody, /Binance Portfolio is the read-only Binance exchange account/);
+    assert.equal(JSON.parse(requestBody).model, "deepseek-test");
   } finally {
     globalThis.fetch = originalFetch;
-    if (previous.provider === undefined) delete process.env.AGENTPAY_LLM_PROVIDER; else process.env.AGENTPAY_LLM_PROVIDER = previous.provider;
-    if (previous.key === undefined) delete process.env.AGENTPAY_LLM_API_KEY; else process.env.AGENTPAY_LLM_API_KEY = previous.key;
-    if (previous.model === undefined) delete process.env.AGENTPAY_LLM_MODEL; else process.env.AGENTPAY_LLM_MODEL = previous.model;
+    if (previous.key === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = previous.key;
+    if (previous.model === undefined) delete process.env.AGENTPAY_DEEPSEEK_MODEL; else process.env.AGENTPAY_DEEPSEEK_MODEL = previous.model;
   }
 });

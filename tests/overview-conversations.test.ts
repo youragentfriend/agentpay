@@ -20,11 +20,10 @@ const previousEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-conversations-"));
-  for (const name of ["AGENTPAY_DB_PATH", "AGENTPAY_LLM_PROVIDER", "AGENTPAY_LLM_API_KEY", "AGENTPAY_LLM_MODEL"]) previousEnv[name] = process.env[name];
+  for (const name of ["AGENTPAY_DB_PATH", "DEEPSEEK_API_KEY", "AGENTPAY_DEEPSEEK_MODEL"]) previousEnv[name] = process.env[name];
   process.env.AGENTPAY_DB_PATH = path.join(directory, "agentpay.sqlite");
-  process.env.AGENTPAY_LLM_PROVIDER = "gemini";
-  process.env.AGENTPAY_LLM_API_KEY = "test-key";
-  process.env.AGENTPAY_LLM_MODEL = "gemini-test";
+  process.env.DEEPSEEK_API_KEY = "test-key";
+  process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
   originalFetch = globalThis.fetch;
 });
 
@@ -35,12 +34,12 @@ afterEach(() => {
   for (const [name, value] of Object.entries(previousEnv)) value === undefined ? delete process.env[name] : process.env[name] = value;
 });
 
-function mockGemini(values: unknown[], prompts: string[] = []) {
+function mockDeepSeek(values: unknown[], prompts: string[] = []) {
   globalThis.fetch = async (_input, init) => {
     prompts.push(String(JSON.parse(String(init?.body)).input));
     const value = values.shift();
-    assert.notEqual(value, undefined, "unexpected Gemini call");
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }), { status: 200 });
+    assert.notEqual(value, undefined, "unexpected DeepSeek call");
+    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200 });
   };
 }
 
@@ -66,7 +65,7 @@ test("list/get APIs persist non-empty conversations and omit empty sessions", as
   assert.equal(listOverviewConversations().length, 1, "New conversation must not create an empty recent-chat entry");
 });
 
-test("persists the user turn immediately while Gemini is in flight", async () => {
+test("persists the user turn immediately while DeepSeek is in flight", async () => {
   let release!: (response: Response) => void;
   let calls = 0;
   globalThis.fetch = () => {
@@ -87,7 +86,7 @@ test("persists the user turn immediately while Gemini is in flight", async () =>
 
 test("generates and persists a first-exchange title without a title-only call", async () => {
   const prompts: string[] = [];
-  mockGemini([activitySelection, activityExecution], prompts);
+  mockDeepSeek([activitySelection, activityExecution], prompts);
   const result = await runOverviewSkillRuntime("Show my latest payment activity");
   assert.equal(result.title, "Review Recent Payment Activity");
   assert.equal(getOverviewConversation(result.conversationId).title, result.title);
@@ -96,7 +95,7 @@ test("generates and persists a first-exchange title without a title-only call", 
 });
 
 test("uses a deterministic sanitized fallback for invalid or missing titles and redacts secrets", async () => {
-  mockGemini([activitySelection, { ...activityExecution, title: "too short" }]);
+  mockDeepSeek([activitySelection, { ...activityExecution, title: "too short" }]);
   const result = await runOverviewSkillRuntime("Show API_KEY=super-secret latest failed USDT transfers");
   assert.equal(result.title, "Show latest failed USDT transfers");
   const stored = getOverviewConversation(result.conversationId);
@@ -105,7 +104,7 @@ test("uses a deterministic sanitized fallback for invalid or missing titles and 
 });
 
 test("restores skill, collected fields, pending state, and latest workflow before continuing", async () => {
-  mockGemini([
+  mockDeepSeek([
     { skill: "agentic-wallet-operations", switchSkill: false },
     { operation: "wallet-transfer", message: "Ready for review.", parameters: { asset: "USDT", amount: "3", recipient: "0x1111111111111111111111111111111111111111", network: "BSC" }, missingFields: [], title: "Prepare USDT Wallet Transfer" },
     { skill: "agentic-wallet-operations", switchSkill: false },
@@ -132,7 +131,7 @@ test("supports multiple concurrent conversations without mixing state", async ()
       : activity
         ? { operation: "activity-report", message: "Alpha activity ready.", parameters: { sort: "newest" }, missingFields: [], title: "Alpha Payment Activity Review" }
         : { operation: "binance-portfolio", message: "Beta holdings ready.", parameters: { source: "Spot" }, missingFields: [], title: "Beta Exchange Holdings Review" };
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }), { status: 200 });
+    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200 });
   };
   const [first, second] = await Promise.all([
     runOverviewSkillRuntime("alpha activity request"),

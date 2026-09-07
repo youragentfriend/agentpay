@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { EnvHttpProxyAgent, fetch as proxyFetch } from "undici";
+import { callDeepSeekJson, deepSeekStatus } from "@/lib/server/deepseek";
 import {
   actionForOperation,
   appendOverviewMessages,
@@ -47,8 +47,6 @@ const ACTIONS_BY_SKILL: Record<OverviewSkill, readonly OverviewAction[]> = {
   "activity-reporting": ["activity"],
   "x402-payment-orchestration": ["x402"],
 };
-const proxyAgent = new EnvHttpProxyAgent();
-
 function frontmatterValue(source: string, name: string): string {
   const match = source.match(new RegExp(`^${name}:\\s*["']?(.+?)["']?\\s*$`, "m"));
   return match?.[1]?.trim() ?? "";
@@ -64,34 +62,7 @@ export function loadOverviewSkillDescriptions(root = process.cwd()): Array<{ nam
   });
 }
 
-export function overviewAgentStatus() {
-  const provider = (process.env.AGENTPAY_LLM_PROVIDER || "gemini").trim().toLowerCase();
-  const key = (process.env.AGENTPAY_LLM_API_KEY || process.env.GEMINI_API_KEY || "").trim();
-  const model = (process.env.AGENTPAY_LLM_MODEL || "gemini-3.6-flash").trim();
-  return { configured: provider === "gemini" && Boolean(key && model), provider: provider === "gemini" ? "gemini" as const : null, model };
-}
-
-function extractText(value: unknown): string {
-  const found: string[] = [];
-  function visit(item: unknown, depth: number) {
-    if (depth > 8 || item === null || item === undefined) return;
-    if (Array.isArray(item)) return void item.forEach((entry) => visit(entry, depth + 1));
-    if (typeof item !== "object") return;
-    for (const [key, entry] of Object.entries(item as Record<string, unknown>)) {
-      if (["text", "output_text", "outputText", "content"].includes(key) && typeof entry === "string" && entry.trim()) found.push(entry);
-      else visit(entry, depth + 1);
-    }
-  }
-  visit(value, 0);
-  return [...new Set(found)].join("\n");
-}
-
-function parseJsonText(text: string): unknown {
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  return JSON.parse(start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed);
-}
+export function overviewAgentStatus() { return deepSeekStatus(); }
 
 export function validateOverviewAgentResult(value: unknown): OverviewAgentResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The Overview agent returned an invalid response.");
@@ -169,41 +140,11 @@ function executionInstructions(skill: OverviewSkill, message: string, root: stri
   ].join("\n");
 }
 
-async function providerFetch(url: string, key: string, init: RequestInit) {
-  if (key.startsWith("oc-sent-v2.")) return proxyFetch(url, { ...init, dispatcher: proxyAgent } as Parameters<typeof proxyFetch>[1]);
-  return fetch(url, init);
-}
-
-async function callGemini(input: string): Promise<unknown> {
-  const status = overviewAgentStatus();
-  if (!status.configured || !status.provider) throw new Error("The protected Gemini free-tier key is not configured for AgentPay Overview.");
-  const key = (process.env.AGENTPAY_LLM_API_KEY || process.env.GEMINI_API_KEY || "").trim();
-  const base = (process.env.AGENTPAY_LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const response = await providerFetch(`${base}/interactions`, key, {
-      method: "POST",
-      headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: status.model, input }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      if (response.status === 429) throw new Error("Gemini free-tier quota is currently unavailable. AgentPay did not fall back to another provider.");
-      throw new Error(`The Gemini Overview agent is unavailable (HTTP ${response.status}).`);
-    }
-    const text = extractText(await response.json());
-    if (!text || text.length > 10_000) throw new Error("The Overview agent returned no usable response.");
-    return parseJsonText(text);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /** Kept for compatibility with existing callers and focused selector tests. */
 export async function runOverviewAgent(messages: OverviewMessage[], root = process.cwd()): Promise<OverviewAgentResult> {
   const transcript = messages.slice(-10).map((message) => `${message.role.toUpperCase()}: ${message.content.slice(0, 2_000)}`).join("\n").slice(-10_000);
-  return validateOverviewAgentResult(await callGemini(`${legacyInstructions(root)}\n\nConversation:\n${transcript}`));
+  return validateOverviewAgentResult(await callDeepSeekJson(`${legacyInstructions(root)}\n\nConversation:\n${transcript}`, { maxTextChars: 10_000 }));
 }
 
 export async function runOverviewSkillRuntime(message: string, conversationId?: string, root = process.cwd()): Promise<OverviewRuntimeResult> {
@@ -222,11 +163,11 @@ export async function runOverviewSkillRuntime(message: string, conversationId?: 
 
   try {
     const transcript = conversation.messages.map((entry) => `${entry.role.toUpperCase()}: ${entry.content}`).join("\n").slice(-12_000);
-    const selection = validateSelection(await callGemini(`${selectionInstructions(root, conversation.selectedSkill)}\n\nConversation:\n${transcript}`), conversation.selectedSkill);
+    const selection = validateSelection(await callDeepSeekJson(`${selectionInstructions(root, conversation.selectedSkill)}\n\nConversation:\n${transcript}`, { maxTextChars: 10_000 }), conversation.selectedSkill);
     const selectedSkill = selection.skill;
     if (selectedSkill !== conversation.selectedSkill) conversation = updateOverviewConversation(conversation.id, { selectedSkill });
 
-    const execution = validateSkillExecution(selectedSkill, await callGemini(`${executionInstructions(selectedSkill, transcript, root, firstCompletedExchange)}\n\nBounded conversation:\n${transcript}`));
+    const execution = validateSkillExecution(selectedSkill, await callDeepSeekJson(`${executionInstructions(selectedSkill, transcript, root, firstCompletedExchange)}\n\nBounded conversation:\n${transcript}`, { maxTextChars: 10_000 }));
     const workflow = workflowForExecution(execution);
     const action = actionForOperation(execution.operation);
     const title = conversation.title ?? sanitizeOverviewTitle(execution.title, cleanMessage);

@@ -39,7 +39,7 @@ The dedicated x402 Service Finder has three modes: **Discover with AI**, **Brows
 
 Configure merchant hosts independently with `AGENTPAY_X402_ALLOWED_HOSTS`, then add each exact `METHOD https://host/path` trust rule in Settings. These checks are intentionally separate. Real signing remains disabled unless `AGENTPAY_ENABLE_X402=true`; keep it false for ordinary development.
 
-AI discovery is optional and server-only. Set `AGENTPAY_LLM_PROVIDER=openai`, `AGENTPAY_LLM_API_KEY`, and optionally `AGENTPAY_LLM_MODEL`/`AGENTPAY_LLM_BASE_URL` through the deployment secret manager. The API key is never sent to the browser or stored in SQLite. When unconfigured or unavailable, Browse and Direct remain fully usable and deterministic.
+AI routing and optional x402 discovery use DeepSeek only and remain server-side. Store `DEEPSEEK_API_KEY` in the deployment secret manager; optionally set `AGENTPAY_DEEPSEEK_MODEL` (default `deepseek-v4-flash`) or `AGENTPAY_DEEPSEEK_BASE_URL`. The API key is never sent to the browser or stored in SQLite. When DeepSeek is unconfigured or unavailable, deterministic catalog browsing and direct workflows remain available; AgentPay does not fall back to another model provider.
 
 The Binance menu also provides a separate, server-only read-only account portfolio across Spot, Funding, USDⓈ-M Futures, Simple Earn, and Margin. Run `npm run setup:binance-account` in a trusted host terminal for masked local setup, or configure `BINANCE_READONLY_API_KEY` and `BINANCE_READONLY_API_SECRET` through the production deployment secret manager. Do not reuse Binance Pay credentials. Sources fail independently, USD values are estimates from public Binance market prices, and no trading or withdrawal endpoint is present. See `docs/binance-readonly.md`.
 

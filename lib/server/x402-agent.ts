@@ -1,14 +1,9 @@
 import type { X402ChatMessage, X402RequestMethod } from "@/lib/x402-types";
 import { isSupportedX402Network } from "@/lib/server/x402-networks";
-import { EnvHttpProxyAgent, fetch as proxyFetch } from "undici";
+import { callDeepSeekJson, deepSeekStatus } from "@/lib/server/deepseek";
 
 const MAX_MESSAGES = 12;
 const MAX_TRANSCRIPT_CHARS = 12_000;
-const proxyAgent = new EnvHttpProxyAgent();
-async function providerFetch(url: string, key: string, init: RequestInit) {
-  if (key.startsWith("oc-sent-v2.")) return proxyFetch(url, { ...init, dispatcher: proxyAgent } as Parameters<typeof proxyFetch>[1]);
-  return fetch(url, init);
-}
 const RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -51,51 +46,7 @@ export type X402AgentCandidate = {
   requestBody?: unknown; x402Version: 2; networks: string[]; sourceUrls: string[];
 };
 export type X402AgentResult = { action: "answer" | "prepare"; message: string; candidate?: X402AgentCandidate };
-export type X402AgentProvider = "gemini" | "openai";
-
-export function x402AgentStatus() {
-  const raw = (process.env.AGENTPAY_LLM_PROVIDER || "gemini").trim().toLowerCase();
-  const provider: X402AgentProvider | null = raw === "gemini" || raw === "openai" ? raw : null;
-  const key = provider === "gemini"
-    ? (process.env.AGENTPAY_LLM_API_KEY || process.env.GEMINI_API_KEY || "").trim()
-    : provider === "openai" ? (process.env.AGENTPAY_LLM_API_KEY || process.env.OPENAI_API_KEY || "").trim() : "";
-  const model = provider === "gemini"
-    ? (process.env.AGENTPAY_LLM_MODEL || "gemini-3.6-flash")
-    : provider === "openai" ? (process.env.AGENTPAY_LLM_MODEL || "gpt-5.6-luna") : null;
-  return { configured: Boolean(provider && key), provider, model, liveSearch: Boolean(provider && key) };
-}
-
-function extractText(value: unknown): string {
-  if (!value || typeof value !== "object") return "";
-  const row = value as Record<string, unknown>;
-  for (const key of ["output_text", "outputText"]) if (typeof row[key] === "string") return String(row[key]);
-  for (const key of ["output", "outputs"]) {
-    if (!Array.isArray(row[key])) continue;
-    const parts: string[] = [];
-    for (const item of row[key] as unknown[]) {
-      if (!item || typeof item !== "object") continue;
-      const entry = item as Record<string, unknown>;
-      if ((entry.type === "text" || entry.type === "output_text") && typeof entry.text === "string") parts.push(entry.text);
-      if (Array.isArray(entry.content)) for (const content of entry.content) if (content && typeof content === "object" && typeof (content as Record<string, unknown>).text === "string") parts.push(String((content as Record<string, unknown>).text));
-    }
-    if (parts.length) return parts.join("\n");
-  }
-  if (Array.isArray(row.candidates)) {
-    const parts = row.candidates.flatMap(candidate => candidate && typeof candidate === "object" && (candidate as Record<string, unknown>).content && typeof (candidate as Record<string, unknown>).content === "object" && Array.isArray(((candidate as Record<string, unknown>).content as Record<string, unknown>).parts) ? (((candidate as Record<string, unknown>).content as Record<string, unknown>).parts as unknown[]) : []);
-    const text = shopper(parts);
-    if (text.length) return text.join("\n");
-  }
-  return "";
-}
-function shopper(parts: unknown[]): string[] {
-  return parts.filter(part => part && typeof part === "object" && typeof (part as Record<string, unknown>).text === "string").map(part => String((part as Record<string, unknown>).text));
-}
-function jsonText(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("```")) return trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  const start = trimmed.indexOf("{"), end = trimmed.lastIndexOf("}");
-  return start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed;
-}
+export function x402AgentStatus() { return deepSeekStatus(); }
 function validateResult(value: unknown): X402AgentResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("The x402 agent returned an invalid response.");
   const row = value as Record<string, unknown>;
@@ -122,31 +73,10 @@ function validateResult(value: unknown): X402AgentResult {
   } };
 }
 
-async function callOpenAi(key: string, model: string, transcript: string, signal: AbortSignal): Promise<unknown> {
-  const base = (process.env.AGENTPAY_LLM_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
-  const response = await providerFetch(`${base}/responses`, key, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, store: false, tools: [{ type: "web_search" }], tool_choice: "auto", instructions: INSTRUCTIONS, input: transcript, text: { format: { type: "json_schema", name: "agentpay_x402_search", strict: true, schema: RESULT_SCHEMA } } }), signal });
-  if (!response.ok) throw new Error(`The OpenAI x402 search agent is unavailable (HTTP ${response.status}).`);
-  return response.json();
-}
-async function callGemini(key: string, model: string, transcript: string, signal: AbortSignal): Promise<unknown> {
-  const base = (process.env.AGENTPAY_LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta").replace(/\/$/, "");
-  const response = await providerFetch(`${base}/interactions`, key, { method: "POST", headers: { "x-goog-api-key": key, "Content-Type": "application/json" }, body: JSON.stringify({ model, input: `${INSTRUCTIONS}\n\nConversation:\n${transcript}`, tools: [{ type: "google_search" }] }), signal });
-  if (!response.ok) throw new Error(`The Gemini x402 search agent is unavailable (HTTP ${response.status}).`);
-  return response.json();
-}
-
 export async function runX402Agent(messages: X402ChatMessage[]): Promise<X402AgentResult> {
   const status = x402AgentStatus();
-  if (!status.configured || !status.provider || !status.model) throw new Error("The protected live-search LLM API key is not configured for AgentPay x402.");
-  const key = status.provider === "gemini"
-    ? (process.env.AGENTPAY_LLM_API_KEY || process.env.GEMINI_API_KEY || "").trim()
-    : (process.env.AGENTPAY_LLM_API_KEY || process.env.OPENAI_API_KEY || "").trim();
+  if (!status.configured) throw new Error("The protected DeepSeek API key is not configured for AgentPay x402 discovery.");
   const transcript = messages.slice(-MAX_MESSAGES).map(item => `${item.role.toUpperCase()}: ${item.content}`).join("\n").slice(-MAX_TRANSCRIPT_CHARS);
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 45_000);
-  try {
-    const data = status.provider === "gemini" ? await callGemini(key, status.model, transcript, controller.signal) : await callOpenAi(key, status.model, transcript, controller.signal);
-    const text = extractText(data);
-    if (!text || text.length > 20_000) throw new Error("The x402 agent returned no usable response.");
-    return validateResult(JSON.parse(jsonText(text)));
-  } finally { clearTimeout(timer); }
+  const data = await callDeepSeekJson(`${INSTRUCTIONS}\n\nConversation:\n${transcript}`, { timeoutMs: 45_000, webSearch: true, schema: RESULT_SCHEMA as Record<string, unknown>, schemaName: "agentpay_x402_search", maxTextChars: 20_000 });
+  return validateResult(data);
 }
