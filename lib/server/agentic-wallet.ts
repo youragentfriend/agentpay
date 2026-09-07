@@ -12,6 +12,7 @@ import type {
 } from "@/lib/wallet-types";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
 import type { X402Preview, X402Signature } from "@/lib/x402-types";
+import { directChildEnvironment } from "@/lib/server/direct-network";
 
 const execFileAsync = promisify(execFile);
 const BAW_BIN = path.join(process.cwd(), "node_modules", ".bin", "baw");
@@ -57,6 +58,7 @@ async function runBaw<T>(args: readonly string[], timeout = READ_TIMEOUT_MS): Pr
       cwd: process.cwd(),
       timeout,
       maxBuffer: MAX_OUTPUT_BYTES,
+      env: directChildEnvironment(),
       windowsHide: true,
     });
     return parseCliEnvelope<T>(stdout);

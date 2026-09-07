@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import type { BinancePayCapability, BinancePayCurrencies, BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
 import { saveBinancePayOrder } from "@/lib/server/binance-pay-store";
 import { enforcePaymentPolicy, PaymentPolicyError, usdAmountForCurrency } from "@/lib/server/payment-policy";
+import { directChildEnvironment } from "@/lib/server/direct-network";
 
 const execFileAsync = promisify(execFile);
 const SKILL_DIR = path.join(process.cwd(), "vendor", "binance", "payment");
@@ -60,7 +61,7 @@ async function runUnlocked(args: string[], timeout = 45_000, structured = true):
       cwd: SKILL_DIR,
       timeout,
       maxBuffer: MAX_OUTPUT,
-      env: process.env,
+      env: directChildEnvironment(),
       windowsHide: true,
     });
     return structured ? parseLastJson(stdout) : {};
