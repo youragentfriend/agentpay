@@ -2,6 +2,25 @@ export type X402OptionStatus = "READY_TO_SIGN" | "ACTION_REQUIRED" | "NOT_SIGNAB
 export type X402IntentStatus = "prepared" | "reviewed" | "approved" | "signing" | "approving" | "replaying" | "completed" | "cancelled" | "failed";
 export type X402RequestMethod = "GET" | "POST";
 
+export interface X402CatalogServiceInput {
+  title: string;
+  description: string;
+  category: string;
+  endpoint: string;
+  method: X402RequestMethod;
+  networks: string[];
+  sourceUrls: string[];
+  origin: "curated" | "ai-discovered";
+}
+export interface X402CatalogService extends X402CatalogServiceInput {
+  id: string;
+  verificationStatus: "candidate" | "verified";
+  verifiedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  removedAt?: string;
+}
+
 export interface X402PaymentOption {
   index: number;
   status: X402OptionStatus;
