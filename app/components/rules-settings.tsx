@@ -6,6 +6,7 @@ import type { AgentPaySettings, PaymentRail, SpendingLimits } from "@/lib/settin
 
 const RAILS: Array<{ id: PaymentRail; label: string; help: string }> = [
   { id: "binance-pay", label: "Binance Pay", help: "Applied only to Binance Pay transactions." },
+  { id: "binance-onchain", label: "Onchain Pay", help: "Applied only to Binance Onchain Pay withdrawals to external blockchain addresses." },
   { id: "x402", label: "x402", help: "Applied only to approved x402 purchases with a reliable USD valuation." },
   { id: "agentic-wallet", label: "Agentic Wallet", help: "Applied only to direct Agentic Wallet transfers." },
 ];
@@ -67,7 +68,7 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   const dailyError = spendingLimitError(activeRail, "dailyUsdLimit", active.dailyUsdLimit);
   const hasAnyLimitError = RAILS.some(({ id }) => spendingLimitError(id, "perPaymentUsdLimit", limits[id].perPaymentUsdLimit) || spendingLimitError(id, "dailyUsdLimit", limits[id].dailyUsdLimit));
   return <div className="rules-settings-card">
-    <div className="locked-rule settings-card"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
+    <div className="locked-rule settings-card"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, Onchain Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
     <section className="settings-card spending-rules-card">
       <div className="settings-section-heading"><div><strong>Spending limits</strong><span>Configure independent limits for each payment rail.</span></div></div>
       <div className="spending-limit-tabs" role="tablist" aria-label="Payment rail spending limits">{RAILS.map((item) => { const invalid = Boolean(spendingLimitError(item.id, "perPaymentUsdLimit", limits[item.id].perPaymentUsdLimit) || spendingLimitError(item.id, "dailyUsdLimit", limits[item.id].dailyUsdLimit)); return <button type="button" role="tab" aria-selected={activeRail === item.id} className={`${activeRail === item.id ? "active" : ""}${invalid ? " has-error" : ""}`} key={item.id} onClick={() => setActiveRail(item.id)}>{item.label}</button>; })}</div>

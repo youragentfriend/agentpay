@@ -15,3 +15,8 @@ vendor/binance/payment/payment_qr.png
 vendor/binance/payment/inbox/
 __pycache__/
 *.pyc
+vendor/binance/onchain-pay/.local.md
+vendor/binance/onchain-pay/*.pem
+vendor/binance/onchain-pay/**/*.pem
+onchain-pay.json
+onchain-pay.json.*

@@ -33,6 +33,8 @@ function db() {
       daily_usd_limit TEXT,
       binance_pay_per_payment_usd_limit TEXT,
       binance_pay_daily_usd_limit TEXT,
+      onchain_pay_per_payment_usd_limit TEXT,
+      onchain_pay_daily_usd_limit TEXT,
       x402_per_payment_usd_limit TEXT,
       x402_daily_usd_limit TEXT,
       wallet_per_payment_usd_limit TEXT,
@@ -49,6 +51,8 @@ function db() {
   if (!columns.has("daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN daily_usd_limit TEXT");
   if (!columns.has("binance_pay_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN binance_pay_per_payment_usd_limit TEXT");
   if (!columns.has("binance_pay_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN binance_pay_daily_usd_limit TEXT");
+  if (!columns.has("onchain_pay_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN onchain_pay_per_payment_usd_limit TEXT");
+  if (!columns.has("onchain_pay_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN onchain_pay_daily_usd_limit TEXT");
   if (!columns.has("x402_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN x402_per_payment_usd_limit TEXT");
   if (!columns.has("x402_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN x402_daily_usd_limit TEXT");
   if (!columns.has("wallet_per_payment_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN wallet_per_payment_usd_limit TEXT");
@@ -67,24 +71,29 @@ function db() {
   const now = new Date().toISOString();
   database.prepare(`
     INSERT OR IGNORE INTO app_settings (id, display_name, display_currency, time_zone,
-      binance_pay_per_payment_usd_limit, binance_pay_daily_usd_limit, x402_per_payment_usd_limit, x402_daily_usd_limit,
+      binance_pay_per_payment_usd_limit, binance_pay_daily_usd_limit, onchain_pay_per_payment_usd_limit, onchain_pay_daily_usd_limit, x402_per_payment_usd_limit, x402_daily_usd_limit,
       wallet_per_payment_usd_limit, wallet_daily_usd_limit, updated_at)
-    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(DEFAULT_AGENTPAY_SETTINGS.displayName, DEFAULT_AGENTPAY_SETTINGS.displayCurrency, DEFAULT_AGENTPAY_SETTINGS.timeZone,
     DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].dailyUsdLimit,
+    DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-onchain"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-onchain"].dailyUsdLimit,
     DEFAULT_AGENTPAY_SETTINGS.spendingLimits.x402.perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits.x402.dailyUsdLimit,
     DEFAULT_AGENTPAY_SETTINGS.spendingLimits["agentic-wallet"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["agentic-wallet"].dailyUsdLimit, now);
   if (!columns.has("binance_pay_per_payment_usd_limit")) database.exec("UPDATE app_settings SET binance_pay_per_payment_usd_limit=COALESCE(per_payment_usd_limit,'50') WHERE id=1");
   if (!columns.has("binance_pay_daily_usd_limit")) database.exec("UPDATE app_settings SET binance_pay_daily_usd_limit=COALESCE(daily_usd_limit,'100') WHERE id=1");
+  if (!columns.has("onchain_pay_per_payment_usd_limit")) database.exec("UPDATE app_settings SET onchain_pay_per_payment_usd_limit='100' WHERE id=1");
+  if (!columns.has("onchain_pay_daily_usd_limit")) database.exec("UPDATE app_settings SET onchain_pay_daily_usd_limit='250' WHERE id=1");
   if (!columns.has("x402_per_payment_usd_limit")) database.exec("UPDATE app_settings SET x402_per_payment_usd_limit=per_payment_usd_limit WHERE id=1");
   if (!columns.has("x402_daily_usd_limit")) database.exec("UPDATE app_settings SET x402_daily_usd_limit=daily_usd_limit WHERE id=1");
   if (!columns.has("wallet_per_payment_usd_limit")) database.exec("UPDATE app_settings SET wallet_per_payment_usd_limit=per_payment_usd_limit WHERE id=1");
   if (!columns.has("wallet_daily_usd_limit")) database.exec("UPDATE app_settings SET wallet_daily_usd_limit=daily_usd_limit WHERE id=1");
   database.prepare(`UPDATE app_settings SET
     binance_pay_per_payment_usd_limit=COALESCE(binance_pay_per_payment_usd_limit,?), binance_pay_daily_usd_limit=COALESCE(binance_pay_daily_usd_limit,?),
+    onchain_pay_per_payment_usd_limit=COALESCE(onchain_pay_per_payment_usd_limit,?), onchain_pay_daily_usd_limit=COALESCE(onchain_pay_daily_usd_limit,?),
     x402_per_payment_usd_limit=COALESCE(x402_per_payment_usd_limit,?), x402_daily_usd_limit=COALESCE(x402_daily_usd_limit,?),
     wallet_per_payment_usd_limit=COALESCE(wallet_per_payment_usd_limit,?), wallet_daily_usd_limit=COALESCE(wallet_daily_usd_limit,?) WHERE id=1`).run(
       DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].dailyUsdLimit,
+      DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-onchain"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-onchain"].dailyUsdLimit,
       DEFAULT_AGENTPAY_SETTINGS.spendingLimits.x402.perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits.x402.dailyUsdLimit,
       DEFAULT_AGENTPAY_SETTINGS.spendingLimits["agentic-wallet"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["agentic-wallet"].dailyUsdLimit);
   return database;
@@ -132,6 +141,7 @@ function validateTimeZone(value: unknown) {
 const USD_LIMIT = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,5})?$/;
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const OTHER_CHAIN_ADDRESS = /^[A-Za-z0-9:_-]{20,256}$/;
 
 function validateUsdLimit(value: unknown, label: string): string | null {
   if (value === null || value === "") return null;
@@ -152,8 +162,8 @@ function validateStringArray(value: unknown, label: string): string[] {
 
 function validateWalletDestinations(value: unknown): string[] {
   const destinations = validateStringArray(value, "Trusted wallet destinations").map((destination) => {
-    if (!EVM_ADDRESS.test(destination) && !SOLANA_ADDRESS.test(destination)) {
-      throw new SettingsValidationError("Trusted wallet destinations must be valid EVM or Solana addresses.");
+    if (!EVM_ADDRESS.test(destination) && !SOLANA_ADDRESS.test(destination) && !OTHER_CHAIN_ADDRESS.test(destination)) {
+      throw new SettingsValidationError("Trusted wallet destinations must be valid blockchain addresses without spaces.");
     }
     return destination.startsWith("0x") ? destination.toLowerCase() : destination;
   });
@@ -194,7 +204,7 @@ function validateSpendingLimits(value: unknown): UpdateAgentPaySettings["spendin
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Spending limits must be provided for each payment rail.");
   const input = value as Record<string, unknown>;
   const read = (rail: keyof UpdateAgentPaySettings["spendingLimits"], label: string) => {
-    const candidate = input[rail];
+    const candidate = input[rail] ?? (rail === "binance-onchain" ? DEFAULT_AGENTPAY_SETTINGS.spendingLimits[rail] : undefined);
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) throw new SettingsValidationError(`${label} spending limits are required.`);
     const fields = candidate as Record<string, unknown>;
     const perPaymentUsdLimit = validateUsdLimit(fields.perPaymentUsdLimit, `${label} per-payment limit`);
@@ -207,6 +217,7 @@ function validateSpendingLimits(value: unknown): UpdateAgentPaySettings["spendin
   };
   return {
     "binance-pay": read("binance-pay", "Binance Pay"),
+    "binance-onchain": read("binance-onchain", "Onchain Pay"),
     x402: read("x402", "x402"),
     "agentic-wallet": read("agentic-wallet", "Agentic Wallet"),
   };
@@ -244,6 +255,7 @@ function mapSettings(row: Record<string, unknown>): AgentPaySettings {
     requireApproval: true,
     spendingLimits: {
       "binance-pay": { perPaymentUsdLimit: row.binance_pay_per_payment_usd_limit === null ? null : String(row.binance_pay_per_payment_usd_limit), dailyUsdLimit: row.binance_pay_daily_usd_limit === null ? null : String(row.binance_pay_daily_usd_limit) },
+      "binance-onchain": { perPaymentUsdLimit: row.onchain_pay_per_payment_usd_limit === null ? null : String(row.onchain_pay_per_payment_usd_limit), dailyUsdLimit: row.onchain_pay_daily_usd_limit === null ? null : String(row.onchain_pay_daily_usd_limit) },
       x402: { perPaymentUsdLimit: row.x402_per_payment_usd_limit === null ? null : String(row.x402_per_payment_usd_limit), dailyUsdLimit: row.x402_daily_usd_limit === null ? null : String(row.x402_daily_usd_limit) },
       "agentic-wallet": { perPaymentUsdLimit: row.wallet_per_payment_usd_limit === null ? null : String(row.wallet_per_payment_usd_limit), dailyUsdLimit: row.wallet_daily_usd_limit === null ? null : String(row.wallet_daily_usd_limit) },
     },
@@ -270,11 +282,12 @@ export function updateAgentPaySettings(value: unknown): AgentPaySettings {
   db().prepare(`
     UPDATE app_settings
     SET display_name = ?, profile_image_data_url = ?, display_currency = ?, time_zone = ?,
-        binance_pay_per_payment_usd_limit=?, binance_pay_daily_usd_limit=?, x402_per_payment_usd_limit=?, x402_daily_usd_limit=?, wallet_per_payment_usd_limit=?, wallet_daily_usd_limit=?,
+        binance_pay_per_payment_usd_limit=?, binance_pay_daily_usd_limit=?, onchain_pay_per_payment_usd_limit=?, onchain_pay_daily_usd_limit=?, x402_per_payment_usd_limit=?, x402_daily_usd_limit=?, wallet_per_payment_usd_limit=?, wallet_daily_usd_limit=?,
         trusted_wallet_destinations = ?, trusted_x402_hosts = ?, trusted_x402_endpoints = ?, updated_at = ?
     WHERE id = 1
   `).run(settings.displayName, settings.profileImageDataUrl, settings.displayCurrency, settings.timeZone,
     settings.spendingLimits["binance-pay"].perPaymentUsdLimit, settings.spendingLimits["binance-pay"].dailyUsdLimit,
+    settings.spendingLimits["binance-onchain"].perPaymentUsdLimit, settings.spendingLimits["binance-onchain"].dailyUsdLimit,
     settings.spendingLimits.x402.perPaymentUsdLimit, settings.spendingLimits.x402.dailyUsdLimit,
     settings.spendingLimits["agentic-wallet"].perPaymentUsdLimit, settings.spendingLimits["agentic-wallet"].dailyUsdLimit,
     JSON.stringify(settings.trustedWalletDestinations), JSON.stringify(settings.trustedX402Hosts), JSON.stringify(settings.trustedX402Endpoints), updatedAt);

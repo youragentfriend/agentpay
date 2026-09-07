@@ -4,6 +4,7 @@ import type { AgentPayDiagnostics } from "@/lib/diagnostics-types";
 import type { WalletConnectionStatus } from "@/lib/wallet-types";
 import { getWalletStatus } from "@/lib/server/agentic-wallet";
 import { getBinancePayCapability } from "@/lib/server/binance-pay";
+import { getOnchainPayCapability } from "@/lib/server/onchain-pay";
 import { getBinanceAccountStatus, loadBinancePortfolio } from "@/lib/server/binance-readonly";
 import { walletSendEnabled } from "@/lib/server/payment-store";
 import { checkSettingsDatabaseHealth } from "@/lib/server/settings-store";
@@ -15,6 +16,7 @@ export type DiagnosticsDependencies = {
   databaseHealth: () => boolean | Promise<boolean>;
   walletStatus: () => Promise<WalletConnectionStatus>;
   binancePayCapability: () => Promise<{ configured: boolean; executionEnabled: boolean; imageDecodeReady: boolean }>;
+  onchainPayCapability: () => Promise<{ configured: boolean; executionEnabled: boolean; liveDiscoveryEnabled: boolean; webhookReady: boolean }>;
   binanceAccountStatus: () => { configured: boolean; readOnly: true };
   binancePortfolio: () => Promise<BinancePortfolio>;
   x402Capability: () => { executionEnabled: boolean; allowedHosts: string[] };
@@ -29,10 +31,11 @@ async function settled<T>(load: () => T | Promise<T>): Promise<{ ok: true; value
 }
 
 export async function aggregateDiagnostics(dependencies: DiagnosticsDependencies): Promise<AgentPayDiagnostics> {
-  const [database, wallet, binancePay, binanceAccount, x402] = await Promise.all([
+  const [database, wallet, binancePay, onchainPay, binanceAccount, x402] = await Promise.all([
     settled(dependencies.databaseHealth),
     settled(dependencies.walletStatus),
     settled(async () => dependencies.binancePayCapability()),
+    settled(async () => dependencies.onchainPayCapability()),
     settled(async () => {
       const status = dependencies.binanceAccountStatus();
       return { status, portfolio: status.configured ? await dependencies.binancePortfolio() : null };
@@ -42,6 +45,7 @@ export async function aggregateDiagnostics(dependencies: DiagnosticsDependencies
 
   const walletExecution = dependencies.walletExecutionEnabled();
   const binancePayExecution = binancePay.ok ? binancePay.value.executionEnabled : false;
+  const onchainPayExecution = onchainPay.ok ? onchainPay.value.executionEnabled : false;
   const x402Execution = x402.ok ? x402.value.executionEnabled : false;
   const walletState = !wallet.ok ? "unavailable" as const
     : wallet.value === "CONNECTED" ? "connected" as const
@@ -49,7 +53,7 @@ export async function aggregateDiagnostics(dependencies: DiagnosticsDependencies
   const accountState = !binanceAccount.ok ? "unavailable" as const
     : !binanceAccount.value.status.configured ? "not_configured" as const
       : binanceAccount.value.portfolio?.connection ?? "error" as const;
-  const degraded = !database.ok || !database.value || !wallet.ok || !binancePay.ok || !binanceAccount.ok || !x402.ok
+  const degraded = !database.ok || !database.value || !wallet.ok || !binancePay.ok || !onchainPay.ok || !binanceAccount.ok || !x402.ok
     || accountState === "partial" || accountState === "error";
 
   return {
@@ -67,6 +71,12 @@ export async function aggregateDiagnostics(dependencies: DiagnosticsDependencies
         state: !binancePay.ok ? "unavailable" : binancePay.value.configured ? "configured" : "not_configured",
         executionEnabled: binancePayExecution,
         imageDecodeReady: binancePay.ok && binancePay.value.imageDecodeReady,
+      },
+      onchainPay: {
+        state: !onchainPay.ok ? "unavailable" : onchainPay.value.configured ? "configured" : "preview",
+        executionEnabled: onchainPayExecution,
+        liveDiscoveryEnabled: onchainPay.ok && onchainPay.value.liveDiscoveryEnabled,
+        webhookReady: onchainPay.ok && onchainPay.value.webhookReady,
       },
       binanceAccount: {
         state: accountState,
@@ -86,6 +96,7 @@ export async function aggregateDiagnostics(dependencies: DiagnosticsDependencies
       approvalRequired: true,
       agenticWallet: walletExecution,
       binancePay: binancePayExecution,
+      onchainPay: onchainPayExecution,
       x402: x402Execution,
     },
   };
@@ -102,6 +113,7 @@ export function getAgentPayDiagnostics(): Promise<AgentPayDiagnostics> {
     databaseHealth: checkSettingsDatabaseHealth,
     walletStatus: getWalletStatus,
     binancePayCapability: getBinancePayCapability,
+    onchainPayCapability: getOnchainPayCapability,
     binanceAccountStatus: getBinanceAccountStatus,
     binancePortfolio: loadBinancePortfolio,
     x402Capability,

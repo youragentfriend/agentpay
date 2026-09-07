@@ -5,11 +5,11 @@ import type { SpendingRangePreset, SpendingReport } from "@/lib/report-types";
 
 const EMPTY: SpendingReport = { generatedAt: "", timezone: "UTC", range: { preset: "month", from: "", to: "", label: "" }, filters: { sources: [], includePending: false }, summary: { settledTotalUsd: "0.00", pendingTotalUsd: "0.00", transactionCount: 0, pendingCount: 0, averageUsd: "0.00", largestUsd: "0.00", unvaluedCount: 0 }, bySource: [], byAsset: [], trend: [], calendar: { month: "", label: "", days: [] }, transactions: [] };
 const PRESETS: Array<{ value: SpendingRangePreset; label: string }> = [{ value: "today", label: "Today" }, { value: "week", label: "7 days" }, { value: "month", label: "This month" }, { value: "quarter", label: "3 months" }, { value: "year", label: "This year" }, { value: "custom", label: "Custom" }];
-const SOURCE_COLORS: Record<string, string> = { "agentic-wallet": "#171815", "binance-pay": "#f5cd45", x402: "#5f7c70" };
+const SOURCE_COLORS: Record<string, string> = { "agentic-wallet": "#171815", "binance-pay": "#f5cd45", "binance-onchain": "#c4971a", x402: "#5f7c70" };
 function usd(value: string) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value || 0)); }
 function monthShift(value: string, delta: number) { const [year, month] = value.split("-").map(Number); const date = new Date(Date.UTC(year, month - 1 + delta, 1)); return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`; }
 function dateParts(date: Date, timeZone: string) { const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date); const get = (type: string) => parts.find(part => part.type === type)?.value || ""; return `${get("year")}-${get("month")}-${get("day")}`; }
-function sourceLabel(source: string) { return source === "agentic-wallet" ? "Agentic Wallet" : source === "binance-pay" ? "Binance Pay" : "x402"; }
+function sourceLabel(source: string) { return source === "agentic-wallet" ? "Agentic Wallet" : source === "binance-pay" ? "Binance Pay" : source === "binance-onchain" ? "Binance Onchain Pay" : "x402"; }
 
 export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
   const [report, setReport] = useState(EMPTY);
@@ -47,7 +47,7 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
     <div className="reports-toolbar no-print">
       <div className="reports-presets" aria-label="Report period">{PRESETS.map(item => <button key={item.value} className={range === item.value ? "active" : ""} onClick={() => setRange(item.value)}>{item.label}</button>)}</div>
       <div className="reports-filter-row">
-        <label><span>Payment rail</span><select value={source} onChange={event => setSource(event.target.value)}><option value="">All rails</option><option value="agentic-wallet">Agentic Wallet</option><option value="binance-pay">Binance Pay</option><option value="x402">x402</option></select></label>
+        <label><span>Payment rail</span><select value={source} onChange={event => setSource(event.target.value)}><option value="">All rails</option><option value="agentic-wallet">Agentic Wallet</option><option value="binance-pay">Binance Pay</option><option value="binance-onchain">Binance Onchain Pay</option><option value="x402">x402</option></select></label>
         <label><span>Asset</span><select value={asset} onChange={event => setAsset(event.target.value)}><option value="">All assets</option>{assetOptions.map(item => <option key={item}>{item}</option>)}</select></label>
         <label className="reports-pending-toggle"><input type="checkbox" checked={includePending} onChange={event => setIncludePending(event.target.checked)} /><span>Include pending transactions</span></label>
         <button className="secondary-button" onClick={() => window.print()}>Print report</button>

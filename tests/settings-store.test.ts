@@ -17,7 +17,7 @@ const profileImageDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAA
 
 const policyFields = {
   profileImageDataUrl: null as string | null,
-  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" }, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" } },
+  spendingLimits: { "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" }, "binance-onchain": { perPaymentUsdLimit: "100", dailyUsdLimit: "250" }, x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" } },
   trustedWalletDestinations: [] as string[],
   trustedX402Hosts: [] as string[],
   trustedX402Endpoints: [] as string[],

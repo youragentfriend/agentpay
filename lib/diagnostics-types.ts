@@ -27,6 +27,12 @@ export type AgentPayDiagnostics = {
       executionEnabled: boolean;
       imageDecodeReady: boolean;
     };
+    onchainPay: {
+      state: "configured" | "preview" | "unavailable";
+      executionEnabled: boolean;
+      liveDiscoveryEnabled: boolean;
+      webhookReady: boolean;
+    };
     binanceAccount: {
       state: "connected" | "partial" | "error" | "not_configured" | "unavailable";
       configured: boolean;
@@ -43,6 +49,7 @@ export type AgentPayDiagnostics = {
     approvalRequired: true;
     agenticWallet: boolean;
     binancePay: boolean;
+    onchainPay: boolean;
     x402: boolean;
   };
 };
