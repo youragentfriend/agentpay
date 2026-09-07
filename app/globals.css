@@ -810,34 +810,3 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .payment-rails { padding: 18px; }
   .chat-bubble { max-width: 94%; }
 }
-
-/* Binance Onchain Pay */
-.onchain-pay-workflow { display: grid; gap: 16px; margin-top: 28px; }
-.onchain-pay-status-card, .onchain-pay-composer { padding: 20px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
-.onchain-pay-status-card { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px,.9fr); align-items: center; gap: 24px; background: linear-gradient(135deg,#fff 0%,#faf8ed 100%); }
-.onchain-pay-status-card h2, .onchain-pay-composer h2 { margin: 5px 0; font-size: 20px; }
-.onchain-pay-status-card p, .onchain-pay-composer .option-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.onchain-capability-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
-.onchain-capability-grid span { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.8); }
-.onchain-capability-grid small { color: var(--muted-2); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.onchain-capability-grid strong { font-size: 12px; }
-.onchain-source-destination { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin: 18px 0; }
-.onchain-source-destination > div { display: grid; gap: 5px; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--soft); }
-.onchain-source-destination small { color: var(--muted-2); font-size: 9px; font-weight: 700; text-transform: uppercase; }
-.onchain-source-destination strong { font-size: 13px; }
-.onchain-source-destination > span { color: var(--muted-2); font-size: 18px; }
-.onchain-pay-fields { margin-bottom: 12px; }
-.onchain-net-receive { display: flex; align-items: flex-start; gap: 10px; margin: 13px 0; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #fafaf7; cursor: pointer; }
-.onchain-net-receive input { width: 16px; height: 16px; margin-top: 2px; }
-.onchain-net-receive span { display: grid; gap: 4px; }
-.onchain-net-receive strong { font-size: 12px; }
-.onchain-net-receive small { color: var(--muted); font-size: 10px; line-height: 1.45; }
-.onchain-pay-review { margin-top: 0; }
-.onchain-order-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.onchain-order-actions a.primary-button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-.onchain-tx-hash { display: block; margin: 12px 0; padding: 11px; overflow-wrap: anywhere; }
-@media (max-width: 760px) {
-  .onchain-pay-status-card { grid-template-columns: 1fr; }
-  .onchain-source-destination { grid-template-columns: 1fr; }
-  .onchain-source-destination > span { transform: rotate(90deg); text-align: center; }
-}

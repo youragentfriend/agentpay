@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentPayDiagnostics } from "@/lib/diagnostics-types";
 
-type Destination = "binance" | "binance-pay" | "onchain-pay" | "wallet" | "x402";
+type Destination = "binance" | "binance-pay" | "wallet" | "x402";
 
 type DiagnosticsSettingsProps = {
   mode: "connections" | "diagnostics";
@@ -71,14 +71,12 @@ export function DiagnosticsSettings({ mode, onNavigate }: DiagnosticsSettingsPro
 function ConnectionCards({ data, onNavigate }: { data: AgentPayDiagnostics; onNavigate: DiagnosticsSettingsProps["onNavigate"] }) {
   const wallet = data.connections.agenticWallet;
   const pay = data.connections.binancePay;
-  const onchain = data.connections.onchainPay;
   const account = data.connections.binanceAccount;
   const x402 = data.connections.x402;
   const healthySources = account.sources.filter((source) => source.state === "available" || source.state === "empty").length;
   return <div className="connection-list live-connection-list">
     <ConnectionCard icon="W" title="Agentic Wallet" detail="Balances, transfers, and x402 signing" state={titleCase(wallet.state)} stateTone={tone(wallet.state)} facts={[executionLabel(wallet.executionEnabled)]} action="Manage" onClick={() => onNavigate("wallet")}/>
     <ConnectionCard icon="B" title="Binance Pay" detail="Payment links, receive links, and QR inspection" state={titleCase(pay.state)} stateTone={tone(pay.state)} facts={[pay.imageDecodeReady ? "QR decoder ready" : "QR decoder unavailable", executionLabel(pay.executionEnabled)]} action="Open" onClick={() => onNavigate("binance-pay")}/>
-    <ConnectionCard icon="↗" title="Binance Onchain Pay" detail="Send supported Binance balances to external blockchain addresses" state={titleCase(onchain.state)} stateTone={tone(onchain.state)} facts={[onchain.liveDiscoveryEnabled ? "Live asset discovery" : "Documented preview catalog", onchain.webhookReady ? "Webhook ready" : "Webhook setup required", executionLabel(onchain.executionEnabled)]} action="Open" onClick={() => onNavigate("onchain-pay")}/>
     <ConnectionCard icon="B" title="Binance Account" detail="Read-only Spot, Funding, Futures, Earn, and Margin visibility" state={titleCase(account.state)} stateTone={tone(account.state)} facts={["Read only", account.sources.length ? `${healthySources}/${account.sources.length} sources responding` : "Source health not checked"]} action="Manage" onClick={() => onNavigate("binance")}/>
     <ConnectionCard icon="×" title="x402" detail="Allowlisted service discovery and Agentic Wallet signing" state={titleCase(x402.state)} stateTone={tone(x402.state)} facts={[`${x402.allowedHostCount} allowed host${x402.allowedHostCount === 1 ? "" : "s"}`, executionLabel(x402.executionEnabled)]} action="Open" onClick={() => onNavigate("x402")}/>
   </div>;
@@ -102,8 +100,6 @@ function DiagnosticCards({ data }: { data: AgentPayDiagnostics }) {
     ["Agentic Wallet", titleCase(data.connections.agenticWallet.state), tone(data.connections.agenticWallet.state)],
     ["Binance Pay", titleCase(data.connections.binancePay.state), tone(data.connections.binancePay.state)],
     ["QR decoder", data.connections.binancePay.imageDecodeReady ? "Ready" : "Unavailable", data.connections.binancePay.imageDecodeReady ? "success" : "awaiting"],
-    ["Onchain Pay", titleCase(data.connections.onchainPay.state), tone(data.connections.onchainPay.state)],
-    ["Onchain webhook", data.connections.onchainPay.webhookReady ? "Ready" : "Setup required", data.connections.onchainPay.webhookReady ? "success" : "awaiting"],
     ["Binance Account", titleCase(account.state), tone(account.state)],
     ["Binance sources", account.sources.length ? `${availableSources}/${account.sources.length} responding` : "Not checked", account.sources.length && availableSources === account.sources.length ? "success" : "awaiting"],
     ["x402 capability", titleCase(data.connections.x402.state), tone(data.connections.x402.state)],
@@ -111,7 +107,6 @@ function DiagnosticCards({ data }: { data: AgentPayDiagnostics }) {
     ["Approval requirement", data.execution.approvalRequired ? "Locked on" : "Unavailable", data.execution.approvalRequired ? "success" : "failed"],
     ["Agentic Wallet execution", executionLabel(data.execution.agenticWallet), data.execution.agenticWallet ? "success" : "neutral"],
     ["Binance Pay execution", executionLabel(data.execution.binancePay), data.execution.binancePay ? "success" : "neutral"],
-    ["Onchain Pay execution", executionLabel(data.execution.onchainPay), data.execution.onchainPay ? "success" : "neutral"],
     ["x402 execution", executionLabel(data.execution.x402), data.execution.x402 ? "success" : "neutral"],
     ["Environment", titleCase(data.system.environment), "neutral"],
     ["Version", `v${data.system.buildVersion}`, "neutral"],

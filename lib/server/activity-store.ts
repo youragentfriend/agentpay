@@ -3,9 +3,9 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-export const ACTIVITY_SOURCES = ["agentic-wallet", "binance-pay", "binance-onchain", "x402"] as const;
+export const ACTIVITY_SOURCES = ["agentic-wallet", "binance-pay", "x402"] as const;
 export type ActivitySource = (typeof ACTIVITY_SOURCES)[number];
-export const ACTIVITY_TYPES = ["transfer", "binance-pay", "onchain-pay", "x402"] as const;
+export const ACTIVITY_TYPES = ["transfer", "binance-pay", "x402"] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 export type ActivityStatusGroup = "awaiting-approval" | "in-progress" | "successful" | "failed";
 export type ActivityStatusCategory = "yellow" | "blue" | "green" | "red";
@@ -161,7 +161,7 @@ function maskReference(value: unknown): string | undefined {
 
 function statusMapping(status: string): { group: ActivityStatusGroup; category: ActivityStatusCategory } {
   const normalized = status.trim().toLowerCase().replaceAll("_", "-");
-  if (["failed", "failure", "error", "expired", "rejected", "cancelled", "canceled", "abandoned", "withdraw-failed", "withdraw-abandoned", "on-ramp-failed"].includes(normalized)) {
+  if (["failed", "failure", "error", "expired", "rejected", "cancelled", "canceled"].includes(normalized)) {
     return { group: "failed", category: "red" };
   }
   if (["success", "succeeded", "successful", "completed", "confirmed"].includes(normalized)) {
@@ -222,22 +222,6 @@ function binanceProjection(row: Record<string, unknown>): Projection {
   return makeProjection({ source: "binance-pay", sourceId: String(row.id), activityType: "binance-pay", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset].filter(Boolean).join(" ") });
 }
 
-function onchainProjection(row: Record<string, unknown>): Projection {
-  const status = stringValue(row.status) || "unknown";
-  const amount = stringValue(row.amount);
-  const asset = stringValue(row.asset);
-  const amountUsd = stringValue(row.amount_usd);
-  const network = stringValue(row.network) || "blockchain";
-  const createdAt = stringValue(row.created_at) || new Date(0).toISOString();
-  const updatedAt = stringValue(row.updated_at) || createdAt;
-  const mapped = statusMapping(status);
-  const title = [amount, asset].filter(Boolean).join(" ") || "Binance Onchain Pay";
-  const summary = `Binance → ${network} external address`;
-  const reference = maskReference(row.tx_hash || row.external_order_id);
-  const spendState = status === "completed" ? "settled" as const : ["link-created", "waiting-for-binance", "on-ramp-processing", "on-ramp-completed", "convert-processing", "convert-completed", "withdraw-initiated", "withdraw-processing"].includes(status) ? "pending" as const : "none" as const;
-  return makeProjection({ source: "binance-onchain", sourceId: String(row.id), activityType: "onchain-pay", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset, network, "Binance Onchain Pay"].filter(Boolean).join(" ") });
-}
-
 function x402Projection(row: Record<string, unknown>): Projection {
   const status = stringValue(row.status) || "unknown";
   const createdAt = stringValue(row.created_at) || new Date(0).toISOString();
@@ -269,9 +253,6 @@ function sourceProjections(): Projection[] {
   }
   if (tableExists("binance_pay_orders")) {
     for (const row of getDatabase().prepare("SELECT * FROM binance_pay_orders").all() as unknown as Record<string, unknown>[]) result.push(binanceProjection(row));
-  }
-  if (tableExists("onchain_pay_orders")) {
-    for (const row of getDatabase().prepare("SELECT * FROM onchain_pay_orders").all() as unknown as Record<string, unknown>[]) result.push(onchainProjection(row));
   }
   if (tableExists("x402_intents")) {
     for (const row of getDatabase().prepare("SELECT * FROM x402_intents").all() as unknown as Record<string, unknown>[]) result.push(x402Projection(row));
@@ -310,8 +291,8 @@ function toEvent(row: ActivityRow): ActivityEvent {
   return { id: row.id, source: row.source, activityType: row.activity_type, status: row.raw_status, statusGroup: row.status_group, statusCategory: row.status_category, amount: row.amount ?? undefined, asset: row.asset ?? undefined, amountUsd: row.amount_usd ?? undefined, direction: row.direction, spendState: row.spend_state, title: row.title, summary: row.summary, occurredAt: row.occurred_at, createdAt: row.created_at, updatedAt: row.updated_at, reference: row.safe_reference ?? undefined };
 }
 
-const sourceAliases: Record<string, ActivitySource> = { "agentic-wallet": "agentic-wallet", "agentic_wallet": "agentic-wallet", wallet: "agentic-wallet", payment: "agentic-wallet", "payment-intent": "agentic-wallet", "payment-intents": "agentic-wallet", payment_intents: "agentic-wallet", "binance-pay": "binance-pay", binance: "binance-pay", "binance_pay": "binance-pay", binance_pay_orders: "binance-pay", "binance-onchain": "binance-onchain", "onchain-pay": "binance-onchain", onchain_pay_orders: "binance-onchain", x402: "x402", x402_intents: "x402" };
-const typeAliases: Record<string, ActivityType> = { transfer: "transfer", payment: "transfer", "payment-intent": "transfer", "payment_intent": "transfer", "binance-pay": "binance-pay", "binance-pay-order": "binance-pay", "binance_pay_order": "binance-pay", "onchain-pay": "onchain-pay", onchain: "onchain-pay", x402: "x402", "x402-intent": "x402", "x402_intent": "x402" };
+const sourceAliases: Record<string, ActivitySource> = { "agentic-wallet": "agentic-wallet", "agentic_wallet": "agentic-wallet", wallet: "agentic-wallet", payment: "agentic-wallet", "payment-intent": "agentic-wallet", "payment-intents": "agentic-wallet", payment_intents: "agentic-wallet", "binance-pay": "binance-pay", binance: "binance-pay", "binance_pay": "binance-pay", binance_pay_orders: "binance-pay", x402: "x402", x402_intents: "x402" };
+const typeAliases: Record<string, ActivityType> = { transfer: "transfer", payment: "transfer", "payment-intent": "transfer", "payment_intent": "transfer", "binance-pay": "binance-pay", "binance-pay-order": "binance-pay", "binance_pay_order": "binance-pay", x402: "x402", "x402-intent": "x402", "x402_intent": "x402" };
 
 function oneOf<T extends string>(value: string, aliases: Record<string, T>, label: string): T {
   const normalized = value.trim().toLowerCase();

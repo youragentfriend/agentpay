@@ -26,7 +26,6 @@ function dependencies(overrides: Partial<DiagnosticsDependencies> = {}): Diagnos
     databaseHealth: () => true,
     walletStatus: async () => "CONNECTED",
     binancePayCapability: async () => ({ configured: true, executionEnabled: false, imageDecodeReady: true }),
-    onchainPayCapability: async () => ({ configured: false, executionEnabled: false, liveDiscoveryEnabled: false, webhookReady: false }),
     binanceAccountStatus: () => ({ configured: true, readOnly: true }),
     binancePortfolio: async () => portfolio,
     x402Capability: () => ({ executionEnabled: false, allowedHosts: ["private.example"] }),
@@ -44,10 +43,9 @@ test("maps aggregate capabilities without treating disabled execution as a failu
   assert.equal(result.system.uptimeSeconds, 3661);
   assert.equal(result.connections.agenticWallet.state, "connected");
   assert.equal(result.connections.binancePay.state, "configured");
-  assert.equal(result.connections.onchainPay.state, "preview");
   assert.equal(result.connections.binanceAccount.state, "connected");
   assert.equal(result.connections.x402.state, "ready");
-  assert.deepEqual(result.execution, { approvalRequired: true, agenticWallet: false, binancePay: false, onchainPay: false, x402: false });
+  assert.deepEqual(result.execution, { approvalRequired: true, agenticWallet: false, binancePay: false, x402: false });
 });
 
 test("isolates failed sources and returns partial diagnostics", async () => {

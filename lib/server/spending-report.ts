@@ -1,8 +1,8 @@
 import { listReportActivityEvents, type ActivityEvent, type ActivitySource } from "@/lib/server/activity-store";
 import type { SpendingBreakdown, SpendingCalendarDay, SpendingRangePreset, SpendingReport, SpendingReportTransaction } from "@/lib/report-types";
 
-const SOURCES: ActivitySource[] = ["agentic-wallet", "binance-pay", "binance-onchain", "x402"];
-const SOURCE_LABELS: Record<ActivitySource, string> = { "agentic-wallet": "Agentic Wallet", "binance-pay": "Binance Pay", "binance-onchain": "Binance Onchain Pay", x402: "x402" };
+const SOURCES: ActivitySource[] = ["agentic-wallet", "binance-pay", "x402"];
+const SOURCE_LABELS: Record<ActivitySource, string> = { "agentic-wallet": "Agentic Wallet", "binance-pay": "Binance Pay", x402: "x402" };
 
 type Options = { preset?: string; from?: string; to?: string; timezone?: string; sources?: string[]; asset?: string; includePending?: boolean; calendarMonth?: string; now?: Date };
 function validTimeZone(value: string) { try { new Intl.DateTimeFormat("en", { timeZone: value }).format(); return value; } catch { return "UTC"; } }

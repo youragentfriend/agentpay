@@ -1,4 +1,4 @@
-export type PaymentRail = "agentic-wallet" | "binance-pay" | "x402" | "onchain-pay";
+export type PaymentRail = "agentic-wallet" | "binance-pay" | "x402";
 
 export type PaymentStatus =
   | "discovered"

@@ -8,7 +8,7 @@ const DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const USD_EQUIVALENTS = new Set(["USD", "USDT", "USDC", "FDUSD"]);
 
 export type PaymentPolicyInput = {
-  rail: "agentic-wallet" | "binance-pay" | "binance-onchain" | "x402";
+  rail: "agentic-wallet" | "binance-pay" | "x402";
   amountUsd?: string;
   destination?: string;
   x402Host?: string;
@@ -128,9 +128,6 @@ export function getDailySpendUsd(rail: PaymentPolicyInput["rail"], now = new Dat
     for (const row of db().prepare("SELECT amount, currency FROM binance_pay_orders WHERE status IN ('PROCESSING','SUCCESS') AND updated_at >= ?").all(since) as unknown as Array<{ amount: string | null; currency: string | null }>) {
       amounts.push(usdAmountForCurrency(row.amount, row.currency));
     }
-  }
-  if (rail === "binance-onchain" && tableExists("onchain_pay_orders")) {
-    for (const row of db().prepare("SELECT amount_usd FROM onchain_pay_orders WHERE status IN ('approved','link-created','waiting-for-binance','on-ramp-processing','on-ramp-completed','convert-processing','convert-completed','withdraw-initiated','withdraw-processing','completed') AND updated_at >= ?").all(since) as unknown as Array<{ amount_usd: string | null }>) amounts.push(row.amount_usd ?? undefined);
   }
   if (rail === "x402" && tableExists("x402_intents")) {
     const columns = new Set((db().prepare("PRAGMA table_info(x402_intents)").all() as unknown as Array<{ name: string }>).map(column => column.name));

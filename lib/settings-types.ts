@@ -1,11 +1,10 @@
 export type DisplayCurrency = "USD";
-export type PaymentRail = "binance-pay" | "binance-onchain" | "x402" | "agentic-wallet";
+export type PaymentRail = "binance-pay" | "x402" | "agentic-wallet";
 export type SpendingLimit = { perPaymentUsdLimit: string | null; dailyUsdLimit: string | null };
 export type SpendingLimits = Record<PaymentRail, SpendingLimit>;
 
 export const SPENDING_LIMIT_RULES = {
   "binance-pay": { minimum: "0.0001", perPaymentMaximum: "50", dailyMaximum: "100", decimals: 4 },
-  "binance-onchain": { minimum: "0.0001", perPaymentMaximum: "500", dailyMaximum: "1000", decimals: 4 },
   x402: { minimum: "0.0001", perPaymentMaximum: "20", dailyMaximum: "20", decimals: 4 },
   "agentic-wallet": { minimum: "0.00001", perPaymentMaximum: "50", dailyMaximum: "100", decimals: 5 },
 } as const satisfies Record<PaymentRail, { minimum: string; perPaymentMaximum: string; dailyMaximum: string; decimals: number }>;
@@ -55,7 +54,6 @@ export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
   timeZone: "UTC",
   spendingLimits: {
     "binance-pay": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" },
-    "binance-onchain": { perPaymentUsdLimit: "100", dailyUsdLimit: "250" },
     x402: { perPaymentUsdLimit: "20", dailyUsdLimit: "20" },
     "agentic-wallet": { perPaymentUsdLimit: "50", dailyUsdLimit: "100" },
   },
