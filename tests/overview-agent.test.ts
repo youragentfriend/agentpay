@@ -29,18 +29,20 @@ test("asks DeepSeek to select from skill descriptions without provider fallback"
   process.env.AGENTPAY_DEEPSEEK_MODEL = "deepseek-test";
   let requestBody = "";
   globalThis.fetch = async (input, init) => {
-    assert.equal(String(input), "https://api.deepseek.com/responses");
+    assert.equal(String(input), "https://api.deepseek.com/chat/completions");
     assert.equal((init?.headers as Record<string, string>).Authorization, "Bearer test-key");
     requestBody = String(init?.body || "");
-    return Response.json({ output_text: JSON.stringify({ skill: "binance-portfolio", action: "binance-balance", message: "Loading your read-only Binance exchange portfolio." }) });
+    return Response.json({ choices: [{ message: { content: JSON.stringify({ skill: "binance-portfolio", action: "binance-balance", message: "Loading your read-only Binance exchange portfolio." }) } }] });
   };
   try {
     const result = await runOverviewAgent([{ role: "user", content: "Show my Spot and Earn holdings" }]);
     assert.equal(result.skill, "binance-portfolio");
     assert.equal(result.action, "binance-balance");
-    assert.match(requestBody, /Agentic Wallet is an on-chain wallet/);
-    assert.match(requestBody, /Binance Portfolio is the read-only Binance exchange account/);
-    assert.equal(JSON.parse(requestBody).model, "deepseek-test");
+    const request = JSON.parse(requestBody);
+    assert.match(request.messages[0].content, /Agentic Wallet is an on-chain wallet/);
+    assert.match(request.messages[0].content, /Binance Portfolio is the read-only Binance exchange account/);
+    assert.equal(request.model, "deepseek-test");
+    assert.deepEqual(request.response_format, { type: "json_object" });
   } finally {
     globalThis.fetch = originalFetch;
     if (previous.key === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = previous.key;

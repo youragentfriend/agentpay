@@ -195,20 +195,23 @@ const PARAMETER_FIELDS: Record<SkillOperation, readonly string[]> = {
 };
 
 export function validateSkillExecution(skill: OverviewSkill, value: unknown): SkillExecution {
-  const row = exactObject(value, ["operation", "message", "parameters", "missingFields", "title"], "Skill execution");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Skill execution must be an object.");
+  const row = value as Record<string, unknown>;
   if (typeof row.operation !== "string" || !SKILL_OPERATIONS[skill].includes(row.operation as never)) {
     throw new Error(`The skill runtime selected an invalid operation for ${skill}.`);
   }
   const operation = row.operation as SkillOperation;
-  const rawParameters = exactObject(row.parameters ?? {}, PARAMETER_FIELDS[operation], "Skill parameters");
+  if (!row.parameters || typeof row.parameters !== "object" || Array.isArray(row.parameters)) throw new Error("Skill parameters must be an object.");
   const parameters: Record<string, string> = {};
-  for (const [name, value] of Object.entries(rawParameters)) {
+  for (const [name, value] of Object.entries(row.parameters as Record<string, unknown>)) {
+    if (!PARAMETER_FIELDS[operation].includes(name)) continue;
     if (typeof value !== "string" || value.trim().length > 2_000) throw new Error(`The skill runtime returned an invalid ${name}.`);
     if (value.trim()) parameters[name] = value.trim();
   }
   if (!Array.isArray(row.missingFields) || row.missingFields.length > 8) throw new Error("The skill runtime returned invalid missing fields.");
-  const missingFields = row.missingFields.map((field) => boundedString(field, "missing field", 50));
-  if (missingFields.some((field) => !PARAMETER_FIELDS[operation].includes(field))) throw new Error("The skill runtime requested an unsupported field.");
+  const missingFields = row.missingFields
+    .map((field) => boundedString(field, "missing field", 50))
+    .filter((field) => PARAMETER_FIELDS[operation].includes(field));
   const required: Partial<Record<SkillOperation, string[]>> = {
     "wallet-transfer": ["asset", "amount", "recipient", "network"],
     "binance-pay-inspect": ["rawQr"],

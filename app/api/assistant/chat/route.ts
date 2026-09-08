@@ -1,7 +1,7 @@
 import { runOverviewSkillRuntime } from "@/lib/server/overview-agent";
 
 export const runtime = "nodejs";
-export const maxDuration = 75;
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {

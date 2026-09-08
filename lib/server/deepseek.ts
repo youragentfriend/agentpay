@@ -1,12 +1,12 @@
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_MODEL = "deepseek-v4-flash";
 
-export type DeepSeekStatus = { configured: boolean; provider: "deepseek"; model: string; liveSearch: boolean };
+export type DeepSeekStatus = { configured: boolean; provider: "deepseek"; model: string; liveSearch: false };
 
 export function deepSeekStatus(): DeepSeekStatus {
   const key = (process.env.DEEPSEEK_API_KEY || "").trim();
   const model = (process.env.AGENTPAY_DEEPSEEK_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
-  return { configured: Boolean(key), provider: "deepseek", model, liveSearch: Boolean(key) };
+  return { configured: Boolean(key), provider: "deepseek", model, liveSearch: false };
 }
 
 export function extractDeepSeekText(value: unknown): string {
@@ -35,10 +35,26 @@ export function extractDeepSeekText(value: unknown): string {
 }
 
 function parseJsonText(text: string): unknown {
-  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, "");
   const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  return JSON.parse(start >= 0 && end > start ? trimmed.slice(start, end + 1) : trimmed);
+  if (start < 0) return JSON.parse(trimmed.replace(/\s*```$/, ""));
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < trimmed.length; index += 1) {
+    const character = trimmed[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') inString = true;
+    else if (character === "{") depth += 1;
+    else if (character === "}" && --depth === 0) return JSON.parse(trimmed.slice(start, index + 1));
+  }
+  throw new Error("DeepSeek returned incomplete JSON.");
 }
 
 export async function callDeepSeekJson(input: string, options: { timeoutMs?: number; webSearch?: boolean; schema?: Record<string, unknown>; schemaName?: string; maxTextChars?: number } = {}): Promise<unknown> {
@@ -49,17 +65,20 @@ export async function callDeepSeekJson(input: string, options: { timeoutMs?: num
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
   try {
-    const format = options.schema
-      ? { type: "json_schema", name: options.schemaName || "agentpay_response", schema: options.schema }
-      : { type: "json_object" };
-    const response = await fetch(`${base}/responses`, {
+    if (options.webSearch) {
+      throw new Error("Live x402 discovery needs an AgentPay web-search provider; DeepSeek's standalone API does not expose native web search.");
+    }
+    const schemaInstruction = options.schema
+      ? `\n\nRequired JSON Schema (${options.schemaName || "agentpay_response"}):\n${JSON.stringify(options.schema)}`
+      : "";
+    const response = await fetch(`${base}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: status.model,
-        input: `${input}\n\nReturn valid JSON only.`,
-        ...(options.webSearch ? { tools: [{ type: "web_search" }], tool_choice: { type: "web_search" } } : {}),
-        text: { format },
+        messages: [{ role: "user", content: `${input}${schemaInstruction}\n\nReturn valid JSON only.` }],
+        response_format: { type: "json_object" },
+        stream: false,
       }),
       signal: controller.signal,
     });

@@ -167,7 +167,7 @@ export async function runOverviewSkillRuntime(message: string, conversationId?: 
     const selectedSkill = selection.skill;
     if (selectedSkill !== conversation.selectedSkill) conversation = updateOverviewConversation(conversation.id, { selectedSkill });
 
-    const execution = validateSkillExecution(selectedSkill, await callDeepSeekJson(`${executionInstructions(selectedSkill, transcript, root, firstCompletedExchange)}\n\nBounded conversation:\n${transcript}`, { maxTextChars: 10_000 }));
+    const execution = validateSkillExecution(selectedSkill, await callDeepSeekJson(`${executionInstructions(selectedSkill, transcript, root, firstCompletedExchange)}\n\nBounded conversation:\n${transcript}`, { timeoutMs: 60_000, maxTextChars: 10_000 }));
     const workflow = workflowForExecution(execution);
     const action = actionForOperation(execution.operation);
     const title = conversation.title ?? sanitizeOverviewTitle(execution.title, cleanMessage);

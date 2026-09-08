@@ -36,10 +36,10 @@ afterEach(() => {
 
 function mockDeepSeek(values: unknown[], prompts: string[] = []) {
   globalThis.fetch = async (_input, init) => {
-    prompts.push(String(JSON.parse(String(init?.body)).input));
+    prompts.push(String(JSON.parse(String(init?.body)).messages?.[0]?.content));
     const value = values.shift();
     assert.notEqual(value, undefined, "unexpected DeepSeek call");
-    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(value) } }] }), { status: 200 });
   };
 }
 
@@ -124,14 +124,14 @@ test("restores skill, collected fields, pending state, and latest workflow befor
 
 test("supports multiple concurrent conversations without mixing state", async () => {
   globalThis.fetch = async (_input, init) => {
-    const prompt = String(JSON.parse(String(init?.body)).input);
+    const prompt = String(JSON.parse(String(init?.body)).messages?.[0]?.content);
     const activity = prompt.includes("alpha activity request");
     const value = prompt.includes("You are AgentPay's skill selector")
       ? { skill: activity ? "activity-reporting" : "binance-portfolio", switchSkill: false }
       : activity
         ? { operation: "activity-report", message: "Alpha activity ready.", parameters: { sort: "newest" }, missingFields: [], title: "Alpha Payment Activity Review" }
         : { operation: "binance-portfolio", message: "Beta holdings ready.", parameters: { source: "Spot" }, missingFields: [], title: "Beta Exchange Holdings Review" };
-    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(value) } }] }), { status: 200 });
   };
   const [first, second] = await Promise.all([
     runOverviewSkillRuntime("alpha activity request"),

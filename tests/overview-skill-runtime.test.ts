@@ -42,10 +42,10 @@ afterEach(() => {
 
 function mockDeepSeek(values: unknown[], prompts: string[] = []) {
   globalThis.fetch = async (_input, init) => {
-    prompts.push(String(JSON.parse(String(init?.body)).input));
+    prompts.push(String(JSON.parse(String(init?.body)).messages?.[0]?.content));
     const value = values.shift();
     assert.notEqual(value, undefined, "unexpected DeepSeek call");
-    return new Response(JSON.stringify({ output_text: JSON.stringify(value) }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(value) } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
 }
 
@@ -131,8 +131,8 @@ test("loads only references relevant to the selected operation", () => {
 
 test("rejects provider endpoint injection and cross-skill operations", () => {
   assert.throws(() => validateSkillExecution("activity-reporting", { operation: "wallet-transfer", message: "bad", parameters: {}, missingFields: [] }), /invalid operation/);
-  assert.throws(() => validateSkillExecution("activity-reporting", { operation: "activity-report", message: "bad", parameters: { endpoint: "https://evil.example" }, missingFields: [] }), /unsupported fields/);
-  assert.throws(() => validateSkillExecution("binance-pay-orchestration", { operation: "binance-pay-inspect", message: "bad", parameters: {}, missingFields: ["apiKey"] }), /unsupported field/);
+  assert.deepEqual(validateSkillExecution("activity-reporting", { operation: "activity-report", message: "safe", parameters: { endpoint: "https://evil.example", asset: "USDT" }, missingFields: [] }).parameters, { asset: "USDT" });
+  assert.deepEqual(validateSkillExecution("binance-pay-orchestration", { operation: "binance-pay-inspect", message: "safe", parameters: {}, missingFields: ["apiKey"] }).missingFields, ["rawQr"]);
 });
 
 test("bounds persisted conversation state", () => {
