@@ -276,6 +276,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .data-row small { margin-top: 5px; color: var(--muted-2); font-size: 13px; }
 .amount { flex: 0 0 auto; text-align: right; }
 .mono-value { max-width: 520px; overflow: hidden; font-family: Manrope, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.transaction-explorer-link { display: inline-flex; max-width: 100%; align-items: center; gap: 5px; color: #765a00; font-weight: 700; text-decoration: none; }
+.transaction-explorer-link > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.transaction-explorer-link > b { flex: 0 0 auto; font-size: 11px; }
+.transaction-explorer-link:hover { color: var(--ink); text-decoration: underline; }
+.transaction-explorer-link:focus-visible { border-radius: 4px; outline: 2px solid var(--yellow-deep); outline-offset: 3px; }
 .panel-note, .inline-empty { color: var(--muted); font-size: 13px; }
 .panel-note { padding: 0 20px; }
 .inline-empty { margin: 0; padding: 21px; }
