@@ -149,14 +149,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .panel-heading button, .rails-heading button, .section-heading button { background: transparent; color: #3f433b; font-size: 13px; font-weight: 600; }
 .panel-heading p { margin: 4px 0 0; color: #4f534b; font-size: 13px; }
 .recent-chat-list, .recent-list { min-height: 0; overflow: auto; scrollbar-gutter: stable; }
-.recent-chat-list { flex: 1; }
-.recent-chat-item { display: grid; width: 100%; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 18px; border-bottom: 1px solid var(--line); text-align: left; }
+.recent-chat-list { flex: 1; max-height: 584px; }
+.recent-chat-item { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 38px; align-items: stretch; border-bottom: 1px solid var(--line); }
 .recent-chat-item:hover, .recent-chat-item.active { background: #f6f6ef; }
 .recent-chat-item.active { box-shadow: inset 3px 0 0 var(--yellow); }
+.recent-chat-open { display: grid; min-width: 0; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 10px 15px 18px; text-align: left; }
+.recent-chat-delete { display: grid; width: 30px; height: 30px; place-self: center; place-items: center; border-radius: 8px; color: #777a71; font-size: 20px; line-height: 1; }
+.recent-chat-delete:hover:not(:disabled) { background: #fee8e6; color: var(--red); }
+.recent-chat-delete:disabled { cursor: wait; opacity: .45; }
 .recent-chat-icon { display: grid; width: 36px; height: 36px; place-items: center; overflow: hidden; border-radius: 50%; background: var(--ink); color: var(--yellow); font-size: 12px; font-weight: 700; }
-.recent-chat-item strong, .recent-chat-item small { display: block; }
-.recent-chat-item strong { display: -webkit-box; overflow: hidden; font-size: 14px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.recent-chat-item small { margin-top: 4px; color: #4f534b; font-size: 13px; }
+.recent-chat-open strong, .recent-chat-open small { display: block; }
+.recent-chat-open strong { display: -webkit-box; overflow: hidden; font-size: 14px; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.recent-chat-open small { margin-top: 4px; color: #4f534b; font-size: 13px; }
+.recent-chat-pagination { display: flex; min-height: 55px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: #fafaf7; }
+.recent-chat-pagination span { color: #4f534b; font-size: 12px; font-weight: 600; }
+.recent-chat-pagination button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.recent-chat-pagination button:hover:not(:disabled) { border-color: #b8b9b1; background: var(--soft); }
+.recent-chat-pagination button:disabled { opacity: .35; }
 .recent-chat-empty, .recent-empty { display: flex; min-height: 240px; flex: 1; align-items: center; justify-content: center; flex-direction: column; padding: 24px; background: #fafaf7; text-align: center; }
 .recent-chat-empty > span, .recent-empty > span { color: #8d9087; font-size: 24px; }
 .recent-chat-empty strong, .recent-empty strong { margin-top: 10px; font-size: 15px; }

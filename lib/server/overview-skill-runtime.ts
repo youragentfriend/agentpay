@@ -107,10 +107,22 @@ export function getOverviewConversation(id: string): OverviewConversation {
   return toConversation(row);
 }
 
-export function listOverviewConversations(limit = 20): OverviewConversation[] {
+export function countOverviewConversations(): number {
+  const row = db().prepare("SELECT COUNT(*) AS total FROM overview_skill_sessions WHERE messages_json <> '[]'").get() as unknown as { total: number };
+  return Number(row.total) || 0;
+}
+
+export function listOverviewConversations(limit = 20, offset = 0): OverviewConversation[] {
   const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit)));
-  const rows = db().prepare("SELECT * FROM overview_skill_sessions WHERE messages_json <> '[]' ORDER BY updated_at DESC, created_at DESC, rowid DESC LIMIT ?").all(safeLimit) as unknown as Row[];
+  const safeOffset = Math.max(0, Math.trunc(offset));
+  const rows = db().prepare("SELECT * FROM overview_skill_sessions WHERE messages_json <> '[]' ORDER BY updated_at DESC, created_at DESC, rowid DESC LIMIT ? OFFSET ?").all(safeLimit, safeOffset) as unknown as Row[];
   return rows.map(toConversation);
+}
+
+export function deleteOverviewConversation(id: string): void {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("Overview conversation was not found.");
+  const result = db().prepare("DELETE FROM overview_skill_sessions WHERE id = ?").run(id);
+  if (Number(result.changes) !== 1) throw new Error("Overview conversation was not found.");
 }
 
 export function sanitizeOverviewText(value: string): string {

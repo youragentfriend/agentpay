@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test, { afterEach, beforeEach } from "node:test";
-import { GET, POST as CREATE } from "../app/api/assistant/conversations/route";
+import { DELETE, GET, POST as CREATE } from "../app/api/assistant/conversations/route";
 import { POST as CHAT } from "../app/api/assistant/chat/route";
 import { runOverviewSkillRuntime } from "../lib/server/overview-agent";
 import {
@@ -63,6 +63,32 @@ test("list/get APIs persist non-empty conversations and omit empty sessions", as
   const createResponse = await CREATE(new Request("http://localhost/api/assistant/conversations", { method: "POST", body: "{}" }));
   assert.equal(createResponse.status, 201);
   assert.equal(listOverviewConversations().length, 1, "New conversation must not create an empty recent-chat entry");
+});
+
+test("paginates ten recent chats and deletes one conversation", async () => {
+  const ids: string[] = [];
+  for (let index = 0; index < 12; index += 1) {
+    const conversation = createOverviewConversation();
+    ids.push(conversation.id);
+    updateOverviewConversation(conversation.id, { title: `Conversation ${index + 1}`, messages: [{ role: "user", content: `message ${index + 1}` }] });
+  }
+
+  const firstResponse = await GET(new Request("http://localhost/api/assistant/conversations?limit=10&page=1"));
+  const first = await firstResponse.json() as { conversations: Array<{ id: string }>; pagination: { page: number; pageSize: number; total: number; totalPages: number } };
+  assert.equal(firstResponse.status, 200);
+  assert.equal(first.conversations.length, 10);
+  assert.deepEqual(first.pagination, { page: 1, pageSize: 10, total: 12, totalPages: 2 });
+
+  const secondResponse = await GET(new Request("http://localhost/api/assistant/conversations?limit=10&page=2"));
+  const second = await secondResponse.json() as { conversations: Array<{ id: string }>; pagination: { page: number; total: number; totalPages: number } };
+  assert.equal(second.conversations.length, 2);
+  const deletedId = second.conversations[0].id;
+  const deleteResponse = await DELETE(new Request(`http://localhost/api/assistant/conversations?id=${deletedId}`, { method: "DELETE" }));
+  assert.equal(deleteResponse.status, 200);
+  assert.equal((await deleteResponse.json() as { deleted: boolean }).deleted, true);
+  assert.throws(() => getOverviewConversation(deletedId), /not found/i);
+  assert.equal(listOverviewConversations(20).length, 11);
+  assert.ok(ids.includes(deletedId));
 });
 
 test("persists the user turn immediately while DeepSeek is in flight", async () => {

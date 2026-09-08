@@ -126,6 +126,10 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
   const [recentConversations, setRecentConversations] = useState<ServerConversation[]>([]);
   const [recentState, setRecentState] = useState<"loading" | "ready" | "error">("loading");
   const [recentError, setRecentError] = useState("");
+  const [recentPage, setRecentPage] = useState(1);
+  const [recentTotalPages, setRecentTotalPages] = useState(1);
+  const [recentTotal, setRecentTotal] = useState(0);
+  const [deletingConversationId, setDeletingConversationId] = useState<string>();
   const [activeConversationId, setActiveConversationId] = useState<string>();
   const [welcome, setWelcome] = useState({ greeting: `Welcome back, ${displayName}.` });
   const [assistantBusy, setAssistantBusy] = useState(false);
@@ -148,14 +152,17 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
   }, [turns]);
 
-  const loadRecent = useCallback(async () => {
+  const loadRecent = useCallback(async (page: number) => {
     setRecentState("loading");
     setRecentError("");
     try {
-      const response = await fetch("/api/assistant/conversations?limit=20", { cache: "no-store" });
-      const data = await response.json() as { conversations?: ServerConversation[]; error?: string };
-      if (!response.ok || !Array.isArray(data.conversations)) throw new Error(data.error || "Unable to load recent chats.");
+      const response = await fetch(`/api/assistant/conversations?limit=10&page=${page}`, { cache: "no-store" });
+      const data = await response.json() as { conversations?: ServerConversation[]; pagination?: { page: number; total: number; totalPages: number }; error?: string };
+      if (!response.ok || !Array.isArray(data.conversations) || !data.pagination) throw new Error(data.error || "Unable to load recent chats.");
       setRecentConversations(data.conversations);
+      setRecentPage(data.pagination.page);
+      setRecentTotal(data.pagination.total);
+      setRecentTotalPages(data.pagination.totalPages);
       setRecentState("ready");
     } catch (error) {
       setRecentState("error");
@@ -163,7 +170,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     }
   }, []);
 
-  useEffect(() => { void loadRecent(); }, [loadRecent]);
+  useEffect(() => { void loadRecent(recentPage); }, [loadRecent, recentPage]);
 
   async function sendMessage(rawValue: string, file?: File) {
     const value = rawValue.trim();
@@ -195,7 +202,8 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
       if (version === requestVersion.current) {
         setAssistantBusy(false);
         requestController.current = null;
-        void loadRecent();
+        setRecentPage(1);
+        void loadRecent(1);
       }
     }
   }
@@ -216,7 +224,37 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     setActiveConversationId(undefined);
     setNextId(1);
     setMessage("");
-    void loadRecent();
+    setRecentPage(1);
+    void loadRecent(1);
+  }
+
+  async function deleteConversation(conversation: ServerConversation) {
+    if (!window.confirm(`Delete “${conversation.title || "this conversation"}”? This cannot be undone.`)) return;
+    setDeletingConversationId(conversation.id);
+    setRecentError("");
+    try {
+      const response = await fetch(`/api/assistant/conversations?id=${encodeURIComponent(conversation.id)}`, { method: "DELETE" });
+      const data = await response.json() as { deleted?: boolean; error?: string };
+      if (!response.ok || !data.deleted) throw new Error(data.error || "Unable to delete this conversation.");
+      if (activeConversationId === conversation.id) {
+        requestVersion.current += 1;
+        requestController.current?.abort();
+        requestController.current = null;
+        setAssistantBusy(false);
+        setTurns([]);
+        runtimeConversationId.current = undefined;
+        setActiveConversationId(undefined);
+        setNextId(1);
+        setMessage("");
+      }
+      const nextPage = recentPage > 1 && recentConversations.length === 1 ? recentPage - 1 : recentPage;
+      if (nextPage !== recentPage) setRecentPage(nextPage); else await loadRecent(nextPage);
+    } catch (error) {
+      setRecentState("error");
+      setRecentError(error instanceof Error ? error.message : "Unable to delete this conversation.");
+    } finally {
+      setDeletingConversationId(undefined);
+    }
   }
 
   async function openConversation(summary: ServerConversation) {
@@ -264,7 +302,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
         <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow initialInput={turn.workflow?.input}/>} {turn.action === "binance-pay" && (turn.file ? <QrResult file={turn.file} fileName={turn.file.name}/> : <BinancePayWorkflow embedded initialInput={turn.workflow?.input}/>) }{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive" initialInput={turn.workflow?.input}/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>}{turn.action === "activity" && <InlineActivity input={turn.workflow?.input}/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={turn.workflow?.input.url || extractUrl(turns.find((item) => item.id === turn.id - 1)?.text || "")} initialMessage={turn.workflow?.input.request}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
         <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} disabled={assistantBusy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={assistantBusy ? "AgentPay is selecting the right skill…" : "Ask AgentPay to prepare, inspect, check, or review…"}/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={assistantBusy} onChange={(event) => { attach(event.target.files?.[0]); event.currentTarget.value = ""; }}/></label><div><button className="new-conversation-button" onClick={newConversation} disabled={!turns.length && !assistantBusy}>New conversation</button><button className="send-button" onClick={() => void submit()} disabled={assistantBusy || !message.trim()} aria-label="Send instruction">{assistantBusy ? "…" : "↑"}</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay prepares actions for review. Nothing executes without your explicit approval.</p></div>
       </section>
-      <RecentChats conversations={recentConversations} state={recentState} error={recentError} activeId={activeConversationId} onRetry={loadRecent} onSelect={openConversation} displayName={displayName} profileImageDataUrl={profileImageDataUrl}/>
+      <RecentChats conversations={recentConversations} state={recentState} error={recentError} activeId={activeConversationId} page={recentPage} totalPages={recentTotalPages} total={recentTotal} deletingId={deletingConversationId} onRetry={()=>loadRecent(recentPage)} onSelect={openConversation} onDelete={deleteConversation} onPageChange={setRecentPage} displayName={displayName} profileImageDataUrl={profileImageDataUrl}/>
       </section>
     </section>
     <section className="overview-secondary-grid">
@@ -282,7 +320,14 @@ function InlineActivity({input={}}:{input?:Record<string,string>}){const [events
 function InlineBalance(){const [data,setData]=useState<WalletOverview|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");useEffect(()=>{void fetch("/api/wallet/overview",{cache:"no-store"}).then(async response=>{const value=await response.json();if(!response.ok)throw new Error(value.error||"Unable to load wallet.");setData(value as WalletOverview)}).catch(e=>setError(e instanceof Error?e.message:"Unable to load wallet.")).finally(()=>setLoading(false))},[]);if(loading)return <div className="inline-state">Loading your Agentic Wallet overview…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!data)return <div className="inline-state">No wallet overview returned.</div>;const total=data.balances.reduce((sum,item)=>sum+(Number(item.value)||0),0);return <div className="inline-balance"><div><span className="metric-label">Agentic Wallet value</span><strong>{data.status==="CONNECTED"?"$"+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"Not connected"}</strong><small>{data.status==="CONNECTED"?data.balances.length+" visible on-chain assets · Live wallet data":"Connect in Agentic Wallet to load on-chain balances."}</small></div>{data.balances.length>0&&<div className="balance-pills">{data.balances.slice(0,5).map(balance=><span key={balance.binanceChainId+":"+balance.address}><b>{balance.symbol}</b> {balance.balance}</span>)}</div>}</div>}
 
 function InlineBinancePortfolio(){const[data,setData]=useState<BinancePortfolio|null>(null);const[loading,setLoading]=useState(true);const[error,setError]=useState("");useEffect(()=>{void fetch("/api/binance-account/portfolio",{cache:"no-store"}).then(async response=>{const value=await response.json();if(!response.ok)throw new Error(value.error||"Unable to load Binance portfolio.");setData(value as BinancePortfolio)}).catch(e=>setError(e instanceof Error?e.message:"Unable to load Binance portfolio.")).finally(()=>setLoading(false))},[]);if(loading)return <div className="inline-state">Loading your read-only Binance exchange portfolio…</div>;if(error)return <div className="workflow-error">{error}</div>;if(!data?.configured)return <div className="inline-state"><strong>Connect Binance portfolio</strong><span>Configure protected read-only credentials on the Binance page. Never paste them into chat.</span></div>;return <div className="inline-balance"><div><span className="metric-label">Binance exchange portfolio</span><strong>{data.estimatedTotalUsd.toLocaleString(undefined,{style:"currency",currency:"USD"})}</strong><small>{data.balances.length} visible holdings across Spot, Funding, Futures, Earn, and Margin · {data.connection}</small></div>{data.balances.length>0&&<div className="balance-pills">{data.balances.slice(0,5).map(balance=><span key={balance.id}><b>{balance.asset}</b> {balance.total} · {balance.sourceLabel}</span>)}</div>}</div>}
-function RecentChats({conversations,state,error,activeId,onRetry,onSelect,displayName,profileImageDataUrl}:{conversations:ServerConversation[];state:"loading"|"ready"|"error";error:string;activeId?:string;onRetry:()=>Promise<void>;onSelect:(conversation:ServerConversation)=>void;displayName:string;profileImageDataUrl:string|null}){const initials=displayName.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()).join("")||"A";return <aside className="recent-chats-panel"><div className="panel-heading"><div><h2>Recent Chats</h2><p>Saved securely in AgentPay</p></div></div><div className="recent-chat-list">{state==="loading"?<div className="recent-chat-empty"><span>◌</span><strong>Loading conversations…</strong></div>:state==="error"?<div className="recent-chat-empty"><span>!</span><strong>Couldn’t load chats</strong><p>{error}</p><button className="secondary-button" onClick={()=>void onRetry()}>Try again</button></div>:conversations.length?conversations.map((conversation)=><button className={`recent-chat-item${activeId===conversation.id?" active":""}`} aria-current={activeId===conversation.id?"true":undefined} key={conversation.id} onClick={()=>void onSelect(conversation)}><span className="recent-chat-icon">{profileImageDataUrl?<img src={profileImageDataUrl} alt=""/>:initials}</span><span><strong>{conversation.title||"Conversation in progress"}</strong><small>{conversation.pending?"AgentPay is responding…":new Date(conversation.updatedAt).toLocaleString()}</small></span></button>):<div className="recent-chat-empty"><span>✦</span><strong>No conversations yet</strong><p>Your first message will be saved here automatically.</p></div>}</div></aside>}
+function RecentChats({conversations,state,error,activeId,page,totalPages,total,deletingId,onRetry,onSelect,onDelete,onPageChange,displayName,profileImageDataUrl}:{conversations:ServerConversation[];state:"loading"|"ready"|"error";error:string;activeId?:string;page:number;totalPages:number;total:number;deletingId?:string;onRetry:()=>Promise<void>;onSelect:(conversation:ServerConversation)=>void;onDelete:(conversation:ServerConversation)=>Promise<void>;onPageChange:(page:number)=>void;displayName:string;profileImageDataUrl:string|null}){
+  const initials=displayName.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()).join("")||"A";
+  return <aside className="recent-chats-panel">
+    <div className="panel-heading"><div><h2>Recent Chats</h2><p>{total ? `${total} saved conversation${total===1?"":"s"}` : "Saved securely in AgentPay"}</p></div></div>
+    <div className="recent-chat-list">{state==="loading"?<div className="recent-chat-empty"><span>◌</span><strong>Loading conversations…</strong></div>:state==="error"?<div className="recent-chat-empty"><span>!</span><strong>Couldn’t load chats</strong><p>{error}</p><button className="secondary-button" onClick={()=>void onRetry()}>Try again</button></div>:conversations.length?conversations.map((conversation)=><div className={`recent-chat-item${activeId===conversation.id?" active":""}`} key={conversation.id}><button className="recent-chat-open" aria-current={activeId===conversation.id?"true":undefined} onClick={()=>void onSelect(conversation)}><span className="recent-chat-icon">{profileImageDataUrl?<img src={profileImageDataUrl} alt=""/>:initials}</span><span><strong>{conversation.title||"Conversation in progress"}</strong><small>{conversation.pending?"AgentPay is responding…":new Date(conversation.updatedAt).toLocaleString()}</small></span></button><button className="recent-chat-delete" disabled={deletingId===conversation.id} aria-label={`Delete ${conversation.title||"conversation"}`} title="Delete conversation" onClick={()=>void onDelete(conversation)}>{deletingId===conversation.id?"…":"×"}</button></div>):<div className="recent-chat-empty"><span>✦</span><strong>No conversations yet</strong><p>Your first message will be saved here automatically.</p></div>}</div>
+    {state==="ready"&&totalPages>1&&<div className="recent-chat-pagination"><button disabled={page<=1} onClick={()=>onPageChange(page-1)} aria-label="Previous conversations">←</button><span>Page {page} of {totalPages}</span><button disabled={page>=totalPages} onClick={()=>onPageChange(page+1)} aria-label="Next conversations">→</button></div>}
+  </aside>
+}
 function RecentActivity({onViewAll}:{onViewAll:()=>void}){const [items,setItems]=useState<Array<{id:string;title:string;status:string;time:string;source:string}>>([]);useEffect(()=>{void fetch('/api/payments/activity?page=1&limit=10&sort=newest',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(Array.isArray(data.events)){setItems(data.events.slice(0,10).map((e:any)=>({id:e.id,title:e.title||e.description||e.activityType,status:e.statusGroup,time:e.occurredAt||e.updatedAt,source:e.source})));return}const list=[...(data.x402Intents||[]).map((x:any)=>({id:'x'+x.id,title:`x402 · ${x.resourceHost}`,status:x.status,time:x.updatedAt,source:'x402'})),...(data.binancePayReceipts||[]).map((x:any)=>({id:'b'+x.id,title:`${x.amount||''} ${x.currency||''}`,status:x.status,time:x.updatedAt,source:'Binance Pay'})),...(data.intents||[]).map((x:any)=>({id:'w'+x.id,title:`${x.amount} ${x.asset}`,status:x.status,time:x.createdAt,source:'Agentic Wallet'}))].sort((a,b)=>Date.parse(b.time)-Date.parse(a.time)).slice(0,10);setItems(list)}).catch(()=>setItems([]))},[]);return <aside className="recent-panel"><div className="panel-heading"><h2>Recent Activity</h2><button onClick={onViewAll}>View all</button></div><div className="recent-list">{items.length?items.map(item=><div className="recent-item" key={item.id}><span className={`activity-dot ${statusClass(item.status)}`}/><div><strong>{item.title}</strong><small>{item.source} · {new Date(item.time).toLocaleString()}</small></div><span className={`status-text ${statusClass(item.status)}`}>{friendlyStatus(item.status)}</span></div>):<div className="recent-empty"><span>◷</span><strong>No activity yet</strong><p>Approved transfers and inspected payment requests will appear here.</p></div>}</div></aside>}
 function PaymentRails({walletStatus,onNavigate}:{walletStatus:WalletConnectionStatus;onNavigate:(view:View)=>void}){const[binancePay,setBinancePay]=useState<"checking"|"ready"|"setup"|"unavailable">("checking");const[binanceAccount,setBinanceAccount]=useState<"checking"|"configured"|"setup"|"unavailable">("checking");useEffect(()=>{void fetch("/api/binance-pay/status",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error();const data=await response.json();setBinancePay(data.configured?"ready":"setup")}).catch(()=>setBinancePay("unavailable"));void fetch("/api/binance-account/status",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error();const data=await response.json();setBinanceAccount(data.configured?"configured":"setup")}).catch(()=>setBinanceAccount("unavailable"))},[]);return <section className="payment-rails"><div className="rails-heading"><div><span className="eyebrow">CONNECTIONS</span><h2>Payment rails</h2></div><button onClick={()=>onNavigate("settings")}>Manage</button></div><div className="rail-list"><button className="rail-row" onClick={()=>onNavigate("wallet")}><span className="rail-logo">◇</span><span><strong>Agentic Wallet</strong><small>Balances, transfers, and x402 signing</small></span><span className={`rail-status ${walletStatus==="CONNECTED"?"success":"neutral"}`}>{walletStatus==="CONNECTED"?"Connected":"Not connected"}</span><b>Open →</b></button><button className="rail-row" onClick={()=>onNavigate("binance-pay")}><span className="rail-logo signal">B</span><span><strong>Binance Pay</strong><small>QR, payment links, and receive links</small></span><span className={`rail-status ${binancePay==="ready"?"success":"neutral"}`}>{binancePay==="checking"?"Checking":binancePay==="ready"?"Ready":binancePay==="setup"?"Setup required":"Unavailable"}</span><b>Open →</b></button><button className="rail-row" onClick={()=>onNavigate("binance")}><span className="rail-logo dark">B</span><span><strong>Binance Account</strong><small>Read-only portfolio overview</small></span><span className={`rail-status ${binanceAccount==="configured"?"success":"neutral"}`}>{binanceAccount==="checking"?"Checking":binanceAccount==="configured"?"Configured":binanceAccount==="setup"?"Setup required":"Unavailable"}</span><b>Review →</b></button></div></section>}
 function statusClass(status:string){const s=String(status).toLowerCase();if(['failed','failure','rejected'].some(x=>s.includes(x)))return'failed';if(['success','confirmed','completed'].some(x=>s.includes(x)))return'success';if(s.includes('awaiting')||s.includes('approval'))return'awaiting';return'pending'}
