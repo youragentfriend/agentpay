@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SPENDING_LIMIT_RULES, spendingLimitError } from "@/lib/settings-types";
 import type { AgentPaySettings, PaymentRail, SpendingLimits } from "@/lib/settings-types";
+import { PaymentExecutionControls } from "@/app/components/payment-execution-controls";
 
 const RAILS: Array<{ id: PaymentRail; label: string; help: string }> = [
   { id: "binance-pay", label: "Binance Pay", help: "Applied only to Binance Pay transactions." },
@@ -68,6 +69,7 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   const hasAnyLimitError = RAILS.some(({ id }) => spendingLimitError(id, "perPaymentUsdLimit", limits[id].perPaymentUsdLimit) || spendingLimitError(id, "dailyUsdLimit", limits[id].dailyUsdLimit));
   return <div className="rules-settings-card">
     <div className="locked-rule settings-card"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
+    <PaymentExecutionControls />
     <div className="trusted-rules-grid">
       <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted wallet destinations</strong><span>Agentic Wallet rejects every other destination when this list is populated.</span></div></div><label className="field"><textarea rows={4} value={walletDestinations} onChange={(event) => setWalletDestinations(event.target.value)} placeholder="One EVM or Solana address per line"/></label></section>
       <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted x402 endpoints</strong><span>Exact HTTP method and HTTPS URL. The server host allowlist and SSRF checks still apply independently.</span></div></div><label className="field"><textarea rows={4} value={x402Endpoints} onChange={(event) => setX402Endpoints(event.target.value)} placeholder="GET https://api.example.com/resource"/></label>{settings.trustedX402Hosts.length>0&&<small className="field-help">Legacy hosts were retained for migration visibility but do not grant endpoint trust.</small>}</section>

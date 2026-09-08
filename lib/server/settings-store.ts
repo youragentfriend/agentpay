@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { isIP } from "node:net";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { AgentPaySettings, UpdateAgentPaySettings } from "@/lib/settings-types";
+import type { AgentPaySettings, PaymentExecutionControls, PaymentRail, UpdateAgentPaySettings } from "@/lib/settings-types";
 import { DEFAULT_AGENTPAY_SETTINGS, spendingLimitError } from "@/lib/settings-types";
 
 let database: DatabaseSync | undefined;
@@ -40,6 +40,11 @@ function db() {
       trusted_wallet_destinations TEXT NOT NULL DEFAULT '[]',
       trusted_x402_hosts TEXT NOT NULL DEFAULT '[]',
       trusted_x402_endpoints TEXT NOT NULL DEFAULT '[]',
+      payment_execution_enabled INTEGER NOT NULL DEFAULT 0,
+      binance_pay_execution_enabled INTEGER NOT NULL DEFAULT 0,
+      x402_execution_enabled INTEGER NOT NULL DEFAULT 0,
+      wallet_execution_enabled INTEGER NOT NULL DEFAULT 0,
+      payment_controls_updated_at TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL
     )
   `);
@@ -55,6 +60,11 @@ function db() {
   if (!columns.has("wallet_daily_usd_limit")) database.exec("ALTER TABLE app_settings ADD COLUMN wallet_daily_usd_limit TEXT");
   if (!columns.has("trusted_wallet_destinations")) database.exec("ALTER TABLE app_settings ADD COLUMN trusted_wallet_destinations TEXT NOT NULL DEFAULT '[]'");
   if (!columns.has("trusted_x402_hosts")) database.exec("ALTER TABLE app_settings ADD COLUMN trusted_x402_hosts TEXT NOT NULL DEFAULT '[]'");
+  if (!columns.has("payment_execution_enabled")) database.exec("ALTER TABLE app_settings ADD COLUMN payment_execution_enabled INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("binance_pay_execution_enabled")) database.exec("ALTER TABLE app_settings ADD COLUMN binance_pay_execution_enabled INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("x402_execution_enabled")) database.exec("ALTER TABLE app_settings ADD COLUMN x402_execution_enabled INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("wallet_execution_enabled")) database.exec("ALTER TABLE app_settings ADD COLUMN wallet_execution_enabled INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("payment_controls_updated_at")) database.exec("ALTER TABLE app_settings ADD COLUMN payment_controls_updated_at TEXT NOT NULL DEFAULT ''");
   if (!columns.has("trusted_x402_endpoints")) {
     database.exec("ALTER TABLE app_settings ADD COLUMN trusted_x402_endpoints TEXT NOT NULL DEFAULT '[]'");
     const rows = database.prepare("SELECT id, trusted_x402_hosts FROM app_settings").all() as unknown as Array<{id:number;trusted_x402_hosts:string}>;
@@ -87,6 +97,7 @@ function db() {
       DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["binance-pay"].dailyUsdLimit,
       DEFAULT_AGENTPAY_SETTINGS.spendingLimits.x402.perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits.x402.dailyUsdLimit,
       DEFAULT_AGENTPAY_SETTINGS.spendingLimits["agentic-wallet"].perPaymentUsdLimit, DEFAULT_AGENTPAY_SETTINGS.spendingLimits["agentic-wallet"].dailyUsdLimit);
+  database.exec("UPDATE app_settings SET payment_controls_updated_at=updated_at WHERE payment_controls_updated_at=''");
   return database;
 }
 
@@ -242,6 +253,15 @@ function mapSettings(row: Record<string, unknown>): AgentPaySettings {
     displayCurrency: "USD",
     timeZone: String(row.time_zone),
     requireApproval: true,
+    paymentExecution: {
+      masterEnabled: Number(row.payment_execution_enabled) === 1,
+      rails: {
+        "binance-pay": Number(row.binance_pay_execution_enabled) === 1,
+        x402: Number(row.x402_execution_enabled) === 1,
+        "agentic-wallet": Number(row.wallet_execution_enabled) === 1,
+      },
+      updatedAt: String(row.payment_controls_updated_at || row.updated_at),
+    },
     spendingLimits: {
       "binance-pay": { perPaymentUsdLimit: row.binance_pay_per_payment_usd_limit === null ? null : String(row.binance_pay_per_payment_usd_limit), dailyUsdLimit: row.binance_pay_daily_usd_limit === null ? null : String(row.binance_pay_daily_usd_limit) },
       x402: { perPaymentUsdLimit: row.x402_per_payment_usd_limit === null ? null : String(row.x402_per_payment_usd_limit), dailyUsdLimit: row.x402_daily_usd_limit === null ? null : String(row.x402_daily_usd_limit) },
@@ -257,6 +277,38 @@ function mapSettings(row: Record<string, unknown>): AgentPaySettings {
 export function getAgentPaySettings(): AgentPaySettings {
   const row = db().prepare("SELECT * FROM app_settings WHERE id = 1").get() as Record<string, unknown>;
   return mapSettings(row);
+}
+
+export function getPaymentExecutionControls(): PaymentExecutionControls {
+  return getAgentPaySettings().paymentExecution;
+}
+
+function paymentControlBoolean(value: unknown, label: string) {
+  if (typeof value !== "boolean") throw new SettingsValidationError(`${label} must be on or off.`);
+  return value;
+}
+
+export function updatePaymentExecutionControls(value: unknown): PaymentExecutionControls {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new SettingsValidationError("Payment execution controls must be a JSON object.");
+  const input = value as Record<string, unknown>;
+  const railsInput = input.rails;
+  if (!railsInput || typeof railsInput !== "object" || Array.isArray(railsInput)) throw new SettingsValidationError("Payment rail controls are required.");
+  const railsInputRecord = railsInput as Record<string, unknown>;
+  const rails = {
+    "binance-pay": paymentControlBoolean(railsInputRecord["binance-pay"], "Binance Pay execution"),
+    x402: paymentControlBoolean(railsInputRecord.x402, "x402 execution"),
+    "agentic-wallet": paymentControlBoolean(railsInputRecord["agentic-wallet"], "Agentic Wallet execution"),
+  } satisfies Record<PaymentRail, boolean>;
+  const masterEnabled = paymentControlBoolean(input.masterEnabled, "Master payment execution");
+  const current = getPaymentExecutionControls();
+  const enabling = (!current.masterEnabled && masterEnabled)
+    || (Object.keys(rails) as PaymentRail[]).some((rail) => !current.rails[rail] && rails[rail]);
+  if (enabling && input.confirmEnable !== true) throw new SettingsValidationError("Confirm before enabling payment execution.");
+  const updatedAt = new Date().toISOString();
+  db().prepare("UPDATE app_settings SET payment_execution_enabled=?, binance_pay_execution_enabled=?, x402_execution_enabled=?, wallet_execution_enabled=?, payment_controls_updated_at=? WHERE id=1").run(
+    masterEnabled ? 1 : 0, rails["binance-pay"] ? 1 : 0, rails.x402 ? 1 : 0, rails["agentic-wallet"] ? 1 : 0, updatedAt,
+  );
+  return getPaymentExecutionControls();
 }
 
 export function checkSettingsDatabaseHealth(): boolean {

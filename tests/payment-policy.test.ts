@@ -21,6 +21,7 @@ const trusted = "0x1111111111111111111111111111111111111111";
 const other = "0x2222222222222222222222222222222222222222";
 const settings: AgentPaySettings = {
   displayName: "Mark", profileImageDataUrl: null, displayCurrency: "USD", timeZone: "UTC", updatedAt: new Date().toISOString(), requireApproval: true,
+  paymentExecution: { masterEnabled: false, rails: { "binance-pay": false, x402: false, "agentic-wallet": false }, updatedAt: new Date().toISOString() },
   spendingLimits: { "binance-pay": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, x402: { perPaymentUsdLimit: "10", dailyUsdLimit: "20" }, "agentic-wallet": { perPaymentUsdLimit: "10", dailyUsdLimit: "20" } }, trustedWalletDestinations: [trusted], trustedX402Hosts: ["api.example.com"], trustedX402Endpoints: ["GET https://api.example.com/resource"],
 };
 

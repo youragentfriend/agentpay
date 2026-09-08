@@ -11,6 +11,7 @@ import type {
   WalletTransaction,
 } from "@/lib/wallet-types";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
+import { assertPaymentExecutionAllowed } from "@/lib/server/payment-execution";
 import type { X402Preview, X402Signature } from "@/lib/x402-types";
 import { directChildEnvironment } from "@/lib/server/direct-network";
 
@@ -168,6 +169,7 @@ export async function getWalletLockStatus(binanceChainId: string): Promise<"LOCK
 }
 
 export async function sendWalletTransfer(intent: PreparedTransfer): Promise<string> {
+  assertPaymentExecutionAllowed("agentic-wallet");
   const data = await runBaw<{ txHash?: unknown }>([
     "wallet", "send", "--amount", intent.amount, "--recipient", intent.recipient,
     "--binanceChainId", intent.binanceChainId, "--tokenAddress", intent.tokenAddress,
@@ -192,6 +194,7 @@ export async function previewX402Payment(paymentRequirements: string): Promise<X
 }
 
 export async function signX402Payment(paymentId: string, selectedIndex: number): Promise<X402Signature> {
+  assertPaymentExecutionAllowed("x402");
   if (!QR_CODE_ID.test(paymentId)) throw new AgenticWalletError("The x402 payment ID is invalid.", "INVALID_X402_PAYMENT_ID");
   if (!Number.isSafeInteger(selectedIndex) || selectedIndex < 1) throw new AgenticWalletError("The x402 payment option index is invalid.", "INVALID_X402_OPTION");
   return runBaw<X402Signature>(["x402-payment", "sign", "--paymentId", paymentId, "--selectedIndex", String(selectedIndex)], 120_000);

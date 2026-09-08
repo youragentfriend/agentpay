@@ -7,6 +7,7 @@ import type { BinancePayCapability, BinancePayCurrencies, BinancePayOrder, Binan
 import { saveBinancePayOrder } from "@/lib/server/binance-pay-store";
 import { enforcePaymentPolicy, PaymentPolicyError, usdAmountForCurrency } from "@/lib/server/payment-policy";
 import { directChildEnvironment } from "@/lib/server/direct-network";
+import { assertPaymentExecutionAllowed, isPaymentRailEffectivelyEnabled, PaymentExecutionError } from "@/lib/server/payment-execution";
 
 const execFileAsync = promisify(execFile);
 const SKILL_DIR = path.join(process.cwd(), "vendor", "binance", "payment");
@@ -38,7 +39,7 @@ export function binancePayErrorResponse(error: unknown): Response {
     ? error
     : new BinancePayError("Binance Pay operation failed.");
   const status = paymentError.code === "PAYMENT_CONFIG_REQUIRED" || paymentError.code === "QR_DECODER_NOT_READY" ? 503
-    : paymentError.code === "PAYMENT_EXECUTION_DISABLED" ? 403 : 400;
+    : ["PAYMENT_EXECUTION_DISABLED", "PAYMENT_SERVER_DISABLED", "PAYMENTS_EMERGENCY_STOPPED", "PAYMENT_RAIL_DISABLED"].includes(paymentError.code) ? 403 : 400;
   return Response.json({ error: paymentError.message, code: paymentError.code }, { status });
 }
 
@@ -172,7 +173,7 @@ export async function getBinancePayCapability(): Promise<BinancePayCapability> {
       imageDecodeReady = true;
     } catch { imageDecodeReady = false; }
   }
-  return { configured: missing.length === 0, executionEnabled: process.env.AGENTPAY_ENABLE_BINANCE_PAY === "true", imageDecodeReady, missing };
+  return { configured: missing.length === 0, executionEnabled: isPaymentRailEffectivelyEnabled("binance-pay"), imageDecodeReady, missing };
 }
 
 export function getBinancePayReceiveCurrencies(): BinancePayCurrencies {
@@ -201,7 +202,8 @@ export async function setBinancePaymentAmount(amount: string, currency?: string)
 }
 
 export async function confirmBinancePayment(): Promise<BinancePayOrder> {
-  if (process.env.AGENTPAY_ENABLE_BINANCE_PAY !== "true") throw new BinancePayError("Binance Pay execution is disabled on this server.", "PAYMENT_EXECUTION_DISABLED");
+  try { assertPaymentExecutionAllowed("binance-pay"); }
+  catch (error) { if (error instanceof PaymentExecutionError) throw new BinancePayError(error.message, error.code); throw error; }
   return serialized(async () => {
     const current = await enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "query"], 45_000)));
     enforceBinancePaymentPolicy(current);

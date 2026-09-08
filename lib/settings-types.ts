@@ -2,6 +2,8 @@ export type DisplayCurrency = "USD";
 export type PaymentRail = "binance-pay" | "x402" | "agentic-wallet";
 export type SpendingLimit = { perPaymentUsdLimit: string | null; dailyUsdLimit: string | null };
 export type SpendingLimits = Record<PaymentRail, SpendingLimit>;
+export type PaymentExecutionControls = { masterEnabled: boolean; rails: Record<PaymentRail, boolean>; updatedAt: string };
+export type PaymentExecutionState = { masterEnabled: boolean; updatedAt: string; rails: Record<PaymentRail, { serverEnabled: boolean; userEnabled: boolean; effectiveEnabled: boolean }> };
 
 export const SPENDING_LIMIT_RULES = {
   "binance-pay": { minimum: "0.0001", perPaymentMaximum: "50", dailyMaximum: "100", decimals: 4 },
@@ -28,6 +30,7 @@ export type AgentPaySettings = {
   displayCurrency: DisplayCurrency;
   timeZone: string;
   requireApproval: true;
+  paymentExecution: PaymentExecutionControls;
   spendingLimits: SpendingLimits;
   trustedWalletDestinations: string[];
   /** Legacy host entries retained for migration visibility; exact endpoint trust is enforced. */
@@ -60,4 +63,9 @@ export const DEFAULT_AGENTPAY_SETTINGS: UpdateAgentPaySettings = {
   trustedWalletDestinations: [],
   trustedX402Hosts: [],
   trustedX402Endpoints: [],
+};
+
+export const DEFAULT_PAYMENT_EXECUTION_CONTROLS: Omit<PaymentExecutionControls, "updatedAt"> = {
+  masterEnabled: false,
+  rails: { "binance-pay": false, x402: false, "agentic-wallet": false },
 };

@@ -8,8 +8,10 @@ import { spendingLimitError } from "../lib/settings-types";
 import {
   SettingsValidationError,
   getAgentPaySettings,
+  getPaymentExecutionControls,
   resetSettingsStoreForTests,
   updateAgentPaySettings,
+  updatePaymentExecutionControls,
   validateSettingsUpdate,
 } from "../lib/server/settings-store";
 
@@ -45,6 +47,8 @@ test("creates persistent default AgentPay settings with mandatory approval", () 
   assert.equal(settings.displayCurrency, "USD");
   assert.equal(settings.timeZone, "UTC");
   assert.equal(settings.requireApproval, true);
+  assert.equal(settings.paymentExecution.masterEnabled, false);
+  assert.deepEqual(settings.paymentExecution.rails, { "binance-pay": false, x402: false, "agentic-wallet": false });
   assert.deepEqual(settings.spendingLimits["binance-pay"], { perPaymentUsdLimit: "50", dailyUsdLimit: "100" });
   assert.deepEqual(settings.spendingLimits.x402, { perPaymentUsdLimit: "20", dailyUsdLimit: "20" });
   assert.deepEqual(settings.spendingLimits["agentic-wallet"], { perPaymentUsdLimit: "50", dailyUsdLimit: "100" });
@@ -67,6 +71,19 @@ test("updates rules and persists them in SQLite", () => withDatabase(() => {
   resetSettingsStoreForTests();
   assert.equal(getAgentPaySettings().spendingLimits["binance-pay"].dailyUsdLimit, "100");
   assert.equal(getAgentPaySettings().profileImageDataUrl, profileImageDataUrl);
+  assert.equal(getAgentPaySettings().paymentExecution.masterEnabled, false);
+}));
+
+test("requires confirmation before enabling and preserves rail choices during an emergency stop", () => withDatabase(() => {
+  const enabled = { masterEnabled: true, rails: { "binance-pay": true, x402: false, "agentic-wallet": true } };
+  assert.throws(() => updatePaymentExecutionControls(enabled), /confirm/i);
+  const saved = updatePaymentExecutionControls({ ...enabled, confirmEnable: true });
+  assert.equal(saved.masterEnabled, true);
+  assert.deepEqual(saved.rails, enabled.rails);
+  const stopped = updatePaymentExecutionControls({ masterEnabled: false, rails: enabled.rails });
+  assert.equal(stopped.masterEnabled, false);
+  assert.deepEqual(stopped.rails, enabled.rails);
+  assert.deepEqual(getPaymentExecutionControls().rails, enabled.rails);
 }));
 
 test("migrates a Priority 1 settings database without losing profile values", () => withDatabase((filename) => {
@@ -79,6 +96,8 @@ test("migrates a Priority 1 settings database without losing profile values", ()
   assert.equal(settings.timeZone, "Europe/London");
   assert.equal(settings.profileImageDataUrl, null);
   assert.equal(settings.requireApproval, true);
+  assert.equal(settings.paymentExecution.masterEnabled, false);
+  assert.deepEqual(settings.paymentExecution.rails, { "binance-pay": false, x402: false, "agentic-wallet": false });
   assert.deepEqual(settings.trustedX402Hosts, []);
   assert.deepEqual(settings.trustedX402Endpoints, []);
 }));

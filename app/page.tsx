@@ -15,7 +15,7 @@ import { RulesSettings } from "@/app/components/rules-settings";
 import { X402Workflow } from "@/app/components/x402-workflow";
 import { TransactionExplorerLink } from "@/app/components/transaction-explorer-link";
 import type { AgentPaySettings } from "@/lib/settings-types";
-import { DEFAULT_AGENTPAY_SETTINGS } from "@/lib/settings-types";
+import { DEFAULT_AGENTPAY_SETTINGS, DEFAULT_PAYMENT_EXECUTION_CONTROLS } from "@/lib/settings-types";
 const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "development";
 
 type View = "overview" | "binance" | "binance-pay" | "wallet" | "x402" | "activity" | "settings" | "reports";
@@ -29,7 +29,7 @@ export default function Home() {
   const [walletOpen, setWalletOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("Rules & approvals");
-  const [settings, setSettings] = useState<AgentPaySettings>({ ...DEFAULT_AGENTPAY_SETTINGS, requireApproval: true, updatedAt: new Date(0).toISOString() });
+  const [settings, setSettings] = useState<AgentPaySettings>({ ...DEFAULT_AGENTPAY_SETTINGS, requireApproval: true, paymentExecution: { ...DEFAULT_PAYMENT_EXECUTION_CONTROLS, rails: { ...DEFAULT_PAYMENT_EXECUTION_CONTROLS.rails }, updatedAt: new Date(0).toISOString() }, updatedAt: new Date(0).toISOString() });
 
   useEffect(() => {
     void fetch("/api/settings", { cache: "no-store" })

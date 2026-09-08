@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
+import { isPaymentRailEffectivelyEnabled } from "@/lib/server/payment-execution";
 import { PaymentIntentError } from "@/lib/server/payment-intents";
 
 type PaymentDraft = Omit<PreparedTransfer, "id">;
@@ -105,5 +106,5 @@ export function markPaymentFailed(id: string, code: string, message: string): Pr
 }
 
 export function walletSendEnabled(): boolean {
-  return process.env.AGENTPAY_ENABLE_WALLET_SEND === "true";
+  return isPaymentRailEffectivelyEnabled("agentic-wallet");
 }

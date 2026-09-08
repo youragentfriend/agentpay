@@ -1,7 +1,8 @@
 import { AgenticWalletError, getWalletLockStatus, getWalletOverview, sendWalletTransfer } from "@/lib/server/agentic-wallet";
 import { PaymentIntentError, prepareTransfer } from "@/lib/server/payment-intents";
-import { getPaymentIntent, markPaymentFailed, markPaymentSubmitted, markPaymentSubmitting, walletSendEnabled } from "@/lib/server/payment-store";
+import { getPaymentIntent, markPaymentFailed, markPaymentSubmitted, markPaymentSubmitting } from "@/lib/server/payment-store";
 import { enforcePaymentPolicy, PaymentPolicyError } from "@/lib/server/payment-policy";
+import { assertPaymentExecutionAllowed, PaymentExecutionError } from "@/lib/server/payment-execution";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -9,7 +10,7 @@ export const maxDuration = 180;
 export async function POST(request: Request) {
   let processingId: string | undefined;
   try {
-    if (!walletSendEnabled()) throw new PaymentIntentError("Wallet execution is disabled on this server.", "EXECUTION_DISABLED");
+    assertPaymentExecutionAllowed("agentic-wallet");
     const body = await request.json() as { id?: unknown };
     if (typeof body.id !== "string") throw new PaymentIntentError("Payment intent ID is required.", "INVALID_PAYMENT_INTENT_ID");
     const intent = getPaymentIntent(body.id);
@@ -31,11 +32,13 @@ export async function POST(request: Request) {
   } catch (error) {
     const paymentError = error instanceof PaymentIntentError || error instanceof PaymentPolicyError
       ? error
+      : error instanceof PaymentExecutionError
+        ? new PaymentIntentError(error.message, error.code)
       : error instanceof AgenticWalletError
         ? new PaymentIntentError(error.message, error.code)
         : new PaymentIntentError("Unable to execute this transfer.", "EXECUTE_TRANSFER_FAILED");
     if (processingId) markPaymentFailed(processingId, paymentError.code, paymentError.message);
-    const status = paymentError.code === "EXECUTION_DISABLED" ? 403 : 400;
+    const status = ["EXECUTION_DISABLED", "PAYMENT_SERVER_DISABLED", "PAYMENTS_EMERGENCY_STOPPED", "PAYMENT_RAIL_DISABLED"].includes(paymentError.code) ? 403 : 400;
     return Response.json({ error: paymentError.message, code: paymentError.code }, { status });
   }
 }
