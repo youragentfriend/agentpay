@@ -29,6 +29,7 @@ test("reports settled spending accurately without counting pending, cancelled, o
   assert.equal(report.summary.largestUsd, "20.00");
   assert.equal(report.summary.unvaluedCount, 1);
   assert.equal(report.transactions.some(item => item.id === "pending"), false);
+  assert.equal(report.transactions.find(item => item.id === "unvalued")?.amountUsd, "");
 });
 
 test("builds payment-rail, asset, trend, and daily calendar totals", () => {
@@ -58,4 +59,14 @@ test("groups a yearly trend by month without dropping spending", () => {
   const report = buildSpendingReport(events, { preset: "year", timezone: "UTC", now });
   assert.equal(report.trend.length, 9);
   assert.equal(report.trend.find(point => point.date === "2026-09-01")?.totalUsd, "32.63");
+});
+
+test("keeps every matching transaction available for CSV export", () => {
+  const manyEvents = Array.from({ length: 75 }, (_, index) => event(`row-${index}`, {
+    source: "x402",
+    amountUsd: "1",
+    occurredAt: `2026-09-06T${String(index % 24).padStart(2, "0")}:00:00.000Z`,
+  }));
+  const report = buildSpendingReport(manyEvents, { preset: "month", timezone: "UTC", now });
+  assert.equal(report.transactions.length, 75);
 });

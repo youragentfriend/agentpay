@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { spendingReportCsv, spendingReportCsvFilename } from "@/lib/report-csv";
 import type { SpendingRangePreset, SpendingReport } from "@/lib/report-types";
 
 const EMPTY: SpendingReport = { generatedAt: "", timezone: "UTC", range: { preset: "month", from: "", to: "", label: "" }, filters: { sources: [], includePending: false }, summary: { settledTotalUsd: "0.00", pendingTotalUsd: "0.00", transactionCount: 0, pendingCount: 0, averageUsd: "0.00", largestUsd: "0.00", unvaluedCount: 0 }, bySource: [], byAsset: [], trend: [], calendar: { month: "", label: "", days: [] }, transactions: [] };
@@ -41,6 +42,17 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
   const assetOptions = useMemo(() => report.byAsset.map(item => item.key).filter(key => key !== "unknown"), [report.byAsset]);
   function chooseDate(date: string, future: boolean) { if (future) return; setFrom(date); setTo(date); setRange("custom"); }
   function clearDay() { setFrom(""); setTo(""); setRange("month"); }
+  function exportCsv() {
+    const blob = new Blob([spendingReportCsv(report)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = spendingReportCsvFilename(report);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 
   return <section className="reports-workspace">
     <div className="reports-toolbar no-print">
@@ -49,12 +61,12 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
         <label><span>Payment rail</span><select value={source} onChange={event => setSource(event.target.value)}><option value="">All rails</option><option value="agentic-wallet">Agentic Wallet</option><option value="binance-pay">Binance Pay</option><option value="x402">x402</option></select></label>
         <label><span>Asset</span><select value={asset} onChange={event => setAsset(event.target.value)}><option value="">All assets</option>{assetOptions.map(item => <option key={item}>{item}</option>)}</select></label>
         <label className="reports-pending-toggle"><input type="checkbox" checked={includePending} onChange={event => setIncludePending(event.target.checked)} /><span>Include pending transactions</span></label>
-        <button className="secondary-button" onClick={() => window.print()}>Print report</button>
+        <button className="secondary-button" onClick={exportCsv} disabled={loading || !report.generatedAt}>Export CSV</button>
       </div>
       {range === "custom" && <div className="reports-custom-range"><label><span>From</span><input type="date" max={dateParts(new Date(), timeZone)} value={from} onChange={event => setFrom(event.target.value)} /></label><label><span>To</span><input type="date" max={dateParts(new Date(), timeZone)} value={to} onChange={event => setTo(event.target.value)} /></label>{from && to && from === to && <button className="ghost-button" onClick={clearDay}>Clear selected day</button>}</div>}
     </div>
 
-    <header className="reports-print-heading"><div><span className="eyebrow">AgentPay analytics</span><h2>Spending report</h2><p>{report.range.label} · {report.timezone}</p></div><div><strong>{usd(report.summary.settledTotalUsd)}</strong><span>Settled spending</span></div></header>
+    <header className="reports-print-heading"><div><span className="eyebrow">AgentPay analytics</span><h2>Spending report</h2><p>{report.range.label} · {report.timezone}</p></div></header>
     {error && <div className="workflow-error">{error}</div>}
     {loading && !report.generatedAt ? <div className="workflow-message">Building your spending report…</div> : <>
       <div className="reports-summary-grid">
@@ -63,8 +75,6 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
         <Metric label="Average payment" value={usd(report.summary.averageUsd)} note="Settled average" />
         <Metric label="Largest payment" value={usd(report.summary.largestUsd)} note="Within selected period" />
       </div>
-      {report.summary.unvaluedCount > 0 && <div className="reports-unvalued">{report.summary.unvaluedCount} matching transaction{report.summary.unvaluedCount === 1 ? " has" : "s have"} no reliable USD value and {report.summary.unvaluedCount === 1 ? "is" : "are"} excluded from totals.</div>}
-
       <div className="reports-grid">
         <article className="reports-card reports-primary-card">
           <div className="reports-card-heading"><div><span className="eyebrow">Spending activity</span><h3>{view === "trend" ? "Spending over time" : report.calendar.label}</h3></div><div className="reports-view-toggle no-print"><button className={view === "trend" ? "active" : ""} onClick={() => setView("trend")}>Trend</button><button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")}>Calendar</button></div></div>
@@ -73,7 +83,7 @@ export function ReportsWorkflow({ timeZone }: { timeZone: string }) {
         <article className="reports-card reports-rail-card"><div className="reports-card-heading"><div><span className="eyebrow">Payment rails</span><h3>Spending by rail</h3></div></div><RailDonut report={report} /></article>
       </div>
 
-      <footer className="reports-print-footer">Generated {report.generatedAt ? new Date(report.generatedAt).toLocaleString("en-US", { timeZone: report.timezone }) : "—"} · Pending and unvalued activity is shown separately and never silently added to settled totals.</footer>
+      <footer className="reports-print-footer">Generated {report.generatedAt ? new Date(report.generatedAt).toLocaleString("en-US", { timeZone: report.timezone }) : "—"} · Pending activity is shown separately and never silently added to settled totals.</footer>
     </>}
   </section>;
 }
