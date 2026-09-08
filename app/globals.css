@@ -150,12 +150,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .panel-heading p { margin: 4px 0 0; color: #4f534b; font-size: 13px; }
 .recent-chat-list, .recent-list { min-height: 0; overflow: auto; scrollbar-gutter: stable; }
 .recent-chat-list { flex: 1; max-height: 584px; }
-.recent-chat-item { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) 38px; align-items: stretch; border-bottom: 1px solid var(--line); }
+.recent-chat-item { position: relative; width: 100%; border-bottom: 1px solid var(--line); }
 .recent-chat-item:hover, .recent-chat-item.active { background: #f6f6ef; }
 .recent-chat-item.active { box-shadow: inset 3px 0 0 var(--yellow); }
-.recent-chat-open { display: grid; min-width: 0; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 10px 15px 18px; text-align: left; }
-.recent-chat-delete { display: grid; width: 30px; height: 30px; place-self: center; place-items: center; border-radius: 8px; color: #777a71; font-size: 20px; line-height: 1; }
-.recent-chat-delete:hover:not(:disabled) { background: #fee8e6; color: var(--red); }
+.recent-chat-open { display: grid; width: 100%; min-width: 0; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 11px; padding: 15px 18px 25px; text-align: left; }
+.recent-chat-delete { position: absolute; right: 12px; bottom: 7px; padding: 1px 3px; color: #888b82; font-size: 10px; font-weight: 600; letter-spacing: .02em; line-height: 1.2; }
+.recent-chat-delete:hover:not(:disabled) { color: var(--red); text-decoration: underline; text-underline-offset: 2px; }
 .recent-chat-delete:disabled { cursor: wait; opacity: .45; }
 .recent-chat-icon { display: grid; width: 36px; height: 36px; place-items: center; overflow: hidden; border-radius: 50%; background: var(--ink); color: var(--yellow); font-size: 12px; font-weight: 700; }
 .recent-chat-open strong, .recent-chat-open small { display: block; }
