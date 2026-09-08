@@ -68,6 +68,10 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
   const hasAnyLimitError = RAILS.some(({ id }) => spendingLimitError(id, "perPaymentUsdLimit", limits[id].perPaymentUsdLimit) || spendingLimitError(id, "dailyUsdLimit", limits[id].dailyUsdLimit));
   return <div className="rules-settings-card">
     <div className="locked-rule settings-card"><div><strong>Require approval for every payment</strong><span>Enforced for Agentic Wallet, Binance Pay, and x402. This safety rule cannot be disabled.</span></div><span className="rule-state success">Locked on</span></div>
+    <div className="trusted-rules-grid">
+      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted wallet destinations</strong><span>Agentic Wallet rejects every other destination when this list is populated.</span></div></div><label className="field"><textarea rows={4} value={walletDestinations} onChange={(event) => setWalletDestinations(event.target.value)} placeholder="One EVM or Solana address per line"/></label></section>
+      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted x402 endpoints</strong><span>Exact HTTP method and HTTPS URL. The server host allowlist and SSRF checks still apply independently.</span></div></div><label className="field"><textarea rows={4} value={x402Endpoints} onChange={(event) => setX402Endpoints(event.target.value)} placeholder="GET https://api.example.com/resource"/></label>{settings.trustedX402Hosts.length>0&&<small className="field-help">Legacy hosts were retained for migration visibility but do not grant endpoint trust.</small>}</section>
+    </div>
     <section className="settings-card spending-rules-card">
       <div className="settings-section-heading"><div><strong>Spending limits</strong><span>Configure independent limits for each payment rail.</span></div></div>
       <div className="spending-limit-tabs" role="tablist" aria-label="Payment rail spending limits">{RAILS.map((item) => { const invalid = Boolean(spendingLimitError(item.id, "perPaymentUsdLimit", limits[item.id].perPaymentUsdLimit) || spendingLimitError(item.id, "dailyUsdLimit", limits[item.id].dailyUsdLimit)); return <button type="button" role="tab" aria-selected={activeRail === item.id} className={`${activeRail === item.id ? "active" : ""}${invalid ? " has-error" : ""}`} key={item.id} onClick={() => setActiveRail(item.id)}>{item.label}</button>; })}</div>
@@ -79,10 +83,6 @@ export function RulesSettings({ settings, onSaved }: { settings: AgentPaySetting
         <small className="field-help">{rail.help} Payments without reliable USD data fail closed when a limit is set.</small>
       </div>
     </section>
-    <div className="trusted-rules-grid">
-      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted wallet destinations</strong><span>Agentic Wallet rejects every other destination when this list is populated.</span></div></div><label className="field"><textarea rows={4} value={walletDestinations} onChange={(event) => setWalletDestinations(event.target.value)} placeholder="One EVM or Solana address per line"/></label></section>
-      <section className="settings-card trusted-rule-card"><div className="settings-section-heading"><div><strong>Trusted x402 endpoints</strong><span>Exact HTTP method and HTTPS URL. The server host allowlist and SSRF checks still apply independently.</span></div></div><label className="field"><textarea rows={4} value={x402Endpoints} onChange={(event) => setX402Endpoints(event.target.value)} placeholder="GET https://api.example.com/resource"/></label>{settings.trustedX402Hosts.length>0&&<small className="field-help">Legacy hosts were retained for migration visibility but do not grant endpoint trust.</small>}</section>
-    </div>
     {error && <div className="workflow-error">{error}</div>}
     {saved && <div className="settings-success">Rules saved and active on the server.</div>}
     <div className="settings-actions"><button className="primary-button" disabled={saving || hasAnyLimitError} onClick={() => void save()}>{saving ? "Saving…" : "Save rules"}</button></div>
