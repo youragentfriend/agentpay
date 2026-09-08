@@ -16,7 +16,7 @@ AgentPay turns a user's intent into a controlled, trackable payment workflow. It
 - **Server-side controls** for destinations, endpoints, balances, spending limits, approvals, and execution.
 - **A unified Activity and Reports layer** so every payment can be tracked and understood.
 
-This is the bridge between AI that can recommend an action and AI that can responsibly complete one.
+This is the bridge between AI that can recommend an action and AI that can responsibly complete an approved one.
 
 AgentPay is built for the **Binance Agent OS Payment Workflows** track and uses selected capabilities from the [Binance Skills Hub](https://github.com/binance/binance-skills-hub).
 
@@ -54,7 +54,7 @@ AgentPay is built for the **Binance Agent OS Payment Workflows** track and uses 
 
 ### AgentPay Assistant
 
-The Overview Assistant is the conversational entry point to AgentPay. It selects one of AgentPay's bundled skills for wallet operations, Binance Pay, Binance portfolio, Activity and Reports, or x402. The deterministic backend remains the authority for validation, policy, approval, signing, execution, persistence, and user-facing results.
+The Overview Assistant is the conversational entry point to AgentPay. It selects one of AgentPay's bundled skills for wallet operations, Binance Pay, Binance portfolio, Activity and Reports, or x402. It is an execution agent, not just a form launcher: for supported payment actions, an explicit confirmation in chat lets the backend approve and execute the prepared action automatically, without a second manual send-button click. The deterministic backend remains the authority for validation, policy, approval, signing, execution, persistence, and user-facing results.
 
 ## How AgentPay works
 
@@ -77,11 +77,11 @@ Manual workflows support Binance Pay QR codes, payment links, receive links, Age
 2. AgentPay selects the relevant bundled skill.
 3. The Assistant gathers any missing information.
 4. The backend validates balances, destinations, limits, and payment rules.
-5. AgentPay presents the exact action for approval.
-6. After approval, the appropriate payment rail executes it.
+5. AgentPay presents the exact action for approval in the conversation.
+6. After the user explicitly confirms in chat, the backend approves and executes the supported action automatically.
 7. The result is recorded for tracking and reporting.
 
-Conversational automation does not bypass the controls used by the manual workflows. Both paths lead to the same validation, approval, execution, and Activity records.
+Conversational automation does not bypass the controls used by the manual workflows. Both paths lead to the same validation, approval, execution, and Activity records; the difference is that the Assistant can carry out a supported action after the user's confirmation without requiring another manual button click.
 
 ## Binance Agent OS and Skills Hub integrations
 
