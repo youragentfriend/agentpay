@@ -134,13 +134,3 @@ docs/                        Installation, configuration, and architecture guide
 ```
 
 Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the request flow and provider boundaries.
-
-## Status and roadmap
-
-AgentPay's manual payment rails, safety controls, persistence, Activity, Reports, and provider integrations are implemented. Natural-language Assistant orchestration is being expanded rail by rail so that conversational workflows return natural-language results while still using the same deterministic backend controls.
-
-Planned work includes broader Assistant automation, more provider coverage, stronger multi-user authentication, and deployment hardening.
-
-## License
-
-The repository license will be selected before public release. The vendored Binance Payment skill retains the license declared by its upstream project; see its vendored metadata for attribution.
