@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WalletConnectionStatus, WalletOverview, WalletSignIn } from "@/lib/wallet-types";
+import type { PreparedTransfer } from "@/lib/payment-workflow";
 import type { BinancePortfolio } from "@/lib/binance-portfolio-types";
 import { isSolanaChain } from "@/lib/payment-validation";
 import { PaymentWorkflow } from "@/app/components/payment-workflow";
@@ -104,7 +105,7 @@ function NavParent({label,icon,active,open,onNavigate,onToggle}:{label:string;ic
 
 type ChatAction = "payment" | "binance-pay" | "payment-link" | "binance-balance" | "activity" | "balance" | "x402";
 type ChatWorkflow = { input: Record<string, string> };
-type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: ChatAction; workflow?: ChatWorkflow; file?: File };
+type ChatTurn = { id: number; role: "user" | "assistant"; text: string; action?: ChatAction; workflow?: ChatWorkflow; transfer?: PreparedTransfer; transferPhase?: "awaiting-confirmation" | "submitted" | "cancelled" | "blocked"; file?: File };
 type ServerConversation = {
   id: string;
   title?: string;
@@ -114,6 +115,7 @@ type ServerConversation = {
   latestWorkflow?: ChatWorkflow;
   latestOperation?: string;
   latestAction?: ChatAction;
+  latestTransfer?: PreparedTransfer;
   missingFields: string[];
   pending: boolean;
   createdAt: string;
@@ -187,7 +189,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
     setAssistantBusy(true);
     try {
       const response = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: value, conversationId: runtimeConversationId.current }), signal: controller.signal });
-      const result = await response.json() as { conversationId?: string; action?: ChatAction; operation?: string; workflow?: ChatWorkflow; message?: string; error?: string };
+      const result = await response.json() as { conversationId?: string; action?: ChatAction; operation?: string; workflow?: ChatWorkflow; transfer?: PreparedTransfer; transferPhase?: ChatTurn["transferPhase"]; message?: string; error?: string };
       if (version !== requestVersion.current) return;
       if (result.conversationId) {
         runtimeConversationId.current = result.conversationId;
@@ -195,7 +197,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
       }
       if (!response.ok || !result.message) throw new Error(result.error || "AgentPay could not run the selected skill.");
       const action = file && result.operation === "binance-pay-inspect" ? "binance-pay" : result.action;
-      setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: result.message!, action, workflow: result.workflow, file }]);
+      setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: result.message!, action, workflow: result.workflow, transfer: result.transfer, transferPhase: result.transferPhase, file }]);
     } catch (error) {
       if (version !== requestVersion.current || (error instanceof DOMException && error.name === "AbortError")) return;
       setTurns((current) => [...current, { id: id + 0.5, role: "assistant", text: error instanceof Error ? error.message : "The AgentPay assistant is unavailable." }]);
@@ -272,6 +274,7 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
         text: entry.content,
         action: index === lastAssistant ? conversation.latestAction : undefined,
         workflow: index === lastAssistant ? conversation.latestWorkflow ?? { input: conversation.collectedFields } : undefined,
+        transfer: index === lastAssistant ? conversation.latestTransfer : undefined,
       }));
       setTurns(restored);
       runtimeConversationId.current = conversation.id;
@@ -300,8 +303,8 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
       <section className={`assistant-panel${turns.length ? " has-messages" : " empty"}`}>
         <div className="assistant-status"><div className="assistant-identity"><img className="assistant-badge" src="/brand/assistant-badge.svg" alt=""/><div><strong>AgentPay Assistant</strong><small><span className="status-dot active-dot"/> Ready for an instruction</small></div></div></div>
         <div className="quick-actions">{actions.map((action) => <button key={action.label} disabled={assistantBusy} onClick={() => void sendMessage(action.label)}><span className="quick-action-icon">{action.icon}</span><span><strong>{action.label}</strong><small>{action.description}</small></span><b>→</b></button>)}</div>
-        <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.action === "payment" && <PaymentWorkflow initialInput={turn.workflow?.input}/>} {turn.action === "binance-pay" && (turn.file ? <QrResult file={turn.file} fileName={turn.file.name}/> : <BinancePayWorkflow embedded initialInput={turn.workflow?.input}/>) }{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive" initialInput={turn.workflow?.input}/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>}{turn.action === "activity" && <InlineActivity input={turn.workflow?.input}/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={turn.workflow?.input.url || extractUrl(turns.find((item) => item.id === turn.id - 1)?.text || "")} initialMessage={turn.workflow?.input.request}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
-        <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} disabled={assistantBusy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={assistantBusy ? "AgentPay is selecting the right skill…" : "Ask AgentPay to prepare, inspect, check, or review…"}/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={assistantBusy} onChange={(event) => { attach(event.target.files?.[0]); event.currentTarget.value = ""; }}/></label><div><button className="new-conversation-button" onClick={newConversation} disabled={!turns.length && !assistantBusy}>New conversation</button><button className="send-button" onClick={() => void submit()} disabled={assistantBusy || !message.trim()} aria-label="Send instruction">{assistantBusy ? "…" : "↑"}</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay prepares actions for review. Nothing executes without your explicit approval.</p></div>
+        <div className={`conversation${turns.length ? " has-messages" : " empty"}`} ref={conversationRef} aria-live="polite">{turns.length ? turns.map((turn) => turn.role === "user" ? <div className="chat-bubble user-bubble" key={turn.id}><span>You</span><p>{turn.text}</p></div> : <div className="chat-result" key={turn.id}><div className="assistant-message"><strong>AgentPay</strong><span>{turn.text}</span></div>{turn.transfer && <AssistantTransferCard transfer={turn.transfer} phase={turn.transferPhase}/>} {turn.action === "payment" && <PaymentWorkflow initialInput={turn.workflow?.input}/>} {turn.action === "binance-pay" && (turn.file ? <QrResult file={turn.file} fileName={turn.file.name}/> : <BinancePayWorkflow embedded initialInput={turn.workflow?.input}/>) }{turn.action === "payment-link" && <BinancePayWorkflow embedded initialMode="receive" initialInput={turn.workflow?.input}/>}{turn.action === "binance-balance" && <InlineBinancePortfolio/>}{turn.action === "activity" && <InlineActivity input={turn.workflow?.input}/>}{turn.action === "balance" && <InlineBalance/>}{turn.action === "x402" && <X402Workflow initialUrl={turn.workflow?.input.url || extractUrl(turns.find((item) => item.id === turn.id - 1)?.text || "")} initialMessage={turn.workflow?.input.request}/>}</div>) : <div className="conversation-placeholder"><strong>Conversation preview</strong><span>Your messages and AgentPay responses will appear here.</span></div>}</div>
+        <div className="composer-wrap"><div className="composer"><textarea className="composer-input" rows={2} value={message} disabled={assistantBusy} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submit(); } }} placeholder={assistantBusy ? "AgentPay is selecting the right skill…" : "Ask AgentPay to prepare, inspect, check, or review…"}/><div className="composer-actions"><label className="composer-attach" role="button" tabIndex={0} aria-label="Attach a Binance Pay QR"><span>＋ <b>Attach QR</b></span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={assistantBusy} onChange={(event) => { attach(event.target.files?.[0]); event.currentTarget.value = ""; }}/></label><div><button className="new-conversation-button" onClick={newConversation} disabled={!turns.length && !assistantBusy}>New conversation</button><button className="send-button" onClick={() => void submit()} disabled={assistantBusy || !message.trim()} aria-label="Send instruction">{assistantBusy ? "…" : "↑"}</button></div></div></div><p className="approval-note"><span>◆</span> AgentPay can approve and execute after your explicit chat confirmation. All payment safety controls still apply.</p></div>
       </section>
       <RecentChats conversations={recentConversations} state={recentState} error={recentError} activeId={activeConversationId} page={recentPage} totalPages={recentTotalPages} total={recentTotal} deletingId={deletingConversationId} onRetry={()=>loadRecent(recentPage)} onSelect={openConversation} onDelete={deleteConversation} onPageChange={setRecentPage} displayName={displayName} profileImageDataUrl={profileImageDataUrl}/>
       </section>
@@ -313,6 +316,14 @@ function OverviewView({ onNavigate, walletStatus, displayName, profileImageDataU
   </div>;
 }
 function extractUrl(text:string){return text.match(/https:\/\/[^\s]+/)?.[0]?.replace(/[),.;]+$/,"")||""}
+
+function AssistantTransferCard({transfer,phase}:{transfer:PreparedTransfer;phase?:ChatTurn["transferPhase"]}){
+  const submitted=Boolean(transfer.txHash)||phase==="submitted";
+  const cancelled=phase==="cancelled"||transfer.errorCode==="USER_CANCELLED";
+  const usd=transfer.amountUsd?Number(transfer.amountUsd):undefined;
+  const displayedUsd=usd!==undefined&&Number.isFinite(usd)?usd.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:usd>0&&usd<0.01?6:2}):transfer.amountUsd;
+  return <div className={`assistant-transfer-card ${submitted?"submitted":cancelled?"cancelled":"review"}`}><div className="assistant-transfer-heading"><div><span>{submitted?"Transaction broadcast":cancelled?"Transfer cancelled":"Exact transfer review"}</span><strong>{transfer.amount} {transfer.asset}</strong></div><b>{submitted?"Submitted":cancelled?"Cancelled":"Awaiting chat confirmation"}</b></div><dl><div><dt>Network</dt><dd>{transfer.chainName}</dd></div><div><dt>Recipient</dt><dd className="mono-value">{transfer.recipient}</dd></div>{displayedUsd&&<div><dt>Estimated value</dt><dd>${displayedUsd} USD</dd></div>}<div><dt>Gas priority</dt><dd>{transfer.gasLevel}</dd></div>{transfer.txHash&&<div><dt>Transaction hash</dt><dd className="mono-value"><TransactionExplorerLink chainId={transfer.binanceChainId} transactionHash={transfer.txHash}/></dd></div>}</dl>{!submitted&&!cancelled&&<p>{phase==="blocked"?"Payment execution is currently blocked. After enabling it, reply confirm again to retry this exact review.":"Reply yes, confirm, or approve in chat. No manual button click is required."}</p>}</div>
+}
 
 function QrResult({fileName,file}:{fileName:string;file?:File}){return <div className="qr-result"><div className="inline-empty"><strong>{fileName}</strong><span>QR attached. The shared Binance Pay decoder will validate it when available.</span></div><BinancePayWorkflow initialFile={file} embedded/></div>}
 
@@ -397,7 +408,7 @@ function WalletView({ onStatusChange }: { onStatusChange: (status: WalletConnect
     }
   }
 
-  return <PageFrame eyebrow="Agentic Wallet" title="Your wallet, under your control" description="Live balances, addresses, chains, and transaction history from Binance Agentic Wallet.">
+  return <PageFrame eyebrow="Agentic Wallet" title="Your agentic wallet, under your control" description="Live balances, addresses, chains, and transaction history from Binance Agentic Wallet.">
     {loading && <WalletMessage icon="◌" title="Loading wallet" text="Checking the local Agentic Wallet connection…" />}
     {!loading && error && <WalletMessage icon="!" title="Wallet unavailable" text={error} action={<button className="secondary-button" onClick={() => void loadOverview()}>Retry</button>} />}
     {!loading && !error && overview?.status === "CREATING" && <WalletMessage icon="◌" title="Wallet is being created" text="Binance is still preparing the Agentic Wallet. Retry shortly." action={<button className="secondary-button" onClick={() => void loadOverview()}>Check again</button>} />}

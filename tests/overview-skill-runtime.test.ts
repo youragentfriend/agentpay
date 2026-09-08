@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test, { afterEach, beforeEach } from "node:test";
-import { runOverviewSkillRuntime } from "../lib/server/overview-agent";
+import { isWalletTransferConfirmation, runOverviewSkillRuntime, type AssistantWalletTransferRuntime } from "../lib/server/overview-agent";
+import type { PreparedTransfer } from "../lib/payment-workflow";
 import {
   createOverviewConversation,
   getOverviewConversation,
@@ -49,8 +50,23 @@ function mockDeepSeek(values: unknown[], prompts: string[] = []) {
   };
 }
 
+function transfer(values: Partial<PreparedTransfer> = {}): PreparedTransfer {
+  return { id: "transfer-1", status: "awaiting-approval", amount: "0.01", amountUsd: "0.01", asset: "USDT", availableBalance: "5", recipient: "0x1111111111111111111111111111111111111111", tokenAddress: "0x2222222222222222222222222222222222222222", binanceChainId: "56", chainName: "BNB Smart Chain", gasLevel: "MEDIUM", createdAt: "2026-09-08T10:00:00.000Z", expiresAt: "2026-09-08T10:10:00.000Z", warnings: [], ...values };
+}
+
+function walletRuntime(overrides: Partial<AssistantWalletTransferRuntime> = {}): AssistantWalletTransferRuntime {
+  let current = transfer();
+  return {
+    prepare: async () => current,
+    confirm: async () => current = transfer({ status: "submitted", txHash: `0x${"ab".repeat(32)}`, submittedAt: "2026-09-08T10:01:00.000Z" }),
+    cancel: () => current = transfer({ status: "failed", errorCode: "USER_CANCELLED", errorMessage: "Cancelled" }),
+    get: () => current,
+    ...overrides,
+  };
+}
+
 const cases = [
-  { skill: "agentic-wallet-operations", request: "Send 2 USDT on BSC to 0x1111111111111111111111111111111111111111", operation: "wallet-transfer", action: "payment", path: "/api/payments/prepare", parameters: { asset: "USDT", amount: "2", network: "BSC", recipient: "0x1111111111111111111111111111111111111111", gasPriority: "MEDIUM" } },
+  { skill: "agentic-wallet-operations", request: "Send 2 USDT on BSC to 0x1111111111111111111111111111111111111111", operation: "wallet-transfer", action: undefined, path: undefined, parameters: { asset: "USDT", amount: "2", network: "BSC", recipient: "0x1111111111111111111111111111111111111111", gasPriority: "MEDIUM" } },
   { skill: "binance-pay-orchestration", request: "Create a Binance Pay receive link for 8 USDT", operation: "binance-pay-receive", action: "payment-link", path: "/api/binance-pay/receive", parameters: { currency: "USDT", amount: "8" } },
   { skill: "binance-portfolio", request: "Show my Spot and Earn holdings", operation: "binance-portfolio", action: "binance-balance", path: "/api/binance-account/portfolio", parameters: { source: "Spot,Earn" } },
   { skill: "activity-reporting", request: "Show failed USDT activity this month", operation: "activity-report", action: "activity", path: "/api/payments/activity", parameters: { statusGroup: "failed", asset: "USDT", from: "2026-09-01", sort: "newest" } },
@@ -64,12 +80,21 @@ for (const item of cases) {
       { skill: item.skill, switchSkill: false },
       { operation: item.operation, message: "Prepared the deterministic workflow for review.", parameters: item.parameters, missingFields: [] },
     ], prompts);
-    const result = await runOverviewSkillRuntime(item.request);
+    const result = item.skill === "agentic-wallet-operations"
+      ? await runOverviewSkillRuntime(item.request, undefined, process.cwd(), walletRuntime())
+      : await runOverviewSkillRuntime(item.request);
     assert.equal(result.skill, item.skill);
     assert.equal(result.action, item.action);
     assert.equal(result.workflow?.path, item.path);
-    assert.equal(result.workflow?.type, "deterministic-workflow");
-    assert.deepEqual(result.workflow?.input, item.parameters);
+    if (item.skill === "agentic-wallet-operations") {
+      assert.equal(result.workflow, undefined);
+      assert.equal(result.transferPhase, "awaiting-confirmation");
+      assert.equal(result.transfer?.chainName, "BNB Smart Chain");
+      assert.match(result.message, /reply yes, confirm, or approve/i);
+    } else {
+      assert.equal(result.workflow?.type, "deterministic-workflow");
+      assert.deepEqual(result.workflow?.input, item.parameters);
+    }
     assert.match(prompts[1], /--- COMPLETE SKILL\.md ---/);
     assert.match(prompts[1], new RegExp(`name: ["']?${item.skill}`));
     assert.equal(process.env.AGENTPAY_ENABLE_WALLET_SEND, "false");
@@ -86,13 +111,61 @@ test("keeps the selected skill across a follow-up and collects missing transfer 
     { skill: "agentic-wallet-operations", switchSkill: false },
     { operation: "wallet-transfer", message: "The transfer is ready for deterministic review.", parameters: { asset: "USDT", amount: "4", recipient: "0x1111111111111111111111111111111111111111", network: "BSC" }, missingFields: [] },
   ]);
-  const first = await runOverviewSkillRuntime("Send USDT");
+  const runtime = walletRuntime();
+  const first = await runOverviewSkillRuntime("Send USDT", undefined, process.cwd(), runtime);
   assert.equal(first.action, undefined);
   assert.deepEqual(first.missingFields, ["amount", "recipient", "network"]);
-  const second = await runOverviewSkillRuntime("4 to 0x1111111111111111111111111111111111111111 on BSC", first.conversationId);
+  const second = await runOverviewSkillRuntime("4 to 0x1111111111111111111111111111111111111111 on BSC", first.conversationId, process.cwd(), runtime);
   assert.equal(second.skill, "agentic-wallet-operations");
-  assert.equal(second.action, "payment");
+  assert.equal(second.action, undefined);
+  assert.equal(second.transferPhase, "awaiting-confirmation");
   assert.equal(getOverviewConversation(first.conversationId).selectedSkill, "agentic-wallet-operations");
+});
+
+test("prepares from collected chat fields and automatically broadcasts after explicit confirmation", async () => {
+  const calls: Array<{ type: string; value?: Record<string, string> }> = [];
+  const runtime = walletRuntime({
+    prepare: async (parameters) => { calls.push({ type: "prepare", value: parameters }); return transfer({ recipient: parameters.recipient, amount: parameters.amount }); },
+    confirm: async () => { calls.push({ type: "confirm" }); return transfer({ status: "submitted", txHash: `0x${"cd".repeat(32)}`, submittedAt: "2026-09-08T10:02:00.000Z" }); },
+  });
+  mockDeepSeek([
+    { skill: "agentic-wallet-operations", switchSkill: false },
+    { operation: "wallet-transfer", message: "Need a network.", parameters: { asset: "USDT", amount: "0.01", recipient: "0x1111111111111111111111111111111111111111" }, missingFields: ["network"], title: "Send USDT Wallet Transfer" },
+    { skill: "agentic-wallet-operations", switchSkill: false },
+    { operation: "wallet-transfer", message: "Ready.", parameters: { network: "bnb" }, missingFields: [] },
+  ]);
+  const first = await runOverviewSkillRuntime("USDT 0.01 to 0x1111111111111111111111111111111111111111", undefined, process.cwd(), runtime);
+  assert.deepEqual(first.missingFields, ["network"]);
+  assert.match(first.message, /which network/i);
+  const review = await runOverviewSkillRuntime("bnb", first.conversationId, process.cwd(), runtime);
+  assert.equal(review.workflow, undefined);
+  assert.equal(review.action, undefined);
+  assert.equal(review.transferPhase, "awaiting-confirmation");
+  assert.deepEqual(calls[0]?.value, { asset: "USDT", amount: "0.01", recipient: "0x1111111111111111111111111111111111111111", network: "bnb" });
+  const submitted = await runOverviewSkillRuntime("approved", first.conversationId, process.cwd(), runtime);
+  assert.equal(submitted.transferPhase, "submitted");
+  assert.equal(calls.at(-1)?.type, "confirm");
+  assert.match(submitted.message, /transaction was broadcast/i);
+  assert.match(submitted.message, /transaction hash:/i);
+  assert.equal(getOverviewConversation(first.conversationId).pendingTransferId, undefined);
+});
+
+test("accepts only clear transfer confirmations", () => {
+  for (const value of ["yes", "confirm", "approved", "go ahead", "yes, send it"]) assert.equal(isWalletTransferConfirmation(value), true);
+  for (const value of ["can you confirm?", "yes but change the amount", "not yet", "no", "cancel"]) assert.equal(isWalletTransferConfirmation(value), false);
+});
+
+test("keeps the exact review pending when server payment controls block confirmation", async () => {
+  const runtime = walletRuntime({ confirm: async () => { throw Object.assign(new Error("The emergency stop is active."), { code: "PAYMENTS_EMERGENCY_STOPPED" }); } });
+  mockDeepSeek([
+    { skill: "agentic-wallet-operations", switchSkill: false },
+    { operation: "wallet-transfer", message: "Ready.", parameters: { asset: "USDT", amount: "0.01", recipient: "0x1111111111111111111111111111111111111111", network: "BNB" }, missingFields: [], title: "Send USDT Wallet Transfer" },
+  ]);
+  const review = await runOverviewSkillRuntime("Send 0.01 USDT on BNB", undefined, process.cwd(), runtime);
+  const blocked = await runOverviewSkillRuntime("yes", review.conversationId, process.cwd(), runtime);
+  assert.equal(blocked.transferPhase, "blocked");
+  assert.match(blocked.message, /nothing was sent/i);
+  assert.equal(getOverviewConversation(review.conversationId).pendingTransferId, "transfer-1");
 });
 
 test("switches skills only on an explicit domain-change decision", async () => {

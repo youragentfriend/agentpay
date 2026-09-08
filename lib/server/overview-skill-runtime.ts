@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { OverviewMessage, OverviewSkill } from "@/lib/server/overview-agent";
+import type { PreparedTransfer } from "@/lib/payment-workflow";
 
 export const SKILL_OPERATIONS = {
   "agentic-wallet-operations": ["wallet-overview", "wallet-transfer"],
@@ -38,13 +39,15 @@ export type OverviewConversation = {
   latestWorkflow?: WorkflowDescriptor;
   latestOperation?: SkillOperation;
   latestAction?: OverviewUiAction;
+  pendingTransferId?: string;
+  latestTransfer?: PreparedTransfer;
   missingFields: string[];
   pending: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-type ConversationState = Pick<OverviewConversation, "collectedFields" | "latestWorkflow" | "latestOperation" | "latestAction" | "missingFields" | "pending">;
+type ConversationState = Pick<OverviewConversation, "collectedFields" | "latestWorkflow" | "latestOperation" | "latestAction" | "pendingTransferId" | "latestTransfer" | "missingFields" | "pending">;
 type Row = { id: string; title: string | null; selected_skill: string | null; messages_json: string; state_json: string; created_at: string; updated_at: string };
 let database: DatabaseSync | undefined;
 let databaseFile = "";
@@ -85,6 +88,8 @@ function toConversation(row: Row): OverviewConversation {
     latestWorkflow: state.latestWorkflow,
     latestOperation: state.latestOperation,
     latestAction: state.latestAction,
+    pendingTransferId: state.pendingTransferId,
+    latestTransfer: state.latestTransfer,
     missingFields: state.missingFields ?? [],
     pending: state.pending === true,
     createdAt: row.created_at,
@@ -153,7 +158,9 @@ export function updateOverviewConversation(id: string, values: {
   collectedFields?: Record<string, string>;
   latestWorkflow?: WorkflowDescriptor | null;
   latestOperation?: SkillOperation;
-  latestAction?: OverviewUiAction;
+  latestAction?: OverviewUiAction | null;
+  pendingTransferId?: string | null;
+  latestTransfer?: PreparedTransfer | null;
   missingFields?: string[];
   pending?: boolean;
 }): OverviewConversation {
@@ -167,7 +174,9 @@ export function updateOverviewConversation(id: string, values: {
     collectedFields: values.collectedFields ?? current.collectedFields,
     latestWorkflow: values.latestWorkflow === null ? undefined : values.latestWorkflow ?? current.latestWorkflow,
     latestOperation: values.latestOperation ?? current.latestOperation,
-    latestAction: values.latestAction ?? current.latestAction,
+    latestAction: values.latestAction === null ? undefined : values.latestAction ?? current.latestAction,
+    pendingTransferId: values.pendingTransferId === null ? undefined : values.pendingTransferId ?? current.pendingTransferId,
+    latestTransfer: values.latestTransfer === null ? undefined : values.latestTransfer ?? current.latestTransfer,
     missingFields: values.missingFields ?? current.missingFields,
     pending: values.pending ?? current.pending,
   };

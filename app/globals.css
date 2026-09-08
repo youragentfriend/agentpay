@@ -124,7 +124,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .chat-result { display: grid; min-width: 0; max-width: 100%; gap: 10px; }
 .assistant-message { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid #e8dca6; border-radius: 16px 16px 16px 4px; background: #fff8d9; }
 .assistant-message strong { color: #765a00; font-size: 13px; }
-.assistant-message span { overflow-wrap: anywhere; color: #242620; font-size: 15px; line-height: 1.65; }
+.assistant-message span { overflow-wrap: anywhere; color: #242620; font-size: 15px; line-height: 1.65; white-space: pre-line; }
+.assistant-transfer-card { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.assistant-transfer-card.review { border-color: #e0c75a; }
+.assistant-transfer-card.submitted { border-color: rgba(36,116,90,.35); }
+.assistant-transfer-card.cancelled { opacity: .78; }
+.assistant-transfer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 15px; border-bottom: 1px solid var(--line); background: #f7f6f0; }
+.assistant-transfer-heading span, .assistant-transfer-heading strong { display: block; }
+.assistant-transfer-heading span { color: var(--muted-2); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.assistant-transfer-heading strong { margin-top: 4px; font-size: 17px; }
+.assistant-transfer-heading > b { color: #765a00; font-size: 11px; text-align: right; }
+.assistant-transfer-card.submitted .assistant-transfer-heading > b { color: var(--green); }
+.assistant-transfer-card dl { margin: 0; }
+.assistant-transfer-card dl > div { display: grid; grid-template-columns: 125px minmax(0,1fr); gap: 12px; padding: 10px 15px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.assistant-transfer-card dt { color: var(--muted); }
+.assistant-transfer-card dd { min-width: 0; margin: 0; overflow-wrap: anywhere; text-align: right; }
+.assistant-transfer-card p { margin: 0; padding: 12px 15px; background: #fff9dc; color: #765a00; font-size: 11px; line-height: 1.5; }
 .composer-wrap { padding: 0 24px 30px; }
 .composer { padding: 14px 15px 11px; border: 1px solid #cdcec6; border-radius: 13px; background: #fff; box-shadow: 0 6px 20px rgba(25, 25, 20, .04); }
 .composer:focus-within { border-color: #a9a99f; box-shadow: 0 0 0 3px rgba(243, 211, 50, .16); }

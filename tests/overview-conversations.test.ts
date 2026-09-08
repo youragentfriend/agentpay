@@ -5,7 +5,8 @@ import path from "node:path";
 import test, { afterEach, beforeEach } from "node:test";
 import { DELETE, GET, POST as CREATE } from "../app/api/assistant/conversations/route";
 import { POST as CHAT } from "../app/api/assistant/chat/route";
-import { runOverviewSkillRuntime } from "../lib/server/overview-agent";
+import { runOverviewSkillRuntime, type AssistantWalletTransferRuntime } from "../lib/server/overview-agent";
+import type { PreparedTransfer } from "../lib/payment-workflow";
 import {
   createOverviewConversation,
   getOverviewConversation,
@@ -136,16 +137,21 @@ test("restores skill, collected fields, pending state, and latest workflow befor
     { skill: "agentic-wallet-operations", switchSkill: false },
     { operation: "wallet-transfer", message: "Updated for review.", parameters: { amount: "4", asset: "USDT", recipient: "0x1111111111111111111111111111111111111111", network: "BSC" }, missingFields: [] },
   ]);
-  const first = await runOverviewSkillRuntime("Send 3 USDT on BSC to 0x1111111111111111111111111111111111111111");
+  let current: PreparedTransfer = { id: "transfer-3", status: "awaiting-approval", amount: "3", amountUsd: "3", asset: "USDT", availableBalance: "10", recipient: "0x1111111111111111111111111111111111111111", tokenAddress: "0x2222222222222222222222222222222222222222", binanceChainId: "56", chainName: "BNB Smart Chain", gasLevel: "MEDIUM", createdAt: "2026-09-08T10:00:00.000Z", expiresAt: "2026-09-08T10:10:00.000Z", warnings: [] };
+  const runtime: AssistantWalletTransferRuntime = { prepare: async parameters => current = { ...current, id: `transfer-${parameters.amount}`, amount: parameters.amount }, confirm: async () => current, cancel: () => ({ ...current, status: "failed" }), get: () => current };
+  const first = await runOverviewSkillRuntime("Send 3 USDT on BSC to 0x1111111111111111111111111111111111111111", undefined, process.cwd(), runtime);
   const restored = getOverviewConversation(first.conversationId);
   assert.equal(restored.selectedSkill, "agentic-wallet-operations");
-  assert.equal(restored.latestAction, "payment");
-  assert.equal(restored.latestWorkflow?.path, "/api/payments/prepare");
+  assert.equal(restored.latestAction, undefined);
+  assert.equal(restored.latestWorkflow, undefined);
+  assert.equal(restored.latestTransfer?.amount, "3");
+  assert.equal(restored.pendingTransferId, "transfer-3");
   assert.equal(restored.collectedFields.amount, "3");
   assert.equal(restored.pending, false);
-  const continued = await runOverviewSkillRuntime("Change the amount to 4", restored.id);
+  const continued = await runOverviewSkillRuntime("Change the amount to 4", restored.id, process.cwd(), runtime);
   assert.equal(continued.conversationId, restored.id);
   assert.equal(getOverviewConversation(restored.id).collectedFields.amount, "4");
+  assert.equal(getOverviewConversation(restored.id).latestTransfer?.amount, "4");
 });
 
 test("supports multiple concurrent conversations without mixing state", async () => {
