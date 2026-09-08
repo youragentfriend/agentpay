@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+.env*
+!.env.example
+*.log
+*.tsbuildinfo
+data/*.sqlite*
+binance-readonly.json
+vendor/binance/payment/config.json
+vendor/binance/payment/config.json.*
+vendor/binance/payment/.payment_state.json
+vendor/binance/payment/.api_lock_time
+vendor/binance/payment/payment_qr.png
+vendor/binance/payment/inbox/
+__pycache__/
+*.pyc
