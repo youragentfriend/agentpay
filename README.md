@@ -1,8 +1,8 @@
 # AgentPay
 
-**A universal payment layer for AI agents, built for Binance Agent OS.**
+**An automated payment layer for AI agents, built on Binance Agent OS.**
 
-AgentPay brings wallet transfers, Binance Pay, exchange balances, x402 services, approvals, activity, and spending controls into one payment workspace. It is designed to let people and AI agents prepare real payment actions while keeping the user in control of what can happen and where funds can go.
+AgentPay lets users describe a payment, confirm the exact details, and allow the Assistant to complete supported transactions automatically through one secure workspace. It brings Agentic Wallet transfers, Binance Pay, exchange balances, x402 services, approvals, activity, and spending controls together while keeping the user in control of what can happen and where funds can go.
 
 ## Why AgentPay
 
