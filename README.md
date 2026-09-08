@@ -6,13 +6,17 @@ AgentPay brings wallet transfers, Binance Pay, exchange balances, x402 services,
 
 ## Why AgentPay
 
-AI agents can understand requests, but payments are fragmented across wallets, exchange accounts, merchant QR codes, and pay-per-call services. AgentPay gives agents one controlled payment layer:
+AI agents are becoming better at making decisions, but they still struggle to take safe, useful action in the real world. Payments are split across wallets, exchange accounts, merchant QR codes, and pay-per-call services, each with different rules and approval steps.
+
+AgentPay turns a user's intent into a controlled, trackable payment workflow. It gives people and AI agents one place to choose the right payment rail, check the details, approve the exact action, and see what happened afterward:
 
 - **One interface** for multiple payment rails.
-- **Real provider workflows** instead of simulated payment screens.
-- **Clear review before money moves.**
-- **Server-side policy enforcement** for destinations, endpoints, spending limits, approvals, and execution.
-- **A unified Activity and Reports layer** across every supported rail.
+- **Real provider workflows** for wallet transfers, Binance Pay, and x402 services.
+- **A clear review before money moves**, whether the workflow starts with a form or a conversation.
+- **Server-side controls** for destinations, endpoints, balances, spending limits, approvals, and execution.
+- **A unified Activity and Reports layer** so every payment can be tracked and understood.
+
+This is the bridge between AI that can recommend an action and AI that can responsibly complete one.
 
 AgentPay is built for the **Binance Agent OS Payment Workflows** track and uses selected capabilities from the [Binance Skills Hub](https://github.com/binance/binance-skills-hub).
 
@@ -50,7 +54,34 @@ AgentPay is built for the **Binance Agent OS Payment Workflows** track and uses 
 
 ### AgentPay Assistant
 
-The Overview Assistant selects one of AgentPay's bundled skills for wallet operations, Binance Pay, Binance portfolio, Activity and Reports, or x402. The deterministic backend remains the authority for validation, policy, approval, signing, execution, persistence, and user-facing results.
+The Overview Assistant is the conversational entry point to AgentPay. It selects one of AgentPay's bundled skills for wallet operations, Binance Pay, Binance portfolio, Activity and Reports, or x402. The deterministic backend remains the authority for validation, policy, approval, signing, execution, persistence, and user-facing results.
+
+## How AgentPay works
+
+AgentPay supports both direct user workflows and conversational agent workflows. Both use the same server-side payment controls.
+
+### Manual workflow
+
+1. Connect the required Binance account or Agentic Wallet.
+2. Choose a payment rail: Binance Pay, Agentic Wallet, or x402 Services.
+3. Enter or inspect the payment details.
+4. Review the recipient, amount, network, limits, and policy checks.
+5. Approve and execute the payment.
+6. Track the result in Activity and Reports.
+
+Manual workflows support Binance Pay QR codes, payment links, receive links, Agentic Wallet transfers, x402 service requests, and read-only Binance portfolio inspection.
+
+### AgentPay Assistant workflow
+
+1. The user describes the task in natural language.
+2. AgentPay selects the relevant bundled skill.
+3. The Assistant gathers any missing information.
+4. The backend validates balances, destinations, limits, and payment rules.
+5. AgentPay presents the exact action for approval.
+6. After approval, the appropriate payment rail executes it.
+7. The result is recorded for tracking and reporting.
+
+Conversational automation does not bypass the controls used by the manual workflows. Both paths lead to the same validation, approval, execution, and Activity records.
 
 ## Binance Agent OS and Skills Hub integrations
 
