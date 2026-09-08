@@ -1,4 +1,4 @@
-import { listPaymentIntents, walletSendEnabled } from "@/lib/server/payment-store";
+import { listPaymentIntents, reconcileSubmittedWalletIntents, walletSendEnabled } from "@/lib/server/payment-store";
 import { listBinancePayReceipts } from "@/lib/server/binance-pay-store";
 import { getBinancePayCapability } from "@/lib/server/binance-pay";
 import { listX402Intents } from "@/lib/server/x402-store";
@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    await reconcileSubmittedWalletIntents();
     const params = new URL(request.url).searchParams;
     const value = (name: string): string | undefined => params.get(name) ?? undefined;
     const rawLimit = value("limit");

@@ -10,7 +10,7 @@ import {
   PaymentIntentError,
   prepareTransfer,
 } from "../lib/server/payment-intents";
-import { approvePaymentIntent, createPaymentIntent } from "../lib/server/payment-store";
+import { approvePaymentIntent, createPaymentIntent, markPaymentSubmitted, markPaymentSubmitting, reconcileSubmittedWalletIntents } from "../lib/server/payment-store";
 
 process.env.AGENTPAY_DB_PATH = path.join(mkdtempSync(path.join(tmpdir(), "agentpay-test-")), "test.sqlite");
 
@@ -78,4 +78,14 @@ test("requires a visible native BNB balance for BSC token gas", () => {
     () => prepareTransfer({ amount: "1", recipient, tokenAddress, binanceChainId: "56" }, { ...wallet, balances: wallet.balances.filter((item) => item.symbol !== "BNB") }),
     (error) => error instanceof PaymentIntentError && error.code === "NATIVE_GAS_REQUIRED",
   );
+});
+
+test("reconciles a broadcast wallet transfer without sending it again", async () => {
+  const prepared = createPaymentIntent(prepareTransfer({ amount: "0.1", recipient, tokenAddress, binanceChainId: "56" }, wallet));
+  approvePaymentIntent(prepared.id);
+  markPaymentSubmitting(prepared.id);
+  markPaymentSubmitted(prepared.id, `0x${"cd".repeat(32)}`);
+  const result = await reconcileSubmittedWalletIntents(async () => "confirmed");
+  assert.equal(result.confirmed, 1);
+  assert.equal(result.failed, 0);
 });

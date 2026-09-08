@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
+import { getWalletTransactionStatus } from "@/lib/server/agentic-wallet";
 import { isPaymentRailEffectivelyEnabled } from "@/lib/server/payment-execution";
 import { PaymentIntentError } from "@/lib/server/payment-intents";
 
@@ -103,6 +104,32 @@ export function markPaymentConfirmed(id: string): PreparedTransfer {
 export function markPaymentFailed(id: string, code: string, message: string): PreparedTransfer {
   getDatabase().prepare("UPDATE payment_intents SET status = 'failed', error_code = ?, error_message = ? WHERE id = ?").run(code, message, id);
   return getPaymentIntent(id);
+}
+
+export type WalletTransactionStatusReader = (txHash: string) => Promise<"pending" | "confirmed" | "failed" | undefined>;
+
+/** Refresh broadcast wallet transfers without ever retrying or submitting them again. */
+export async function reconcileSubmittedWalletIntents(
+  readStatus: WalletTransactionStatusReader = getWalletTransactionStatus,
+) {
+  let confirmed = 0;
+  let failed = 0;
+  for (const intent of listPaymentIntents()) {
+    if (intent.status !== "submitted" || !intent.txHash) continue;
+    try {
+      const status = await readStatus(intent.txHash);
+      if (status === "confirmed") {
+        markPaymentConfirmed(intent.id);
+        confirmed += 1;
+      } else if (status === "failed") {
+        markPaymentFailed(intent.id, "ONCHAIN_TRANSACTION_FAILED", "Binance reported that the on-chain transaction failed.");
+        failed += 1;
+      }
+    } catch {
+      // A status-read failure must not turn a broadcast transaction into a false failure.
+    }
+  }
+  return { confirmed, failed };
 }
 
 export function walletSendEnabled(): boolean {

@@ -206,6 +206,10 @@ function paymentProjection(row: Record<string, unknown>): Projection {
   return makeProjection({ source: "agentic-wallet", sourceId: String(row.id), activityType: "transfer", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset, stringValue(row.chain_name)].filter(Boolean).join(" ") });
 }
 
+function isRecordableWalletPaymentStatus(status: string): boolean {
+  return !["awaiting-approval", "approved"].includes(status.trim().toLowerCase().replaceAll("_", "-"));
+}
+
 function binanceProjection(row: Record<string, unknown>): Projection {
   const status = stringValue(row.status) || "unknown";
   const amount = stringValue(row.amount);
@@ -249,7 +253,9 @@ function x402Projection(row: Record<string, unknown>): Projection {
 function sourceProjections(): Projection[] {
   const result: Projection[] = [];
   if (tableExists("payment_intents")) {
-    for (const row of getDatabase().prepare("SELECT * FROM payment_intents").all() as unknown as Record<string, unknown>[]) result.push(paymentProjection(row));
+    for (const row of getDatabase().prepare("SELECT * FROM payment_intents").all() as unknown as Record<string, unknown>[]) {
+      if (isRecordableWalletPaymentStatus(String(row.status || ""))) result.push(paymentProjection(row));
+    }
   }
   if (tableExists("binance_pay_orders")) {
     for (const row of getDatabase().prepare("SELECT * FROM binance_pay_orders").all() as unknown as Record<string, unknown>[]) result.push(binanceProjection(row));
@@ -263,6 +269,11 @@ function sourceProjections(): Projection[] {
 /** Upsert the projection. Re-running this is safe and does not duplicate events. */
 export function syncActivityEvents(): { inserted: number; updated: number; unchanged: number; total: number } {
   const db = getDatabase();
+  // Approval is an internal preparation state, not a completed activity. Remove
+  // old projections created before this rule so they cannot remain visible.
+  if (tableExists("payment_intents")) {
+    db.prepare("DELETE FROM activity_events WHERE source = 'agentic-wallet' AND source_id IN (SELECT id FROM payment_intents WHERE LOWER(REPLACE(status, '_', '-')) IN ('awaiting-approval', 'approved'))").run();
+  }
   const projections = sourceProjections();
   const existing = new Map<string, ActivityRow>();
   for (const row of db.prepare("SELECT * FROM activity_events").all() as unknown as ActivityRow[]) existing.set(`${row.source}:${row.source_id}`, row);

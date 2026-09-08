@@ -180,7 +180,7 @@ export async function sendWalletTransfer(intent: PreparedTransfer): Promise<stri
   return txHash;
 }
 
-export async function getWalletTransactionStatus(txHash: string): Promise<string | undefined> {
+export async function getWalletTransactionStatus(txHash: string): Promise<"pending" | "confirmed" | "failed" | undefined> {
   const data = await runBaw<Record<string, unknown>>(["wallet", "tx-history", "--tx", txHash]);
   const transaction = Array.isArray(data.transactions) ? record(data.transactions[0]) : data;
   return normalizeWalletTransactionStatus(text(transaction.status));

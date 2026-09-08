@@ -1,8 +1,8 @@
 import type { GasLevel, PreparedTransfer } from "@/lib/payment-workflow";
-import { AgenticWalletError, getWalletLockStatus, getWalletOverview, sendWalletTransfer } from "@/lib/server/agentic-wallet";
+import { AgenticWalletError, getWalletLockStatus, getWalletOverview, getWalletTransactionStatus, sendWalletTransfer } from "@/lib/server/agentic-wallet";
 import { PaymentIntentError, prepareTransfer } from "@/lib/server/payment-intents";
 import { enforcePaymentPolicy, PaymentPolicyError } from "@/lib/server/payment-policy";
-import { approvePaymentIntent, createPaymentIntent, getPaymentIntent, markPaymentFailed, markPaymentSubmitted, markPaymentSubmitting } from "@/lib/server/payment-store";
+import { approvePaymentIntent, createPaymentIntent, getPaymentIntent, markPaymentConfirmed, markPaymentFailed, markPaymentSubmitted, markPaymentSubmitting } from "@/lib/server/payment-store";
 import { assertPaymentExecutionAllowed, PaymentExecutionError } from "@/lib/server/payment-execution";
 import type { WalletOverview } from "@/lib/wallet-types";
 
@@ -85,7 +85,15 @@ export async function executeWalletTransferIntent(id: string): Promise<PreparedT
     if (await getWalletLockStatus(intent.binanceChainId) === "LOCKED") throw new PaymentIntentError("The wallet is locked by another pending transaction or Binance confirmation.", "WALLET_LOCKED");
     processingId = markPaymentSubmitting(intent.id).id;
     const txHash = await sendWalletTransfer(intent);
-    return markPaymentSubmitted(intent.id, txHash);
+    const submitted = markPaymentSubmitted(intent.id, txHash);
+    // The provider may already report confirmation by the time send returns.
+    // A status-read failure is intentionally non-fatal: the broadcast is durable.
+    try {
+      const status = await getWalletTransactionStatus(txHash);
+      if (status === "confirmed") return markPaymentConfirmed(intent.id);
+      if (status === "failed") return markPaymentFailed(intent.id, "ONCHAIN_TRANSACTION_FAILED", "Binance reported that the on-chain transaction failed.");
+    } catch { /* retain submitted until a later status refresh */ }
+    return submitted;
   } catch (error) {
     const result = paymentError(error, "Unable to execute this transfer.", "EXECUTE_TRANSFER_FAILED");
     if (processingId) markPaymentFailed(processingId, result.code, result.message);

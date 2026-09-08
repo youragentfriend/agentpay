@@ -200,11 +200,29 @@ export function PaymentWorkflow({ onClose, initialInput = {} }: { onClose?: () =
     setSubmitting(true); setError("");
     try {
       const response = await fetch("/api/payments/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: prepared.id }) });
-      const data = await response.json();
+      const data = await response.json() as PreparedTransfer & PaymentApiError;
       if (!response.ok) throw new Error(data.error ?? "Unable to execute transfer.");
-      setPrepared(data as PreparedTransfer);
+      setPrepared(data);
+      if (data.status === "submitted") await refreshStatus(data.id);
     } catch (executeError) { setError(executeError instanceof Error ? executeError.message : "Unable to execute transfer."); }
     finally { setSubmitting(false); }
+  }
+
+  async function refreshStatus(id: string) {
+    const attempts = 5;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try {
+        const response = await fetch("/api/payments/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+        const data = await response.json() as PreparedTransfer & PaymentApiError;
+        if (!response.ok) throw new Error(data.error ?? "Unable to refresh transaction status.");
+        setPrepared(data);
+        if (data.status === "confirmed" || data.status === "failed") return;
+      } catch (refreshError) {
+        setError(refreshError instanceof Error ? `The transfer was broadcast, but its status could not be refreshed: ${refreshError.message}` : "The transfer was broadcast, but its status could not be refreshed.");
+        return;
+      }
+      if (attempt < attempts - 1) await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
+    }
   }
 
   async function copyRecipient() {
@@ -234,6 +252,6 @@ export function PaymentWorkflow({ onClose, initialInput = {} }: { onClose?: () =
     {wallet.balances.length === 0 && <div className="notice"><span>i</span><div><strong>No spendable balances returned</strong><p>Fund the Agentic Wallet before a transfer can be prepared. AgentPay will not invent token data.</p></div></div>}
     {error && <div className="workflow-error">{error}</div>}
     <div className="payment-workflow-actions"><button type="button" className="primary-button" disabled={submitting || wallet.balances.length === 0} onClick={() => void prepare()}>{submitting ? "Checking…" : "Prepare transfer"} <span>→</span></button>{onClose && <button type="button" className="secondary-button" onClick={onClose}>Close</button>}</div>
-    {prepared && <div className="review-card"><div className="review-heading"><div><span>Payment intent</span><h2>{prepared.status === "approved" ? "Approved for execution" : prepared.status === "submitted" ? "Submitted — awaiting confirmation" : "Review before approval"}</h2></div><span className={`review-status ${prepared.status}`}>{prepared.status.replace("-", " ")}</span></div><dl><div><dt>Amount</dt><dd>{prepared.amount} {prepared.asset}</dd></div><div><dt>Network</dt><dd>{prepared.chainName}</dd></div><div><dt>Recipient</dt><dd className="review-address"><span>{prepared.recipient}</span><button type="button" onClick={() => void copyRecipient()}>{copied ? "Copied" : "Copy"}</button></dd></div><div><dt>Token contract</dt><dd className="review-address"><span>{prepared.tokenAddress}</span></dd></div><div><dt>Gas priority</dt><dd>{prepared.gasLevel}</dd></div><div><dt>Available</dt><dd>{prepared.availableBalance} {prepared.asset}</dd></div>{prepared.txHash && <div><dt>Transaction</dt><dd className="review-address"><TransactionExplorerLink chainId={prepared.binanceChainId} transactionHash={prepared.txHash} /></dd></div>}</dl><ul>{prepared.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>{prepared.status === "awaiting-approval" ? <button type="button" className="primary-button" disabled={submitting} onClick={() => void approve()}>Approve this exact intent</button> : prepared.status === "approved" && executionEnabled ? <button type="button" className="primary-button" disabled={submitting} onClick={() => void execute()}>{submitting ? "Submitting…" : "Send approved transfer"}</button> : prepared.status === "approved" ? <div className="approved-note">✓ Approval persisted. Wallet execution remains disabled until you explicitly ask to enable real sends.</div> : <div className="approved-note">Transaction broadcast recorded. Check Activity for confirmation before treating it as complete.</div>}</div>}
+    {prepared && <div className="review-card"><div className="review-heading"><div><span>Payment intent</span><h2>{prepared.status === "approved" ? "Approved for execution" : prepared.status === "submitted" ? "Submitted — checking confirmation" : prepared.status === "confirmed" ? "Transaction confirmed" : prepared.status === "failed" ? "Transaction failed" : "Review before approval"}</h2></div><span className={`review-status ${prepared.status}`}>{prepared.status.replace("-", " ")}</span></div><dl><div><dt>Amount</dt><dd>{prepared.amount} {prepared.asset}</dd></div><div><dt>Network</dt><dd>{prepared.chainName}</dd></div><div><dt>Recipient</dt><dd className="review-address"><span>{prepared.recipient}</span><button type="button" onClick={() => void copyRecipient()}>{copied ? "Copied" : "Copy"}</button></dd></div><div><dt>Token contract</dt><dd className="review-address"><span>{prepared.tokenAddress}</span></dd></div><div><dt>Gas priority</dt><dd>{prepared.gasLevel}</dd></div><div><dt>Available</dt><dd>{prepared.availableBalance} {prepared.asset}</dd></div>{prepared.txHash && <div><dt>Transaction</dt><dd className="review-address"><TransactionExplorerLink chainId={prepared.binanceChainId} transactionHash={prepared.txHash} /></dd></div>}</dl><ul>{prepared.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>{prepared.status === "awaiting-approval" ? <button type="button" className="primary-button" disabled={submitting} onClick={() => void approve()}>Approve this exact intent</button> : prepared.status === "approved" && executionEnabled ? <button type="button" className="primary-button" disabled={submitting} onClick={() => void execute()}>{submitting ? "Submitting…" : "Send approved transfer"}</button> : prepared.status === "approved" ? <div className="approved-note">✓ Approval persisted. Wallet execution remains disabled until you explicitly ask to enable real sends.</div> : prepared.status === "confirmed" ? <div className="approved-note">✓ Transaction confirmed on-chain and recorded as successful in Activity.</div> : prepared.status === "failed" ? <div className="workflow-error">The wallet reported that this transaction failed. Nothing else was submitted.</div> : <div className="approved-note">Transaction broadcast recorded. AgentPay is checking the network status.</div>}</div>}
   </div>;
 }
