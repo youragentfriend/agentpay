@@ -621,12 +621,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 /* Activity and settings */
 .activity-workspace { margin-top: 28px; }
-.activity-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(3, auto); gap: 8px; margin-bottom: 16px; }
-.activity-toolbar select, .activity-search { height: 42px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
+.activity-toolbar { display: grid; gap: 12px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: #fafaf7; }
+.activity-presets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.activity-presets button { width: 100%; min-width: 0; padding: 8px 10px; border-radius: 9px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.activity-presets button.active { background: var(--ink); color: #fff; }
+.activity-filter-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(3, auto) auto; align-items: center; gap: 8px; }
+.activity-filter-row select, .activity-search, .activity-custom-range input { height: 42px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
 .activity-toolbar select { padding: 0 12px; }
 .activity-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; }
 .activity-search span { color: var(--muted-2); }
 .activity-search input { width: 100%; border: 0; outline: 0; background: transparent; }
+.activity-custom-range { display: flex; align-items: end; gap: 9px; }
+.activity-custom-range label { display: grid; gap: 5px; }
+.activity-custom-range label > span { color: var(--muted-2); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.activity-custom-range input { padding: 8px 10px; }
 .activity-table { overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .activity-table-head, .activity-table-row { display: grid; grid-template-columns: minmax(240px, 1.8fr) minmax(120px, .8fr) minmax(130px, .8fr) minmax(160px, 1fr); align-items: center; gap: 16px; }
 .activity-table-head { padding: 12px 18px; background: #f4f3ed; color: var(--muted-2); font-size: 13px; text-transform: uppercase; }
@@ -734,8 +742,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 @media (max-width: 820px) {
-  .activity-toolbar { grid-template-columns: 1fr 1fr; }
-  .activity-search { grid-column: 1 / -1; }
+  .activity-presets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .activity-filter-row { grid-template-columns: 1fr 1fr; }
+  .activity-filter-row .activity-search { grid-column: 1 / -1; }
   .activity-table-head { display: none; }
   .activity-table-row { grid-template-columns: 1fr auto; }
   .activity-table-row time { grid-column: 1 / -1; }
@@ -787,6 +796,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 
 @media (max-width: 480px) {
+  .activity-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .activity-filter-row { grid-template-columns: 1fr; }
+  .activity-filter-row .activity-search { grid-column: auto; }
+  .activity-custom-range { align-items: stretch; flex-direction: column; }
   .quick-actions { grid-template-columns: 1fr; }
   .quick-actions button { min-height: 64px; }
   .composer-attach b { display: none; }

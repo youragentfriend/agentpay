@@ -91,7 +91,7 @@ export default function Home() {
         {view === "binance-pay" && <BinancePayView/>}
         {view === "wallet" && <WalletView onStatusChange={setWalletStatus}/>}
         {view === "x402" && <X402View/>}
-        {view === "activity" && <ActivityView/>}
+        {view === "activity" && <ActivityView timeZone={settings.timeZone}/>}
         {view === "reports" && <ReportsView timeZone={settings.timeZone}/>} 
         {view === "settings" && <SettingsView tab={settingsTab} onTabChange={setSettingsTab} settings={settings} onSettingsChange={setSettings} onNavigate={navigate}/>}
       </div>
@@ -465,7 +465,7 @@ function groupWalletReceiveAddresses(overview: WalletOverview) {
 
 function BinancePayView(){return <PageFrame eyebrow="Binance Pay" title="Pay or receive with Binance" description="Inspect a supported Binance QR or payment link, review every detail, or generate an official receive link."><BinancePayWorkflow/></PageFrame>}
 function X402View(){return <PageFrame eyebrow="Agentic Wallet / x402" title="x402 Services" description="Ask AgentPay to find, review, and purchase supported pay-per-call or premium services across BSC, Base, and Solana."><X402Workflow/></PageFrame>}
-function ActivityView(){return <PageFrame eyebrow="Activity" title="All activity" description="Filter approvals, transfers, Binance Pay payments, x402 purchases, successes, pending actions, and failures."><ActivityWorkflow/></PageFrame>}
+function ActivityView({timeZone}:{timeZone:string}){return <PageFrame eyebrow="Activity" title="All activity" description="Filter approvals, transfers, Binance Pay payments, x402 purchases, successes, pending actions, and failures."><ActivityWorkflow timeZone={timeZone}/></PageFrame>}
 function ReportsView({timeZone}:{timeZone:string}){return <PageFrame eyebrow="Reports" title="Spending reports" description="Understand where, when, and how much you spend through AgentPay."><ReportsWorkflow timeZone={timeZone}/></PageFrame>}
 function SettingsView({tab,onTabChange,settings,onSettingsChange,onNavigate}:{tab:SettingsTab;onTabChange:(tab:SettingsTab)=>void;settings:AgentPaySettings;onSettingsChange:(settings:AgentPaySettings)=>void;onNavigate:(view:View)=>void}){const tabs:SettingsTab[]=['Rules & approvals','Connections','Diagnostics','General'];return <PageFrame eyebrow="Settings" title="Control how AgentPay works" description="Manage approval rules, connections, diagnostics, and product preferences without exposing credentials."><div className="settings-tabs">{tabs.map(x=><button key={x} className={tab===x?'active':''} onClick={()=>onTabChange(x)}>{x}</button>)}</div>{tab==='Rules & approvals'&&<RulesSettings settings={settings} onSaved={onSettingsChange}/>} {tab==='Connections'&&<DiagnosticsSettings mode="connections" onNavigate={onNavigate}/>} {tab==='Diagnostics'&&<DiagnosticsSettings mode="diagnostics" onNavigate={onNavigate}/>} {tab==='General'&&<ProfileSettings settings={settings} onSaved={onSettingsChange}/>}</PageFrame>}
 function PageFrame({eyebrow,title,description,children}:{eyebrow:string;title:string;description:string;children:React.ReactNode}){return <div className="standard-page"><div className="eyebrow"><span className="spark">✦</span>{eyebrow}</div><h1>{title}</h1><p className="lead">{description}</p>{children}</div>}
