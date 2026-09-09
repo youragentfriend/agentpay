@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/brand/agentpay-logo.png" alt="AgentPay logo" width="220">
+</p>
+
 # AgentPay
 
 **An automated payment layer for AI agents, built on Binance Agent OS.**
