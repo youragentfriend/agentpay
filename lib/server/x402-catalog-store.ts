@@ -7,6 +7,8 @@ import { isSupportedX402Network } from "@/lib/server/x402-networks";
 import type { X402CatalogService, X402CatalogServiceInput, X402RequestMethod } from "@/lib/x402-types";
 
 const SOURCE = "https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources";
+const NANSEN_DOCS = "https://docs.nansen.ai/api/smart-money/netflows";
+const NANSEN_X402_LISTING = "https://x402.new/services/api-nansen-ai-api-v1-smart-money-netflow";
 const CATEGORIES = ["Market data", "Onchain data", "News", "Research", "Weather"] as const;
 const SEEDS: X402CatalogServiceInput[] = [
   { title: "Bitcoin market price", description: "Live BTC/USD spot price, daily range, and volume sourced from Coinbase Exchange.", category: "Market data", endpoint: "https://vibesprings.net/api/price/btc-usd", method: "GET", networks: ["eip155:8453"], sourceUrls: [SOURCE], origin: "curated" },
@@ -15,6 +17,7 @@ const SEEDS: X402CatalogServiceInput[] = [
   { title: "Global weather", description: "Current conditions and a five-day forecast for a city or coordinates.", category: "Weather", endpoint: "https://x402.ottoai.services/weather", method: "GET", networks: ["eip155:8453", "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"], sourceUrls: [SOURCE], origin: "curated" },
   { title: "Ethereum network status", description: "Chain ID, latest block, gas price, chain-head age, and network characteristics.", category: "Onchain data", endpoint: "https://api.onesource.io/api/chain/network-info", method: "GET", networks: ["eip155:8453"], sourceUrls: [SOURCE], origin: "curated" },
   { title: "Neural web search", description: "Search the live web with Exa and return structured research results.", category: "Research", endpoint: "https://stableenrich.dev/api/exa/search", method: "POST", networks: ["eip155:8453", "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp"], sourceUrls: [SOURCE], origin: "curated" },
+  { title: "Nansen Smart Money Netflow", description: "Pay per call for Nansen smart-money netflow data, with a BNB Chain request ready for AgentPay.", category: "Onchain data", endpoint: "https://api.nansen.ai/api/v1/smart-money/netflow", method: "POST", requestBody: { chains: ["bnb"], filters: {}, order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }] }, networks: ["eip155:56", "eip155:8453"], sourceUrls: [NANSEN_DOCS, NANSEN_X402_LISTING], origin: "curated" },
 ];
 
 type Row = Record<string, unknown>;
@@ -28,10 +31,12 @@ function db() {
   database.exec(`CREATE TABLE IF NOT EXISTS x402_catalog_services (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL, category TEXT NOT NULL,
     endpoint TEXT NOT NULL, method TEXT NOT NULL, canonical_key TEXT NOT NULL UNIQUE,
-    networks_json TEXT NOT NULL, source_urls_json TEXT NOT NULL, origin TEXT NOT NULL,
+    request_body_json TEXT, networks_json TEXT NOT NULL, source_urls_json TEXT NOT NULL, origin TEXT NOT NULL,
     verification_status TEXT NOT NULL, verified_at TEXT, created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL, removed_at TEXT
   )`);
+  const columns = database.prepare("PRAGMA table_info(x402_catalog_services)").all() as unknown as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "request_body_json")) database.exec("ALTER TABLE x402_catalog_services ADD COLUMN request_body_json TEXT");
   seed(database);
   return database;
 }
@@ -62,18 +67,25 @@ function validate(input: X402CatalogServiceInput) {
   if (!networks.length) throw new Error("Catalog services must support BSC, Base, or Solana.");
   const sourceUrls = [...new Set(input.sourceUrls.map(value => value.trim()).filter(value => { try { return new URL(value).protocol === "https:"; } catch { return false; } }))].slice(0, 6);
   if (!sourceUrls.length) throw new Error("Catalog services require a reliable HTTPS source.");
-  return { title, description, category, endpoint, method, networks, sourceUrls, origin: input.origin === "ai-discovered" ? "ai-discovered" as const : "curated" as const };
+  let requestBodyJson: string | null = null;
+  if (input.requestBody !== undefined) {
+    if (!input.requestBody || typeof input.requestBody !== "object" || Array.isArray(input.requestBody)) throw new Error("Catalog request bodies must be JSON objects.");
+    requestBodyJson = JSON.stringify(input.requestBody);
+    if (requestBodyJson.length > 12_000) throw new Error("Catalog request bodies are too large.");
+  }
+  return { title, description, category, endpoint, method, requestBodyJson, networks, sourceUrls, origin: input.origin === "ai-discovered" ? "ai-discovered" as const : "curated" as const };
 }
 function seed(target: DatabaseSync) {
-  const insert = target.prepare("INSERT OR IGNORE INTO x402_catalog_services VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+  const insert = target.prepare("INSERT OR IGNORE INTO x402_catalog_services (id,title,description,category,endpoint,method,canonical_key,request_body_json,networks_json,source_urls_json,origin,verification_status,verified_at,created_at,updated_at,removed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
   const now = new Date().toISOString();
   for (const raw of SEEDS) {
     const item = validate(raw), key = canonicalX402ServiceKey(item.method, item.endpoint);
-    insert.run(randomUUID(), item.title, item.description, item.category, item.endpoint, item.method, key, JSON.stringify(item.networks), JSON.stringify(item.sourceUrls), item.origin, "verified", now, now, now, null);
+    insert.run(randomUUID(), item.title, item.description, item.category, item.endpoint, item.method, key, item.requestBodyJson, JSON.stringify(item.networks), JSON.stringify(item.sourceUrls), item.origin, "verified", now, now, now, null);
   }
 }
 function map(row: Row): X402CatalogService {
-  return { id: String(row.id), title: String(row.title), description: String(row.description), category: String(row.category), endpoint: String(row.endpoint), method: String(row.method) as X402RequestMethod, networks: JSON.parse(String(row.networks_json)), sourceUrls: JSON.parse(String(row.source_urls_json)), origin: String(row.origin) as X402CatalogService["origin"], verificationStatus: String(row.verification_status) as X402CatalogService["verificationStatus"], verifiedAt: row.verified_at ? String(row.verified_at) : undefined, createdAt: String(row.created_at), updatedAt: String(row.updated_at), removedAt: row.removed_at ? String(row.removed_at) : undefined };
+  const requestBody = row.request_body_json ? JSON.parse(String(row.request_body_json)) as Record<string, unknown> : undefined;
+  return { id: String(row.id), title: String(row.title), description: String(row.description), category: String(row.category), endpoint: String(row.endpoint), method: String(row.method) as X402RequestMethod, requestBody, networks: JSON.parse(String(row.networks_json)), sourceUrls: JSON.parse(String(row.source_urls_json)), origin: String(row.origin) as X402CatalogService["origin"], verificationStatus: String(row.verification_status) as X402CatalogService["verificationStatus"], verifiedAt: row.verified_at ? String(row.verified_at) : undefined, createdAt: String(row.created_at), updatedAt: String(row.updated_at), removedAt: row.removed_at ? String(row.removed_at) : undefined };
 }
 export function listX402CatalogServices(filters: { query?: string; category?: string; network?: string } = {}) {
   const rows = db().prepare("SELECT * FROM x402_catalog_services WHERE removed_at IS NULL ORDER BY category,title").all() as Row[];
@@ -88,7 +100,7 @@ export function addX402CatalogService(raw: X402CatalogServiceInput) {
     return { service: map(db().prepare("SELECT * FROM x402_catalog_services WHERE canonical_key=?").get(key) as Row), added: false };
   }
   const id = randomUUID();
-  db().prepare("INSERT INTO x402_catalog_services VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, item.title, item.description, item.category, item.endpoint, item.method, key, JSON.stringify(item.networks), JSON.stringify(item.sourceUrls), item.origin, "candidate", null, now, now, null);
+  db().prepare("INSERT INTO x402_catalog_services (id,title,description,category,endpoint,method,canonical_key,request_body_json,networks_json,source_urls_json,origin,verification_status,verified_at,created_at,updated_at,removed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(id, item.title, item.description, item.category, item.endpoint, item.method, key, item.requestBodyJson, JSON.stringify(item.networks), JSON.stringify(item.sourceUrls), item.origin, "candidate", null, now, now, null);
   return { service: map(db().prepare("SELECT * FROM x402_catalog_services WHERE id=?").get(id) as Row), added: true };
 }
 export function removeX402CatalogService(id: string) {

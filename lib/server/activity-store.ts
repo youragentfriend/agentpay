@@ -141,6 +141,12 @@ function getDatabase(): DatabaseSync {
     CREATE INDEX IF NOT EXISTS activity_events_source ON activity_events(source);
     CREATE INDEX IF NOT EXISTS activity_events_activity_type ON activity_events(activity_type);
     CREATE INDEX IF NOT EXISTS activity_events_asset ON activity_events(asset);
+    CREATE TABLE IF NOT EXISTS activity_hidden_events (
+      source TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      hidden_at TEXT NOT NULL,
+      PRIMARY KEY(source, source_id)
+    );
   `);
   const columns = new Set((database.prepare("PRAGMA table_info(activity_events)").all() as Array<{ name: string }>).map((column) => column.name));
   if (!columns.has("amount_usd")) database.exec("ALTER TABLE activity_events ADD COLUMN amount_usd TEXT");
@@ -226,6 +232,13 @@ function binanceProjection(row: Record<string, unknown>): Projection {
   return makeProjection({ source: "binance-pay", sourceId: String(row.id), activityType: "binance-pay", status, statusGroup: mapped.group, statusCategory: mapped.category, amount, asset, amountUsd, direction: "outgoing", spendState, title, summary, reference, occurredAt: updatedAt, createdAt, updatedAt, searchText: [title, summary, status, asset].filter(Boolean).join(" ") });
 }
 
+function isRecordableBinancePayStatus(status: string): boolean {
+  // These are local review/input states. They are not payments and should not
+  // appear in Activity or contribute to spending until Binance Pay is sent.
+  return !["awaiting-confirmation", "awaiting-approval", "awaiting-amount", "amount-set", "amount-locked", "prepared", "reviewed", "approved"]
+    .includes(status.trim().toLowerCase().replaceAll("_", "-"));
+}
+
 function x402Projection(row: Record<string, unknown>): Projection {
   const status = stringValue(row.status) || "unknown";
   const createdAt = stringValue(row.created_at) || new Date(0).toISOString();
@@ -258,7 +271,9 @@ function sourceProjections(): Projection[] {
     }
   }
   if (tableExists("binance_pay_orders")) {
-    for (const row of getDatabase().prepare("SELECT * FROM binance_pay_orders").all() as unknown as Record<string, unknown>[]) result.push(binanceProjection(row));
+    for (const row of getDatabase().prepare("SELECT * FROM binance_pay_orders").all() as unknown as Record<string, unknown>[]) {
+      if (isRecordableBinancePayStatus(String(row.status || ""))) result.push(binanceProjection(row));
+    }
   }
   if (tableExists("x402_intents")) {
     for (const row of getDatabase().prepare("SELECT * FROM x402_intents").all() as unknown as Record<string, unknown>[]) result.push(x402Projection(row));
@@ -274,7 +289,11 @@ export function syncActivityEvents(): { inserted: number; updated: number; uncha
   if (tableExists("payment_intents")) {
     db.prepare("DELETE FROM activity_events WHERE source = 'agentic-wallet' AND source_id IN (SELECT id FROM payment_intents WHERE LOWER(REPLACE(status, '_', '-')) IN ('awaiting-approval', 'approved'))").run();
   }
-  const projections = sourceProjections();
+  if (tableExists("binance_pay_orders")) {
+    db.prepare("DELETE FROM activity_events WHERE source = 'binance-pay' AND source_id IN (SELECT id FROM binance_pay_orders WHERE LOWER(REPLACE(status, '_', '-')) IN ('awaiting-confirmation', 'awaiting-approval', 'awaiting-amount', 'amount-set', 'amount-locked', 'prepared', 'reviewed', 'approved'))").run();
+  }
+  db.prepare("DELETE FROM activity_events WHERE EXISTS (SELECT 1 FROM activity_hidden_events hidden WHERE hidden.source = activity_events.source AND hidden.source_id = activity_events.source_id)").run();
+  const projections = sourceProjections().filter((event) => !db.prepare("SELECT 1 FROM activity_hidden_events WHERE source = ? AND source_id = ?").get(event.source, event.sourceId));
   const existing = new Map<string, ActivityRow>();
   for (const row of db.prepare("SELECT * FROM activity_events").all() as unknown as ActivityRow[]) existing.set(`${row.source}:${row.source_id}`, row);
   const upsert = db.prepare(`INSERT INTO activity_events
@@ -296,6 +315,14 @@ export function syncActivityEvents(): { inserted: number; updated: number; uncha
     upsert.run(...next);
   }
   return { inserted, updated, unchanged, total: projections.length };
+}
+
+/** Hide a specific persisted activity projection without deleting its payment record. */
+export function hideActivityEvent(source: ActivitySource, sourceId: string): boolean {
+  const db = getDatabase();
+  const result = db.prepare("INSERT OR IGNORE INTO activity_hidden_events (source, source_id, hidden_at) VALUES (?, ?, ?)").run(source, sourceId, new Date().toISOString());
+  db.prepare("DELETE FROM activity_events WHERE source = ? AND source_id = ?").run(source, sourceId);
+  return Number(result.changes) > 0;
 }
 
 function toEvent(row: ActivityRow): ActivityEvent {

@@ -7,7 +7,7 @@ type Status = { executionEnabled: boolean; supportedNetworks: string[]; ai: { co
 type MobilePanel = "chat" | "services";
 const NETWORKS = [{ value: "", label: "All networks" }, { value: "eip155:56", label: "BSC" }, { value: "eip155:8453", label: "Base" }, { value: "solana:*", label: "Solana" }];
 function networkLabel(network: string) { return network === "eip155:56" ? "BSC" : network === "eip155:8453" ? "Base" : network.startsWith("solana:") ? "Solana" : network; }
-function selectionPrompt(service: X402CatalogService) { return `I want to use ${service.title} with the endpoint ${service.method} ${service.endpoint}.\n\nUse this service to `; }
+function selectionPrompt(service: X402CatalogService) { return `Use the verified ${service.title} service at ${service.method} ${service.endpoint} to `; }
 
 export function X402Workflow({ initialUrl = "", initialMessage = "" }: { initialUrl?: string; initialMessage?: string } = {}) {
   const [status, setStatus] = useState<Status | null>(null);
@@ -85,7 +85,7 @@ export function X402Workflow({ initialUrl = "", initialMessage = "" }: { initial
       <section className={`x402-finder-panel x402-chat-panel ${mobilePanel === "chat" ? "mobile-active" : ""}`}>
         <div className="x402-agent-heading">
           <img src="/brand/assistant-badge.svg" alt="AgentPay Assistant" />
-          <div><strong>Ask AgentPay</strong><p>Choose a service or describe the x402 resource you need.</p></div>
+          <div><strong>Ask AgentPay</strong><p>Choose a verified service or describe what you need. After confirmation, AgentPay pays once and returns the result automatically.</p></div>
           <span className={`rail-status ${status?.executionEnabled ? "success" : "neutral"}`}>{status?.executionEnabled ? "Payments ready" : "Payment disabled"}</span>
         </div>
         <div className="x402-chat-log" ref={logRef} aria-live="polite">
@@ -104,7 +104,7 @@ export function X402Workflow({ initialUrl = "", initialMessage = "" }: { initial
       </section>
 
       <aside className={`x402-catalog-panel ${mobilePanel === "services" ? "mobile-active" : ""}`}>
-        <div className="x402-catalog-heading"><div><span className="eyebrow">x402 catalog</span><h2>Discover services</h2><p>Browse first. AI search is optional.</p></div><button className="secondary-button" onClick={() => setDiscoverOpen(value => !value)}>{discoverOpen ? "Close" : "Discover more"}</button></div>
+        <div className="x402-catalog-heading"><div><span className="eyebrow">x402 catalog</span><h2>Discover services</h2><p>Browse verified services first; AgentPay rechecks every request live.</p></div><button className="secondary-button" onClick={() => setDiscoverOpen(value => !value)}>{discoverOpen ? "Close" : "Discover more"}</button></div>
         {discoverOpen && <div className="x402-discover-shell"><strong>Find another service</strong><input value={discoverQuery} onChange={event => setDiscoverQuery(event.target.value)} placeholder="e.g. historical crypto market data" /><p>Optional AI discovery will be connected after the catalog foundation. Your existing services remain available without it.</p><div><button className="primary-button" disabled>Search with AI</button><button className="secondary-button" onClick={() => { setDiscoverOpen(false); setDiscoverQuery(""); }}>Cancel</button></div></div>}
         <div className="x402-catalog-filters">
           <label><span>Search</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search services" /></label>

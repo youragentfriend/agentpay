@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
-import { runX402Agent, x402AgentStatus } from "../lib/server/x402-agent";
+import { catalogCandidateForRequest, runX402Agent, x402AgentStatus } from "../lib/server/x402-agent";
+import { resetX402CatalogStoreForTests } from "../lib/server/x402-catalog-store";
 
 const message = [{ id: "1", role: "user" as const, content: "find BTC market data", createdAt: new Date().toISOString() }];
 function snapshotEnv() {
@@ -21,6 +25,74 @@ test("requires a protected DeepSeek key for x402 discovery", async () => {
     assert.equal(x402AgentStatus().liveSearch, true);
     await assert.rejects(() => runX402Agent(message), /protected DeepSeek API key/i);
   } finally { restore(); }
+});
+
+test("uses a verified catalog service before DeepSeek discovery", () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-x402-catalog-match-"));
+  const previousDb = process.env.AGENTPAY_DB_PATH;
+  process.env.AGENTPAY_DB_PATH = path.join(directory, "db.sqlite");
+  resetX402CatalogStoreForTests();
+  try {
+    const candidate = catalogCandidateForRequest("Find a Bitcoin price service");
+    assert.equal(candidate?.serviceName, "Bitcoin market price");
+    assert.equal(candidate?.method, "GET");
+    assert.match(candidate?.endpoint || "", /vibesprings\.net/);
+  } finally {
+    resetX402CatalogStoreForTests();
+    if (previousDb === undefined) delete process.env.AGENTPAY_DB_PATH; else process.env.AGENTPAY_DB_PATH = previousDb;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("carries the Nansen BNB request body from the catalog into the agent candidate", () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-x402-nansen-match-"));
+  const previousDb = process.env.AGENTPAY_DB_PATH;
+  process.env.AGENTPAY_DB_PATH = path.join(directory, "db.sqlite");
+  resetX402CatalogStoreForTests();
+  try {
+    const candidate = catalogCandidateForRequest("Use Nansen smart money netflow on BNB Chain");
+    assert.equal(candidate?.serviceName, "Nansen Smart Money Netflow");
+    assert.deepEqual(candidate?.requestBody, { chains: ["bnb"], filters: {}, order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }] });
+    assert.ok(candidate?.networks.includes("eip155:56"));
+  } finally {
+    resetX402CatalogStoreForTests();
+    if (previousDb === undefined) delete process.env.AGENTPAY_DB_PATH; else process.env.AGENTPAY_DB_PATH = previousDb;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("keeps the Nansen request body when the user pastes its endpoint", () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-x402-pasted-nansen-"));
+  const previousDb = process.env.AGENTPAY_DB_PATH;
+  process.env.AGENTPAY_DB_PATH = path.join(directory, "db.sqlite");
+  resetX402CatalogStoreForTests();
+  try {
+    const candidate = catalogCandidateForRequest("Use the verified Nansen Smart Money Netflow service at POST https://api.nansen.ai/api/v1/smart-money/netflow");
+    assert.deepEqual(candidate?.requestBody, { chains: ["bnb"], filters: {}, order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }] });
+  } finally {
+    resetX402CatalogStoreForTests();
+    if (previousDb === undefined) delete process.env.AGENTPAY_DB_PATH; else process.env.AGENTPAY_DB_PATH = previousDb;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("keeps a catalog match when the latest menu follow-up is short", async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "agentpay-x402-menu-context-"));
+  const previousDb = process.env.AGENTPAY_DB_PATH;
+  process.env.AGENTPAY_DB_PATH = path.join(directory, "db.sqlite");
+  resetX402CatalogStoreForTests();
+  try {
+    const result = await runX402Agent([
+      { id: "1", role: "user", content: "Use the Nansen Smart Money Netflow service on BNB Chain", createdAt: new Date().toISOString() },
+      { id: "2", role: "user", content: "Use this service to", createdAt: new Date().toISOString() },
+    ]);
+    assert.equal(result.action, "prepare");
+    assert.equal(result.candidate?.serviceName, "Nansen Smart Money Netflow");
+  } finally {
+    resetX402CatalogStoreForTests();
+    if (previousDb === undefined) delete process.env.AGENTPAY_DB_PATH; else process.env.AGENTPAY_DB_PATH = previousDb;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("searches independently, then asks DeepSeek to evaluate grounded x402 results", async () => {

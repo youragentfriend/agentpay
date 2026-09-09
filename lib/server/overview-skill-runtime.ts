@@ -4,6 +4,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { OverviewMessage, OverviewSkill } from "@/lib/server/overview-agent";
 import type { PreparedTransfer } from "@/lib/payment-workflow";
+import type { X402Intent } from "@/lib/x402-types";
+import type { BinancePayOrder, BinancePayReceiveLink } from "@/lib/binance-pay-types";
 
 export const SKILL_OPERATIONS = {
   "agentic-wallet-operations": ["wallet-overview", "wallet-transfer"],
@@ -41,13 +43,17 @@ export type OverviewConversation = {
   latestAction?: OverviewUiAction;
   pendingTransferId?: string;
   latestTransfer?: PreparedTransfer;
+  pendingX402SessionId?: string;
+  latestX402?: X402Intent;
+  pendingBinancePay?: boolean;
+  latestBinancePay?: BinancePayOrder | BinancePayReceiveLink;
   missingFields: string[];
   pending: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-type ConversationState = Pick<OverviewConversation, "collectedFields" | "latestWorkflow" | "latestOperation" | "latestAction" | "pendingTransferId" | "latestTransfer" | "missingFields" | "pending">;
+type ConversationState = Pick<OverviewConversation, "collectedFields" | "latestWorkflow" | "latestOperation" | "latestAction" | "pendingTransferId" | "latestTransfer" | "pendingX402SessionId" | "latestX402" | "pendingBinancePay" | "latestBinancePay" | "missingFields" | "pending">;
 type Row = { id: string; title: string | null; selected_skill: string | null; messages_json: string; state_json: string; created_at: string; updated_at: string };
 let database: DatabaseSync | undefined;
 let databaseFile = "";
@@ -90,6 +96,10 @@ function toConversation(row: Row): OverviewConversation {
     latestAction: state.latestAction,
     pendingTransferId: state.pendingTransferId,
     latestTransfer: state.latestTransfer,
+    pendingX402SessionId: state.pendingX402SessionId,
+    latestX402: state.latestX402,
+    pendingBinancePay: state.pendingBinancePay === true,
+    latestBinancePay: state.latestBinancePay,
     missingFields: state.missingFields ?? [],
     pending: state.pending === true,
     createdAt: row.created_at,
@@ -161,6 +171,10 @@ export function updateOverviewConversation(id: string, values: {
   latestAction?: OverviewUiAction | null;
   pendingTransferId?: string | null;
   latestTransfer?: PreparedTransfer | null;
+  pendingX402SessionId?: string | null;
+  latestX402?: X402Intent | null;
+  pendingBinancePay?: boolean;
+  latestBinancePay?: BinancePayOrder | BinancePayReceiveLink | null;
   missingFields?: string[];
   pending?: boolean;
 }): OverviewConversation {
@@ -177,6 +191,10 @@ export function updateOverviewConversation(id: string, values: {
     latestAction: values.latestAction === null ? undefined : values.latestAction ?? current.latestAction,
     pendingTransferId: values.pendingTransferId === null ? undefined : values.pendingTransferId ?? current.pendingTransferId,
     latestTransfer: values.latestTransfer === null ? undefined : values.latestTransfer ?? current.latestTransfer,
+    pendingX402SessionId: values.pendingX402SessionId === null ? undefined : values.pendingX402SessionId ?? current.pendingX402SessionId,
+    latestX402: values.latestX402 === null ? undefined : values.latestX402 ?? current.latestX402,
+    pendingBinancePay: values.pendingBinancePay ?? current.pendingBinancePay,
+    latestBinancePay: values.latestBinancePay === null ? undefined : values.latestBinancePay ?? current.latestBinancePay,
     missingFields: values.missingFields ?? current.missingFields,
     pending: values.pending ?? current.pending,
   };

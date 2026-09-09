@@ -43,12 +43,47 @@ export function binancePayErrorResponse(error: unknown): Response {
   return Response.json({ error: paymentError.message, code: paymentError.code }, { status });
 }
 
-function parseLastJson(stdout: string): Record<string, unknown> {
-  const lines = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+export function parseLastJson(stdout: string): Record<string, unknown> {
+  const cleaned = stdout.replace(/[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d/#&.:=?%@~_]+)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g, "");
+  const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
-    if (!lines[index].startsWith("{")) continue;
-    try { return JSON.parse(lines[index]) as Record<string, unknown>; } catch { continue; }
+    try {
+      const parsed = JSON.parse(lines[index]) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch { /* provider logs may surround the JSON result */ }
   }
+
+  // Some skill/provider versions emit pretty-printed JSON or prefix the JSON
+  // with a log label. Extract balanced objects without trusting log content.
+  let candidate: Record<string, unknown> | undefined;
+  for (let start = 0; start < cleaned.length; start += 1) {
+    if (cleaned[start] !== "{") continue;
+    let depth = 0;
+    let quoted = false;
+    let escaped = false;
+    for (let index = start; index < cleaned.length; index += 1) {
+      const character = cleaned[index];
+      if (quoted) {
+        if (escaped) escaped = false;
+        else if (character === "\\") escaped = true;
+        else if (character === '"') quoted = false;
+        continue;
+      }
+      if (character === '"') { quoted = true; continue; }
+      if (character === "{") depth += 1;
+      else if (character === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          try {
+            const parsed = JSON.parse(cleaned.slice(start, index + 1)) as unknown;
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) candidate = parsed as Record<string, unknown>;
+          } catch { /* this brace pair was not a JSON object */ }
+          break;
+        }
+      }
+    }
+  }
+  if (candidate) return candidate;
   throw new BinancePayError("Binance Payment skill returned no structured response.", "INVALID_PAYMENT_RESPONSE");
 }
 
@@ -58,18 +93,22 @@ async function pythonBinary(): Promise<string> {
 
 async function runUnlocked(args: string[], timeout = 45_000, structured = true): Promise<Record<string, unknown>> {
   try {
-    const { stdout } = await execFileAsync(await pythonBinary(), [SCRIPT, ...args], {
+    const { stdout, stderr } = await execFileAsync(await pythonBinary(), [SCRIPT, ...args], {
       cwd: SKILL_DIR,
       timeout,
       maxBuffer: MAX_OUTPUT,
       env: directChildEnvironment(),
       windowsHide: true,
     });
-    return structured ? parseLastJson(stdout) : {};
+    return structured ? parseLastJson([stdout, stderr].filter(Boolean).join("\n")) : {};
   } catch (error) {
     if (error instanceof BinancePayError) throw error;
     const commandError = error as { stdout?: string | Buffer };
-    const output = typeof commandError.stdout === "string" ? commandError.stdout : commandError.stdout?.toString("utf8");
+    const stdout = typeof commandError.stdout === "string" ? commandError.stdout : commandError.stdout?.toString("utf8");
+    const stderr = typeof (error as { stderr?: string | Buffer }).stderr === "string"
+      ? (error as { stderr?: string }).stderr
+      : (error as { stderr?: string | Buffer }).stderr?.toString("utf8");
+    const output = [stdout, stderr].filter(Boolean).join("\n");
     if (output) return parseLastJson(output);
     throw new BinancePayError("Binance Payment command failed.", "PAYMENT_COMMAND_FAILED");
   }
@@ -205,7 +244,11 @@ export async function confirmBinancePayment(): Promise<BinancePayOrder> {
   try { assertPaymentExecutionAllowed("binance-pay"); }
   catch (error) { if (error instanceof PaymentExecutionError) throw new BinancePayError(error.message, error.code); throw error; }
   return serialized(async () => {
-    const current = await enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "query"], 45_000)));
+    // Before confirmation the vendored skill has only a local checkout state;
+    // its provider `query` action correctly reports no active payment order.
+    // Read the local status instead, then let pay_confirm create the provider
+    // order exactly once after AgentPay's policy checks pass.
+    const current = await enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "status"], 45_000)));
     enforceBinancePaymentPolicy(current);
     return enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "pay_confirm"], 90_000)));
   });
@@ -213,6 +256,11 @@ export async function confirmBinancePayment(): Promise<BinancePayOrder> {
 
 export async function pollBinancePayment(): Promise<BinancePayOrder> {
   return serialized(async () => enrichAndPersistOrder(asPaymentOrder(await runUnlocked(["--action", "query"], 45_000))));
+}
+
+/** Clears the provider-side checkout state when a chat review is declined. */
+export async function resetBinancePayment(): Promise<void> {
+  await serialized(() => runUnlocked(["--action", "reset"], 45_000, false).then(() => undefined));
 }
 
 export async function createBinancePayReceiveLink(currency?: string, amount?: string, note?: string): Promise<BinancePayReceiveLink> {

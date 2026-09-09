@@ -3,8 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test, { afterEach, beforeEach } from "node:test";
-import { isWalletTransferConfirmation, runOverviewSkillRuntime, type AssistantWalletTransferRuntime } from "../lib/server/overview-agent";
+import { isBinancePayConfirmation, isWalletTransferConfirmation, runOverviewSkillRuntime, type AssistantActivityReportingRuntime, type AssistantBinancePayRuntime, type AssistantBinancePortfolioRuntime, type AssistantWalletOverviewRuntime, type AssistantWalletTransferRuntime, type AssistantX402Runtime } from "../lib/server/overview-agent";
+import type { BinancePayOrder } from "../lib/binance-pay-types";
+import type { BinancePortfolio } from "../lib/binance-portfolio-types";
 import type { PreparedTransfer } from "../lib/payment-workflow";
+import type { WalletOverview } from "../lib/wallet-types";
+import type { SpendingReport } from "../lib/report-types";
+import type { ActivityPage } from "../lib/server/activity-store";
+import type { X402ChatSession, X402Intent } from "../lib/x402-types";
 import {
   createOverviewConversation,
   getOverviewConversation,
@@ -65,6 +71,53 @@ function walletRuntime(overrides: Partial<AssistantWalletTransferRuntime> = {}):
   };
 }
 
+function x402Runtime(): AssistantX402Runtime {
+  return { run: async () => ({ session: { id: "x402-session", status: "awaiting_confirmation", messages: [{ id: "m1", role: "assistant", content: "I prepared an x402 review.", createdAt: new Date().toISOString() }], updatedAt: new Date().toISOString() } }) };
+}
+
+function x402Intent(status: X402Intent["status"]): X402Intent {
+  const option = { index: 0, status: "READY_TO_SIGN" as const, reasons: [], network: "eip155:8453", amount: "0.01", amountUsd: "0.01", tokenSymbol: "USDC", payTo: "0x1111111111111111111111111111111111111111" };
+  return { id: "x402-intent", resourceUrl: "https://service.example/data", resourceHost: "service.example", requestMethod: "GET", source: "agent", status, paymentId: "payment-1", options: [option], selectedIndex: 0, selectedOption: option, createdAt: "2026-09-08T10:00:00.000Z", updatedAt: "2026-09-08T10:00:00.000Z", ...(status === "completed" ? { responseStatus: 200, responseKind: "json" as const, responseBody: "{\"ok\":true}" } : {}) };
+}
+
+function binanceOrder(values: Partial<BinancePayOrder> = {}): BinancePayOrder {
+  return { status: "AWAITING_CONFIRMATION", checkout_id: "checkout-1", pay_order_id: "order-1", payee: "Demo merchant", amount: "0.01", currency: "USDT", payment_type: "C2C", ...values };
+}
+
+function binanceRuntime(overrides: Partial<AssistantBinancePayRuntime> = {}): AssistantBinancePayRuntime {
+  return { prepare: async () => binanceOrder(), amount: async () => binanceOrder(), confirm: async () => binanceOrder({ status: "SUCCESS", amount_sent: "0.01" }), poll: async () => binanceOrder({ status: "SUCCESS", amount_sent: "0.01" }), reset: async () => undefined, receive: async () => ({ success: true, shareLink: "https://app.binance.com/uni-qr/demo", currency: "USDT" }), ...overrides };
+}
+
+function portfolioRuntime(): AssistantBinancePortfolioRuntime {
+  return { load: async (): Promise<BinancePortfolio> => ({ configured: true, connection: "connected", readOnly: true, refreshedAt: "2026-09-08T10:00:00.000Z", estimatedTotalUsd: 5, pricedAssetCount: 1, unpricedAssetCount: 0, dustThresholdUsd: 0.1, balances: [{ id: "spot:USDT", source: "spot", sourceLabel: "Spot", asset: "USDT", available: "5", total: "5", usdValue: 5, priceUsd: 1, valuation: "stablecoin" }], sources: [{ source: "spot", label: "Spot", state: "available", itemCount: 1 }] }) };
+}
+
+function walletOverviewRuntime(): AssistantWalletOverviewRuntime {
+  const overview: WalletOverview = {
+    status: "CONNECTED",
+    addresses: [],
+    chains: [
+      { binanceChainId: "56", name: "BNB Smart Chain", simpleName: "BNB" },
+      { binanceChainId: "8453", name: "Base", simpleName: "Base" },
+    ],
+    balances: [
+      { symbol: "USDT", address: "0xtoken", binanceChainId: "56", balance: "5.25", price: "1", value: "5.25" },
+      { symbol: "USDT", address: "0xtoken2", binanceChainId: "8453", balance: "2", price: "1", value: "2" },
+    ],
+    transactions: [],
+  };
+  return { load: async () => overview };
+}
+
+function activityReportingRuntime(): AssistantActivityReportingRuntime {
+  const page: ActivityPage = {
+    events: [{ id: "activity-1", source: "agentic-wallet", activityType: "transfer", status: "FAILED", statusGroup: "failed", statusCategory: "red", amount: "0.01", asset: "USDT", amountUsd: "0.01", direction: "outgoing", spendState: "none", title: "Agentic Wallet transfer", summary: "Transfer failed", occurredAt: "2026-09-08T10:00:00.000Z", createdAt: "2026-09-08T10:00:00.000Z", updatedAt: "2026-09-08T10:00:00.000Z" }],
+    pagination: { page: 1, limit: 8, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false },
+  };
+  const report = { generatedAt: "2026-09-08T10:00:00.000Z", timezone: "UTC", range: { preset: "month", from: "2026-09-01", to: "2026-09-08", label: "September 2026" }, filters: { sources: ["agentic-wallet", "binance-pay", "x402"], includePending: false }, summary: { settledTotalUsd: "0.50", pendingTotalUsd: "0.00", transactionCount: 2, pendingCount: 0, averageUsd: "0.25", largestUsd: "0.30", unvaluedCount: 0 }, bySource: [{ key: "agentic-wallet", label: "Agentic Wallet", totalUsd: "0.50", count: 2, percentage: 100 }], byAsset: [], trend: [], calendar: { month: "2026-09", label: "September 2026", days: [] }, transactions: [] } as unknown as SpendingReport;
+  return { activity: () => page, report: () => report };
+}
+
 const cases = [
   { skill: "agentic-wallet-operations", request: "Send 2 USDT on BSC to 0x1111111111111111111111111111111111111111", operation: "wallet-transfer", action: undefined, path: undefined, parameters: { asset: "USDT", amount: "2", network: "BSC", recipient: "0x1111111111111111111111111111111111111111", gasPriority: "MEDIUM" } },
   { skill: "binance-pay-orchestration", request: "Create a Binance Pay receive link for 8 USDT", operation: "binance-pay-receive", action: "payment-link", path: "/api/binance-pay/receive", parameters: { currency: "USDT", amount: "8" } },
@@ -82,25 +135,41 @@ for (const item of cases) {
     ], prompts);
     const result = item.skill === "agentic-wallet-operations"
       ? await runOverviewSkillRuntime(item.request, undefined, process.cwd(), walletRuntime())
-      : await runOverviewSkillRuntime(item.request);
+      : item.skill === "x402-payment-orchestration"
+        ? await runOverviewSkillRuntime(item.request, undefined, process.cwd(), undefined, x402Runtime())
+        : item.skill === "binance-pay-orchestration"
+          ? await runOverviewSkillRuntime(item.request, undefined, process.cwd(), undefined, undefined, binanceRuntime())
+          : item.skill === "binance-portfolio"
+            ? await runOverviewSkillRuntime(item.request, undefined, process.cwd(), undefined, undefined, undefined, portfolioRuntime())
+          : await runOverviewSkillRuntime(item.request);
     assert.equal(result.skill, item.skill);
-    assert.equal(result.action, item.action);
-    assert.equal(result.workflow?.path, item.path);
+    if (item.skill !== "binance-portfolio" && item.skill !== "activity-reporting") assert.equal(result.action, item.action);
     if (item.skill === "agentic-wallet-operations") {
       assert.equal(result.workflow, undefined);
       assert.equal(result.transferPhase, "awaiting-confirmation");
       assert.equal(result.transfer?.chainName, "BNB Smart Chain");
       assert.match(result.message, /reply yes, confirm, or approve/i);
-    } else {
-      assert.equal(result.workflow?.type, "deterministic-workflow");
-      assert.deepEqual(result.workflow?.input, item.parameters);
+    } else if (item.skill === "x402-payment-orchestration") {
+      assert.equal(result.workflow, undefined);
+      assert.equal(result.x402Phase, "awaiting-confirmation");
+      assert.match(result.message, /x402 review/i);
+    } else if (item.skill === "binance-pay-orchestration") {
+      assert.equal(result.workflow, undefined);
+      assert.equal((result.binancePay as { shareLink?: string } | undefined)?.shareLink, "https://app.binance.com/uni-qr/demo");
+    } else if (item.skill === "binance-portfolio") {
+      assert.equal(result.workflow, undefined);
+      assert.equal(result.action, undefined);
+      assert.match(result.message, /USDT/);
+    } else if (item.skill === "activity-reporting") {
+      assert.equal(result.workflow, undefined);
+      assert.equal(result.action, undefined);
+      assert.match(result.message, /no matching payment activity/i);
     }
     assert.match(prompts[1], /--- COMPLETE SKILL\.md ---/);
     assert.match(prompts[1], new RegExp(`name: ["']?${item.skill}`));
     assert.equal(process.env.AGENTPAY_ENABLE_WALLET_SEND, "false");
     assert.equal(process.env.AGENTPAY_ENABLE_BINANCE_PAY, "false");
     assert.equal(process.env.AGENTPAY_ENABLE_X402, "false");
-    assert.ok(!["/api/payments/approve", "/api/payments/execute", "/api/binance-pay/confirm", "/api/x402/execute"].includes(result.workflow?.path || ""));
   });
 }
 
@@ -120,6 +189,46 @@ test("keeps the selected skill across a follow-up and collects missing transfer 
   assert.equal(second.action, undefined);
   assert.equal(second.transferPhase, "awaiting-confirmation");
   assert.equal(getOverviewConversation(first.conversationId).selectedSkill, "agentic-wallet-operations");
+});
+
+test("continues an x402 review from chat confirmation and clears the pending session after delivery", async () => {
+  const calls: Array<{ sessionId?: string; message?: string; action?: "cancel" }> = [];
+  const session = (status: X402ChatSession["status"]): X402ChatSession => ({ id: "x402-session", status, messages: [{ id: "m1", role: "assistant", content: status === "completed" ? "Payment completed." : "Confirm this x402 purchase.", createdAt: new Date().toISOString() }], updatedAt: new Date().toISOString() });
+  const runtime: AssistantX402Runtime = { run: async (input) => { calls.push(input); return input.sessionId ? { session: session("completed"), intent: x402Intent("completed") } : { session: session("awaiting_confirmation"), intent: x402Intent("reviewed") }; } };
+  mockDeepSeek([
+    { skill: "x402-payment-orchestration", switchSkill: false },
+    { operation: "x402-service", message: "I found a service.", parameters: { request: "Bitcoin price" }, missingFields: [] },
+  ]);
+  const first = await runOverviewSkillRuntime("Find a Bitcoin price service", undefined, process.cwd(), undefined, runtime);
+  assert.equal(first.x402Phase, "awaiting-confirmation");
+  assert.equal(getOverviewConversation(first.conversationId).pendingX402SessionId, "x402-session");
+  const second = await runOverviewSkillRuntime("Confirm", first.conversationId, process.cwd(), undefined, runtime);
+  assert.equal(second.x402Phase, "completed");
+  assert.equal(second.x402?.status, "completed");
+  assert.equal(getOverviewConversation(first.conversationId).pendingX402SessionId, undefined);
+  assert.deepEqual(calls, [{ message: "Find a Bitcoin price service" }, { sessionId: "x402-session", message: "Confirm" }]);
+});
+
+test("prepares and automatically confirms a Binance Pay link from chat", async () => {
+  const calls: string[] = [];
+  const runtime = binanceRuntime({
+    prepare: async () => { calls.push("prepare"); return binanceOrder(); },
+    confirm: async () => { calls.push("confirm"); return binanceOrder({ status: "SUCCESS", amount_sent: "0.01" }); },
+  });
+  const review = await runOverviewSkillRuntime("Pay this Binance Pay request: https://app.binance.com/qr/demo", undefined, process.cwd(), undefined, undefined, runtime);
+  assert.equal(review.binancePayPhase, "review");
+  assert.match(review.message, /reply confirm/i);
+  assert.equal(getOverviewConversation(review.conversationId).pendingBinancePay, true);
+  const success = await runOverviewSkillRuntime("Confirm", review.conversationId, process.cwd(), undefined, undefined, runtime);
+  assert.equal(success.binancePayPhase, "success");
+  assert.match(success.message, /payment successful/i);
+  assert.equal(getOverviewConversation(review.conversationId).pendingBinancePay, false);
+  assert.deepEqual(calls, ["prepare", "confirm"]);
+});
+
+test("accepts only clear Binance Pay confirmations", () => {
+  for (const value of ["yes", "confirm", "approved", "go ahead", "yes, pay it"]) assert.equal(isBinancePayConfirmation(value), true);
+  for (const value of ["can you confirm?", "yes but change the amount", "not yet", "no", "cancel"]) assert.equal(isBinancePayConfirmation(value), false);
 });
 
 test("prepares from collected chat fields and automatically broadcasts after explicit confirmation", async () => {
@@ -150,6 +259,36 @@ test("prepares from collected chat fields and automatically broadcasts after exp
   assert.equal(getOverviewConversation(first.conversationId).pendingTransferId, undefined);
 });
 
+test("returns a natural-language Agentic Wallet balance without rendering a workflow", async () => {
+  mockDeepSeek([
+    { skill: "agentic-wallet-operations", switchSkill: false },
+    { operation: "wallet-overview", message: "Reading the wallet.", parameters: { asset: "USDT", network: "BNB" }, missingFields: [] },
+  ]);
+  const result = await runOverviewSkillRuntime("What is my Agentic Wallet USDT balance on BNB Chain?", undefined, process.cwd(), undefined, undefined, undefined, undefined, walletOverviewRuntime());
+  assert.equal(result.action, undefined);
+  assert.equal(result.workflow, undefined);
+  assert.match(result.message, /5\.25 USDT on BNB/i);
+  assert.match(result.message, /read-only/i);
+});
+
+test("summarizes Activity and Reports in natural language without rendering layouts", async () => {
+  mockDeepSeek([
+    { skill: "activity-reporting", switchSkill: false },
+    { operation: "activity-report", message: "Reading activity.", parameters: { statusGroup: "failed", asset: "USDT" }, missingFields: [] },
+    { skill: "activity-reporting", switchSkill: false },
+    { operation: "activity-report", message: "Building a report.", parameters: {}, missingFields: [] },
+  ]);
+  const runtime = activityReportingRuntime();
+  const activity = await runOverviewSkillRuntime("Show my failed USDT activity this month", undefined, process.cwd(), undefined, undefined, undefined, undefined, undefined, runtime);
+  assert.equal(activity.action, undefined);
+  assert.match(activity.message, /1 matching payment record/i);
+  assert.match(activity.message, /failed/i);
+  const report = await runOverviewSkillRuntime("How much did I spend this month?", undefined, process.cwd(), undefined, undefined, undefined, undefined, undefined, runtime);
+  assert.equal(report.action, undefined);
+  assert.match(report.message, /\$0\.50 in settled spending/i);
+  assert.match(report.message, /Agentic Wallet: \$0\.50/i);
+});
+
 test("accepts only clear transfer confirmations", () => {
   for (const value of ["yes", "confirm", "approved", "go ahead", "yes, send it"]) assert.equal(isWalletTransferConfirmation(value), true);
   for (const value of ["can you confirm?", "yes but change the amount", "not yet", "no", "cancel"]) assert.equal(isWalletTransferConfirmation(value), false);
@@ -178,7 +317,7 @@ test("switches skills only on an explicit domain-change decision", async () => {
   const first = await runOverviewSkillRuntime("Show my Binance Spot balance");
   const second = await runOverviewSkillRuntime("Instead show my payment history", first.conversationId);
   assert.equal(second.skill, "activity-reporting");
-  assert.equal(second.action, "activity");
+  assert.equal(second.action, undefined);
 });
 
 test("clarifies ambiguous USDT balance source before selecting a skill", async () => {

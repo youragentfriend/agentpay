@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addBinancePayInputHint, BinancePayError, getBinancePayReceiveCurrencies, getCompatibleBinancePayLink, validateBinancePayInput } from "../lib/server/binance-pay";
+import { addBinancePayInputHint, BinancePayError, getBinancePayReceiveCurrencies, getCompatibleBinancePayLink, parseLastJson, validateBinancePayInput } from "../lib/server/binance-pay";
 
 test("exposes server-controlled receive currency choices", () => {
   const result = getBinancePayReceiveCurrencies();
@@ -52,4 +52,9 @@ test("extracts only direct compatible Binance payment links", () => {
   assert.equal(getCompatibleBinancePayLink("https://app.binance.com/qr/directToken"), "https://app.binance.com/qr/directToken");
   assert.equal(getCompatibleBinancePayLink("https://app.binance.com/uni-qr/request-to-pay?billOrderId=x"), undefined);
   assert.equal(getCompatibleBinancePayLink("000201br.gov.bcb.pix"), undefined);
+});
+
+test("parses Binance Payment JSON after logs, prefixes, ANSI output, or pretty printing", () => {
+  assert.deepEqual(parseLastJson("Starting payment\nresult: {\"status\":\"AWAITING_CONFIRMATION\"}"), { status: "AWAITING_CONFIRMATION" });
+  assert.deepEqual(parseLastJson("\\u001b[32mDone\\u001b[0m\n{\n  \"status\": \"SUCCESS\",\n  \"amount\": \"0.01\"\n}"), { status: "SUCCESS", amount: "0.01" });
 });

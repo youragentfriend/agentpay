@@ -8,6 +8,7 @@ export interface X402CatalogServiceInput {
   category: string;
   endpoint: string;
   method: X402RequestMethod;
+  requestBody?: Record<string, unknown>;
   networks: string[];
   sourceUrls: string[];
   origin: "curated" | "ai-discovered";

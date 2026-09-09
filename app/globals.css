@@ -140,6 +140,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .assistant-transfer-card dt { color: var(--muted); }
 .assistant-transfer-card dd { min-width: 0; margin: 0; overflow-wrap: anywhere; text-align: right; }
 .assistant-transfer-card p { margin: 0; padding: 12px 15px; background: #fff9dc; color: #765a00; font-size: 13px; line-height: 1.5; }
+.assistant-x402-card { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.assistant-x402-card.review { border-color: #e0c75a; }
+.assistant-x402-card.submitted { border-color: rgba(36,116,90,.35); }
+.assistant-x402-card.cancelled { border-color: rgba(160,70,55,.25); opacity: .86; }
+.assistant-x402-card dl { margin: 0; }
+.assistant-x402-card dl > div { display: grid; grid-template-columns: 125px minmax(0,1fr); gap: 12px; padding: 10px 15px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.assistant-x402-card dt { color: var(--muted); }
+.assistant-x402-card dd { min-width: 0; margin: 0; overflow-wrap: anywhere; text-align: right; }
+.assistant-x402-card p { margin: 0; padding: 12px 15px; background: #fff9dc; color: #765a00; font-size: 13px; line-height: 1.5; }
+.assistant-x402-result { max-height: 240px; margin: 0; padding: 12px 15px; overflow: auto; background: #f7f6f0; color: var(--ink); font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .composer-wrap { padding: 0 24px 30px; }
 .composer { padding: 14px 15px 11px; border: 1px solid #cdcec6; border-radius: 13px; background: #fff; box-shadow: 0 6px 20px rgba(25, 25, 20, .04); }
 .composer:focus-within { border-color: #a9a99f; box-shadow: 0 0 0 3px rgba(243, 211, 50, .16); }
@@ -362,7 +372,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .approved-note { margin: 16px 18px; padding: 12px; border: 1px solid rgba(36, 116, 90, .3); border-radius: 8px; background: #eaf5f0; color: var(--green); font-size: 15px; }
 .binance-pay-inputs { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 12px; }
 .binance-pay-inputs .full { grid-column: 1 / -1; }
-.binance-pay-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.binance-pay-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 18px; }
 .binance-pay-option { display: flex; min-width: 0; flex-direction: column; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
 .pay-option { order: 1; }
 .receive-option { order: 2; }

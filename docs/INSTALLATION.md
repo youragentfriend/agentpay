@@ -1,6 +1,24 @@
-# AgentPay installation
+# AgentPay installation and replication
 
-This guide starts AgentPay locally with safe defaults. It is written for a clean checkout and does not require real provider credentials for the initial install, typecheck, tests, or production build.
+This guide has two stages:
+
+1. **Verified core installation:** install AgentPay, run its validation checks, and start the application without provider credentials.
+2. **Full workflow setup:** connect the providers and configure only the payment rails you want to use.
+
+The core installation is complete and functional without real funds. Provider credentials are only required for live wallet, Binance Pay, Binance portfolio, Assistant, or x402 data and payment workflows.
+
+## What each setup provides
+
+| Setup | What works after setup |
+| --- | --- |
+| Core installation | Application UI, bundled skills, validation, tests, production build, read-only pages, and local development server. |
+| Agentic Wallet | Wallet connection, chains, addresses, balances, receiving, transfers, and transaction tracking. Outgoing execution remains disabled until explicitly enabled. |
+| DeepSeek | AgentPay Assistant skill selection and conversational routing. |
+| Binance read-only account | Live Spot, Funding, Futures, Earn, and Margin portfolio data. |
+| Binance Pay | Payment-link inspection, receive links, and—after payment credentials and controls are configured—payments. QR image inspection also requires the documented decoder setup. |
+| x402 | Service discovery and inspection; payment requires an allowed host, trusted exact endpoint, connected wallet, supported balance, and enabled execution controls. |
+
+Completing only the core installation is a valid working installation. Completing the provider steps is required only for the corresponding live workflows.
 
 ## 1. Requirements
 
@@ -64,6 +82,8 @@ Expected result:
 - tests pass using isolated temporary databases;
 - the Next.js production build completes.
 
+At this point, the core AgentPay installation is verified. Continue with the provider steps below to reproduce live integrations.
+
 ## 4. Start AgentPay
 
 For local development:
@@ -94,11 +114,11 @@ The project installs the official `@binance/agentic-wallet` package with `npm ci
 5. Verify the pairing code in the Binance Wallet app.
 6. Select **I approved it** in AgentPay.
 
-The wallet page should then show connection status, chains, addresses, balances, and recent transactions.
+The wallet page should then show connection status, chains, addresses, balances, and recent transactions. Receiving and read-only wallet inspection are available after connection. Outgoing transfers remain blocked until the server capability and Settings controls are deliberately enabled in Step 10.
 
-## 6. Optional DeepSeek Assistant setup
+## 6. Configure the AgentPay Assistant
 
-The Assistant requires a server-side DeepSeek key for model routing. Store it through the hidden-input helper:
+The Assistant requires a server-side DeepSeek key for model routing. This step requires Python 3 because the setup helper is written in Python. Store the key through the hidden-input helper:
 
 ```bash
 npm run setup:deepseek
@@ -108,9 +128,9 @@ The helper writes `.env.local` with owner-only permissions and never prints the 
 
 The key is never sent to the browser or stored in SQLite.
 
-## 7. Optional Binance read-only portfolio setup
+## 7. Configure the Binance read-only portfolio
 
-Create a Binance API key restricted to read-only access. Do not enable trading or withdrawals. Then run:
+This step is required only if live Binance exchange balances are needed. Create a Binance API key restricted to read-only access. Do not enable trading or withdrawals. Then run:
 
 ```bash
 npm run setup:binance-account
@@ -124,9 +144,9 @@ The helper prompts without echoing credentials and stores them outside the repos
 
 The file is created with owner-only permissions. Restart AgentPay, open **Binance**, and refresh the portfolio.
 
-## 8. Optional Binance Pay setup
+## 8. Configure Binance Pay
 
-Binance Pay QR image decoding needs Python virtual-environment support and the system QR library. On Ubuntu or Debian:
+This step is required only if Binance Pay workflows are needed. Binance Pay QR image decoding needs Python virtual-environment support and the system QR library. On Ubuntu or Debian:
 
 ```bash
 sudo apt-get update
@@ -142,9 +162,9 @@ The script creates the virtual environment outside the repository at:
 
 Payment links and receive-link workflows remain separate from image decoding. Configure Binance Pay credentials only through a protected server environment or the ignored provider configuration. Never commit them.
 
-## 9. Optional x402 setup
+## 9. Configure x402 Services
 
-x402 requires all of the following before a payment can execute:
+x402 discovery and inspection can work without payment execution. An x402 payment requires all of the following:
 
 1. A public HTTPS host in `AGENTPAY_X402_ALLOWED_HOSTS`, comma-separated.
 2. The exact `METHOD https://host/path` endpoint trusted in **Settings → Rules & approvals**.
@@ -154,7 +174,7 @@ x402 requires all of the following before a payment can execute:
 
 Catalog browsing and deterministic inspection can remain available while execution is disabled.
 
-## 10. Enabling real payment execution
+## 10. Enable real payment execution only for controlled tests
 
 Keep the defaults off during ordinary development. For a controlled, low-value test only, configure the required server flags in the deployment environment:
 
@@ -165,6 +185,24 @@ AGENTPAY_ENABLE_X402=true
 ```
 
 Restart the server, then enable the matching master and rail controls in **Settings → Rules & approvals**. Server availability does not automatically authorize spending. AgentPay still requires exact review, approval, trust checks, spending limits, signing, and confirmation.
+
+## 11. Full replication checklist
+
+Use this checklist when reproducing the complete project:
+
+1. `npm run skills:validate` succeeds.
+2. `npm run lint` succeeds.
+3. `npm run test` reports all tests passing.
+4. `npm run build` completes successfully.
+5. AgentPay starts and opens at `http://localhost:3000`.
+6. **Agentic Wallet** shows a connected status after pairing.
+7. **AgentPay Assistant** responds after DeepSeek setup.
+8. **Binance** shows portfolio data after read-only account setup.
+9. **Binance Pay** can inspect links or generate receive links after its provider setup.
+10. **x402 Services** can inspect an allowed endpoint after host and endpoint trust setup.
+11. Real payment execution is enabled only for a deliberate, low-value test after reviewing all controls.
+
+If a provider is not configured, AgentPay should show a setup or unavailable state for that provider. This is expected and does not mean the core installation failed.
 
 ## Troubleshooting
 

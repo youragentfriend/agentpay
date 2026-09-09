@@ -23,6 +23,10 @@ test("seeds a useful catalog containing only supported x402 networks", () => wit
   assert.ok(services.length >= 6);
   assert.ok(services.some(item => item.category === "Market data"));
   assert.ok(services.some(item => item.networks.some(network => network.startsWith("solana:"))));
+  const nansen = services.find(item => item.title === "Nansen Smart Money Netflow");
+  assert.equal(nansen?.method, "POST");
+  assert.deepEqual(nansen?.requestBody, { chains: ["bnb"], filters: {}, order_by: [{ field: "net_flow_24h_usd", direction: "DESC" }] });
+  assert.ok(nansen?.networks.includes("eip155:56"));
   assert.ok(services.every(item => item.endpoint.startsWith("https://") && item.networks.every(network => network === "eip155:56" || network === "eip155:8453" || network.startsWith("solana:"))));
 }));
 
