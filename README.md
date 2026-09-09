@@ -143,6 +143,19 @@ Input validation
 
 Fresh installations are fail-closed. Server capability flags and the Settings payment controls are off by default. Enabling a capability does not authorize a payment: approval, signing, trust, spending-limit, confirmation, and execution checks still apply.
 
+### Security and payment controls
+
+- **Trusted wallet destinations:** when the wallet destination list is configured, transfers are allowed only to approved addresses.
+- **Exact x402 endpoint trust:** x402 payments require the exact HTTP method and HTTPS endpoint to be trusted; a trusted host or different path is not enough.
+- **Per-payment limits:** each rail can have its own maximum USD value for one payment.
+- **Daily limits:** each rail can also have its own daily USD spending limit, calculated from persisted payment activity.
+- **Mandatory approval:** every outgoing payment must pass an exact review and explicit approval before signing or execution.
+- **Emergency stop:** the master payment switch stops all outgoing payments immediately while keeping read-only, receiving, inspection, Activity, and Reports features available.
+- **Independent rail switches:** Agentic Wallet, Binance Pay, and x402 can be enabled or disabled separately.
+- **Server-side enforcement:** browser settings and Assistant messages cannot bypass server capability flags, trust checks, balances, limits, approvals, signing, or execution controls.
+- **Secret isolation:** provider credentials, wallet sessions, private keys, and payment signatures stay on the server and are never placed in browser code or SQLite activity records.
+- **Audit trail:** payment outcomes and statuses are persisted in Activity and used by Reports; preparation states are not treated as completed payments.
+
 The current deployment is a single-user local integration without an application authentication layer. Do not expose it directly to the public Internet. Use a protected server or container with persistent state for the Agentic Wallet session.
 
 ## Quick start
