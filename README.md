@@ -20,6 +20,10 @@ This is the bridge between AI that can recommend an action and AI that can respo
 
 AgentPay is built for the **Binance Agent OS Payment Workflows** track and uses selected capabilities from the [Binance Skills Hub](https://github.com/binance/binance-skills-hub).
 
+## Demo
+
+Watch the AgentPay demo on [YouTube](https://www.youtube.com/watch?v=9M1q2WujYP8).
+
 ## What it includes
 
 ### Agentic Wallet
