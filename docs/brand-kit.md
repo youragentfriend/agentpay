@@ -1,25 +1,5 @@
 # AgentPay Brand Kit
 
-**Status:** Applied in Concept 07 production; pending Mark's final visual approval
-**Prepared:** 2026-09-04; production direction updated 2026-09-05
-**Visual reference:** Approved AgentPay Concept 07
-
-## Evidence and limitations
-
-The primary reference is the live Binance Web3 experience: <https://web3.binance.com/en/>. From this AWS host, both `web3.binance.com` and `www.binance.com` returned HTTP 202 with an empty response body, preventing honest extraction of computed CSS, exact breakpoints, or bundled font declarations. This document therefore separates:
-
-- **Observed ecosystem tokens:** values consistently published or used across Binance/BNB design-system references.
-- **AgentPay adopted tokens:** our stable, accessible implementation choices inspired by that system.
-- **Recommendations:** values inferred for a coherent product system; these are not claimed as proprietary Binance source values.
-
-References:
-
-- Binance Web3: <https://web3.binance.com/en/>
-- Binance Design System documentation mirror: <https://hexdocs.pm/binance_design_system/>
-- BNB Chain Design System documentation: <https://design-system-docs.bnbchain.org/>
-- Inter font project and OFL license: <https://github.com/rsms/inter>
-- Google Fonts Inter specimen: <https://fonts.google.com/specimen/Inter>
-
 ## Brand principles
 
 1. **Financial clarity:** amount, asset, network, recipient, approval state, and finality must be visually dominant.
